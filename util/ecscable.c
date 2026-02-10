@@ -1,22 +1,6 @@
 /* ======================================================================== */
 /*  ECScable Interface and Protocol Routines.                               */
 /*  By Joe Zbiciak                                                          */
-/* ------------------------------------------------------------------------ */
-/*  This program is free software; you can redistribute it and/or modify    */
-/*  it under the terms of the GNU General Public License as published by    */
-/*  the Free Software Foundation; either version 2 of the License, or       */
-/*  (at your option) any later version.                                     */
-/*                                                                          */
-/*  This program is distributed in the hope that it will be useful,         */
-/*  but WITHOUT ANY WARRANTY; without even the implied warranty of          */
-/*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
-/*  General Public License for more details.                                */
-/*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
-/* ------------------------------------------------------------------------ */
-/*                 Copyright (c) 2001-+Inf, Joseph Zbiciak                  */
 /* ======================================================================== */
 
 #include <stdio.h>
@@ -27,7 +11,7 @@
 #include "../config.h"
 #include "util/ecscable.h"
 
-#if (!defined(linux) && !defined(WIN32)) || !defined(i386)
+#if (!defined(PLAT_LINUX) && !defined(WIN32)) || !defined(i386)
 
 void ec_sleep(long len)
 {
@@ -48,28 +32,30 @@ void ec_init_ports(unsigned long base)
 int ec_upload
 (
     ecscable_t *ec,        /* ECScable structure                            */
-    uint_16    addr,       /* Address to upload to.                         */
-    uint_16    len,        /* Total length of upload.                       */
-    uint_16    *data,      /* Data to upload.                               */
-    int        width,      /* Width of data to upload.                      */
-    int        icart       /* If non-zero, address is in Intellicart space. */
+    uint16_t    addr,      /* Address to upload to.                         */
+    uint16_t    len,       /* Total length of upload.                       */
+    uint16_t   *data,      /* Data to upload.                               */
+    int         width,     /* Width of data to upload.                      */
+    int         icart      /* If non-zero, address is in Intellicart space. */
 )
 {
-    UNUSED(ec); UNUSED(addr); UNUSED(len); UNUSED(data); UNUSED(width); UNUSED(icart);
+    UNUSED(ec); UNUSED(addr); UNUSED(len);
+    UNUSED(data); UNUSED(width); UNUSED(icart);
     return -1;
 }
 
 int ec_download
 (
     ecscable_t *ec,        /* ECScable structure                            */
-    uint_16    addr,       /* Address to upload to.                         */
-    uint_16    len,        /* Total length of download.                     */
-    uint_16    *data,      /* Data to download.                             */
-    int        width,      /* Width of data to download.                    */
-    int        icart       /* If non-zero, address is in Intellicart space. */
+    uint16_t    addr,      /* Address to upload to.                         */
+    uint16_t    len,       /* Total length of download.                     */
+    uint16_t   *data,      /* Data to download.                             */
+    int         width,     /* Width of data to download.                    */
+    int         icart      /* If non-zero, address is in Intellicart space. */
 )
 {
-    UNUSED(ec); UNUSED(addr); UNUSED(len); UNUSED(data); UNUSED(width); UNUSED(icart);
+    UNUSED(ec); UNUSED(addr); UNUSED(len);
+    UNUSED(data); UNUSED(width); UNUSED(icart);
     return -1;
 }
 
@@ -125,9 +111,9 @@ static char buf[100];
 //#define EC_SEND(e,x) (gets(buf),printf("send(%.8x)\n", (x)), (ec_outb((e)->port, (x))))
 #define EC_SEND(e,x) (printf("send(%.8x)\n", (x)), (ec_outb((e)->port, (x))))
 #define EC_RECV_(e)   ((ec_inb((e)->port + 1) ^ 0x80) >> 3)
-static inline uint_32 EC_RECV(ecscable_t *e)
+static inline uint32_t EC_RECV(ecscable_t *e)
 {
-    uint_32 val = ((ec_inb((e)->port + 1) ^ 0x80) >> 3);
+    uint32_t val = ((ec_inb((e)->port + 1) ^ 0x80) >> 3);
     printf("recv(%.8x)\n", val);
     return val;
 }
@@ -206,7 +192,7 @@ static inline uint_32 EC_RECV(ecscable_t *e)
 /*  question.  There is no good answer.  Currently, the Inty side has no    */
 /*  timeouts, and the PC side implements a fairly long timeout.             */
 /*                                                                          */
-/*  COMMAND SEQUENCE                                                        */ 
+/*  COMMAND SEQUENCE                                                        */
 /*                                                                          */
 /*  The PC alerts the ECS that it wants to issue a command by sending       */
 /*  0x00 on its line, thereby coming out of idle and alerting the ECS       */
@@ -465,17 +451,17 @@ static inline uint_32 EC_RECV(ecscable_t *e)
 int ec_upload
 (
     ecscable_t *ec,        /* ECScable structure                            */
-    uint_16    addr,       /* Address to upload to.                         */
-    uint_16    len,        /* Total length of upload.                       */
-    uint_16    *data,      /* Data to upload.                               */
-    int        width,      /* Width of data to upload.                      */
-    int        icart       /* If non-zero, address is in Intellicart space. */
+    uint16_t    addr,      /* Address to upload to.                         */
+    uint16_t    len,       /* Total length of upload.                       */
+    uint16_t   *data,      /* Data to upload.                               */
+    int         width,     /* Width of data to upload.                      */
+    int         icart      /* If non-zero, address is in Intellicart space. */
 )
 {
     int i, a, l, a_hi;
     int cmd;
-    int (*fxn)(ecscable_t*, uint_16*, int);
-    int (*snd_fxn[16])(ecscable_t*, uint_16*, int) =
+    int (*fxn)(ecscable_t*, uint16_t*, int);
+    int (*snd_fxn[16])(ecscable_t*, uint16_t*, int) =
     {
         ec_send_bytes,  ec_send_bytes,  ec_send_bytes,  ec_send_bytes,
         ec_send_bytes,  ec_send_bytes,  ec_send_bytes,  ec_send_bytes,
@@ -484,8 +470,8 @@ int ec_upload
     };
     int snd_cmd[16] =
     {
-        0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 
-        0x12, 0x12, 0x14, 0x14, 0x14, 0x14, 0x14, 0x14, 
+        0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10,
+        0x12, 0x12, 0x14, 0x14, 0x14, 0x14, 0x14, 0x14,
     };
 
     a_hi = addr + len;
@@ -493,8 +479,8 @@ int ec_upload
     {
         l = a + 32 >= a_hi ? a_hi - a : 32;
 
-        if (width > 0 && width <= 16) 
-        { 
+        if (width > 0 && width <= 16)
+        {
             cmd = snd_cmd[width - 1];
             fxn = snd_fxn[width - 1];
         } else
@@ -504,9 +490,9 @@ int ec_upload
                 m |= data[i + j];
 
             for (j = 0; j < 15; j++)
-                if ((2 << j) > m) 
+                if ((2 << j) > m)
                     break;
-            
+
             cmd = snd_cmd[j];
             fxn = snd_fxn[j];
         }
@@ -528,20 +514,20 @@ int ec_upload
 int ec_download
 (
     ecscable_t *ec,        /* ECScable structure                            */
-    uint_16    addr,       /* Address to upload to.                         */
-    uint_16    len,        /* Total length of download.                     */
-    uint_16    *data,      /* Data to download.                             */
-    int        width,      /* Width of data to download.                    */
-    int        icart       /* If non-zero, address is in Intellicart space. */
+    uint16_t    addr,      /* Address to upload to.                         */
+    uint16_t    len,       /* Total length of download.                     */
+    uint16_t   *data,      /* Data to download.                             */
+    int         width,     /* Width of data to download.                    */
+    int         icart      /* If non-zero, address is in Intellicart space. */
 )
 {
     int i, a, l, a_hi;
     int cmd = 0x1C;
-    int (*ec_recv_width)(ecscable_t*, uint_16*, int) = ec_recv_words;
+    int (*ec_recv_width)(ecscable_t*, uint16_t*, int) = ec_recv_words;
 
     if (width <= 10) { cmd = 0x1A; ec_recv_width = ec_recv_decles; }
     if (width <=  8) { cmd = 0x18; ec_recv_width = ec_recv_bytes;  }
-    if (icart)       cmd += 0x10;
+    if (icart)       { cmd += 0x10;                                }
 
     a_hi = addr + len;
     for (a = addr, i = 0; a < a_hi; a += l, i += l)
@@ -785,7 +771,7 @@ int ec_send_cmdhdr(ecscable_t *ec, int addr, int len)
 /*                                                                          */
 /*  This transfer is followed by the "standard 1010 handshake".             */
 /* ------------------------------------------------------------------------ */
-int ec_send_bytes(ecscable_t *ec, uint_16 *data, int len)
+int ec_send_bytes(ecscable_t *ec, uint16_t *data, int len)
 {
     int i = 0, lsb = 0;
 
@@ -793,7 +779,7 @@ int ec_send_bytes(ecscable_t *ec, uint_16 *data, int len)
     {
         lsb |= (*data & 1) << ++i;
         if (ec_xfer_data(ec, *data++ & 0xFE) < 0) { ec_idle(ec); return -1; }
-        if (i == 7) 
+        if (i == 7)
         {
             if (ec_xfer_data(ec, lsb & 0xFE) < 0) { ec_idle(ec); return -1; }
             lsb = i = 0;
@@ -836,7 +822,7 @@ int ec_send_bytes(ecscable_t *ec, uint_16 *data, int len)
 /*                                                                          */
 /*  This transfer is followed by the "standard 1010 handshake".             */
 /* ------------------------------------------------------------------------ */
-int ec_send_decles(ecscable_t *ec, uint_16 *data, int len)
+int ec_send_decles(ecscable_t *ec, uint16_t *data, int len)
 {
     int i = 0, lsb0 = 0, lsb1 = 0;
 
@@ -848,7 +834,7 @@ int ec_send_decles(ecscable_t *ec, uint_16 *data, int len)
         lsb1 |= ((*data & 1) >> 0) << (2*i);
 
         if (ec_xfer_data(ec, (*data++ >>2)&0xFE) < 0) {ec_idle(ec); return -1;}
-        if (i == 7) 
+        if (i == 7)
         {
             if (ec_xfer_data(ec, lsb0     &0xFE) < 0) {ec_idle(ec); return -1;}
             if (ec_xfer_data(ec,(lsb1    )&0xFE) < 0) {ec_idle(ec); return -1;}
@@ -890,7 +876,7 @@ int ec_send_decles(ecscable_t *ec, uint_16 *data, int len)
 /*                                                                          */
 /*  This transfer is followed by the "standard 1010 handshake".             */
 /* ------------------------------------------------------------------------ */
-int ec_send_words(ecscable_t *ec, uint_16 *data, int len)
+int ec_send_words(ecscable_t *ec, uint16_t *data, int len)
 {
     int i = 0, lsb = 0;
 
@@ -902,7 +888,7 @@ int ec_send_words(ecscable_t *ec, uint_16 *data, int len)
 
         if (ec_xfer_data(ec,(*data       )&0xFE) < 0) {ec_idle(ec); return -1;}
         if (ec_xfer_data(ec,(*data++ >> 8)&0xFE) < 0) {ec_idle(ec); return -1;}
-        if (i == 7) 
+        if (i == 7)
         {
             if (ec_xfer_data(ec,(lsb     )&0xFE) < 0) {ec_idle(ec); return -1;}
             if (ec_xfer_data(ec,(lsb >> 7)&0xFE) < 0) {ec_idle(ec); return -1;}
@@ -929,7 +915,7 @@ int ec_send_words(ecscable_t *ec, uint_16 *data, int len)
 /*                                                                          */
 /*  This transfer is followed by the "standard 1010 handshake".             */
 /* ------------------------------------------------------------------------ */
-int ec_recv_bytes(ecscable_t *ec, uint_16 *data, int len)
+int ec_recv_bytes(ecscable_t *ec, uint16_t *data, int len)
 {
     int b0, b1;
 
@@ -959,7 +945,7 @@ int ec_recv_bytes(ecscable_t *ec, uint_16 *data, int len)
 /*                                                                          */
 /*  This transfer is followed by the "standard 1010 handshake".             */
 /* ------------------------------------------------------------------------ */
-int ec_recv_decles(ecscable_t *ec, uint_16 *data, int len)
+int ec_recv_decles(ecscable_t *ec, uint16_t *data, int len)
 {
     int b0, b1, b2;
 
@@ -993,7 +979,7 @@ int ec_recv_decles(ecscable_t *ec, uint_16 *data, int len)
 /*                                                                          */
 /*  This transfer is followed by the "standard 1010 handshake".             */
 /* ------------------------------------------------------------------------ */
-int ec_recv_words(ecscable_t *ec, uint_16 *data, int len)
+int ec_recv_words(ecscable_t *ec, uint16_t *data, int len)
 {
     int b0, b1, b2, b3;
 
@@ -1003,7 +989,7 @@ int ec_recv_words(ecscable_t *ec, uint_16 *data, int len)
         if ((b1 = ec_xfer_data(ec, 0x7E)) < 0) { ec_idle(ec); return -1; }
         if ((b2 = ec_xfer_data(ec, 0xFC)) < 0) { ec_idle(ec); return -1; }
         if ((b3 = ec_xfer_data(ec, 0xFA)) < 0) { ec_idle(ec); return -1; }
-        *data++ = (0x000F & (b0 >> 1)) | (0x00F0 & (b1 <<  3)) | 
+        *data++ = (0x000F & (b0 >> 1)) | (0x00F0 & (b1 <<  3)) |
                   (0x0F00 & (b2 << 7)) | (0xF000 & (b3 << 11));
     }
     if (ec_xfer_data(ec, 0xAA) != 0xA) { ec_idle(ec); return -1; }
@@ -1020,7 +1006,7 @@ unsigned ec_detect(unsigned port)
     ecscable_t try;
 
     memset(&try, 0, sizeof(try));
-    
+
     if (port) i = 4;
     do
     {
@@ -1031,7 +1017,7 @@ unsigned ec_detect(unsigned port)
 
         EC_CTRL(&try, 0x00);
         ec_idle(&try);
-        for (j = 0; j < 4; j++) 
+        for (j = 0; j < 4; j++)
         {
             if (ec_deidle(&try))                  break;
             if (ec_xfer_data(&try, 0x00) < 0)     break;
@@ -1040,7 +1026,7 @@ unsigned ec_detect(unsigned port)
             ec_idle(&try);
         }
         ec_idle(&try);
-        
+
         if (j > 0 && j != 4)
         {
             printf("> Partial detect on port $%.4X. "
@@ -1136,7 +1122,7 @@ void ec_init_ports(unsigned long base)
             }
             printf("> Granted access to $%.4lX (%ld)\n", ports[i], ports[i]);
         }
-    } 
+    }
 
 
     /* -------------------------------------------------------------------- */
@@ -1162,9 +1148,9 @@ void ec_init_ports(unsigned long base)
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                 Copyright (c) 2001-+Inf, Joseph Zbiciak                  */
 /* ======================================================================== */

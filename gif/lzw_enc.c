@@ -3,7 +3,7 @@
 /*                                                                          */
 /*  This code compresses an input buffer using LZW compression, as defined  */
 /*  by the GIF standard.  This includes dividing the compressed output      */
-/*  into 256-byte blocks.                                                   */
+/*  into MAX_BLOCK_BYTES blocks.                                            */
 /*                                                                          */
 /*  My data structure is entirely uncreative.  I use an N-way tree to       */
 /*  represent the current code table.  It's dirt simple to implement, but   */
@@ -17,23 +17,25 @@
 #ifdef DEBUG
 # define Dprintf(x) jzp_printf x
 #else
-# define Dprintf(x) 
+# define Dprintf(x)
 #endif
 
+#define MAX_BLOCK_BYTES (255)
 
-int lzw_encode(const uint_8 *i_buf, uint_8 *o_buf, int i_len, int max_o_len)
+
+int lzw_encode(const uint8_t *i_buf, uint8_t *o_buf, int i_len, int max_o_len)
 {
-    static uint_16 *dict = NULL;
+    static uint16_t *dict = NULL;
     static int      dict_size = 0;
-    const uint_8 *i_end = i_buf + i_len;
-    const uint_8 *i_ptr;
-    uint_8 *o_end = o_buf + max_o_len - 1; 
-    uint_8 *o_ptr; 
-    uint_8 *last_len_byte;
+    const uint8_t *i_end = i_buf + i_len;
+    const uint8_t *i_ptr;
+    uint8_t *o_end = o_buf + max_o_len - 1;
+    uint8_t *o_ptr;
+    uint8_t *last_len_byte;
     int i;
     int code_size;
     int max_sym = 0, dict_stride;
-    uint_32 curr_word = 0;
+    uint32_t curr_word = 0;
     int curr_bits = 0;
     int code = 0, next_new_code, curr_size;
     int end_of_info, clear_code;
@@ -44,7 +46,7 @@ int lzw_encode(const uint_8 *i_buf, uint_8 *o_buf, int i_len, int max_o_len)
     /*  the input bytes.  We'll pick our starting code size based on that.  */
     /* -------------------------------------------------------------------- */
     for (i = 0; i < i_len; i++)
-        if (i_buf[i] > max_sym) 
+        if (i_buf[i] > max_sym)
             max_sym = i_buf[i];
     dict_stride = max_sym + 1;
     Dprintf(("max_sym = %.2X\n", max_sym));
@@ -64,9 +66,9 @@ int lzw_encode(const uint_8 *i_buf, uint_8 *o_buf, int i_len, int max_o_len)
     /* -------------------------------------------------------------------- */
     if (dict_size < dict_stride)
     {
-        if (dict) 
+        if (dict)
             free(dict);
-        dict      = CALLOC(uint_16, 4096 * dict_stride);
+        dict      = CALLOC(uint16_t, 4096 * dict_stride);
         dict_size = dict_stride;
     }
 
@@ -75,6 +77,7 @@ int lzw_encode(const uint_8 *i_buf, uint_8 *o_buf, int i_len, int max_o_len)
     /* -------------------------------------------------------------------- */
     o_ptr         = o_buf;
     *o_ptr++      = code_size;
+    *o_ptr        = 0;
     last_len_byte = o_ptr++;  /* save room for first data block length byte */
     i_ptr         = i_buf;
     curr_size     = code_size + 1;
@@ -96,21 +99,21 @@ int lzw_encode(const uint_8 *i_buf, uint_8 *o_buf, int i_len, int max_o_len)
         /*  If dictionary's full, send a clear code and flush dictionary.   */
         /*  Otherwise, patch the previous code+char into the dictionary.    */
         /* ---------------------------------------------------------------- */
-        if (next_new_code == 0x1000)
+        if (i_ptr != i_end && next_new_code == 0x1000)
         {
             Dprintf(("CLEAR %.3X %d\n", clear_code, curr_size));
 
-            curr_word |= clear_code << curr_bits; 
+            curr_word |= clear_code << curr_bits;
             curr_bits += curr_size;
             while (curr_bits > 8)
             {
-                /* Handle packaging data into 256-byte records */
-                if (o_ptr - last_len_byte == 256)
+                /* Handle packaging data into MBB-byte records */
+                if (o_ptr - last_len_byte == MAX_BLOCK_BYTES)
                 {
-                    Dprintf(("last_len_byte=%.8X o_ptr=%.8X\n", 
+                    Dprintf(("last_len_byte=%.8X o_ptr=%.8X\n",
                               last_len_byte, o_ptr));
 
-                    *last_len_byte = 255;
+                    *last_len_byte = MAX_BLOCK_BYTES - 1;
                     last_len_byte  = o_ptr++;
                 }
                 if (o_ptr >= o_end)
@@ -123,10 +126,10 @@ int lzw_encode(const uint_8 *i_buf, uint_8 *o_buf, int i_len, int max_o_len)
 
             curr_size = code_size + 1;
             next_new_code = (1 << code_size) + 2;
-            memset(dict, 0, 4096*sizeof(uint_16)*dict_stride);
-        } else
+            memset(dict, 0, 4096*sizeof(uint16_t)*dict_stride);
+        } else if (i_ptr != i_end)
         {
-            Dprintf(("new code: %.3X = %.3X + %.2X\n", next_new_code, 
+            Dprintf(("new code: %.3X = %.3X + %.2X\n", next_new_code,
                      code, next_char));
 
             dict[code*dict_stride + next_char] = next_new_code;
@@ -152,7 +155,7 @@ int lzw_encode(const uint_8 *i_buf, uint_8 *o_buf, int i_len, int max_o_len)
             {
                 next_char = *i_ptr++;
                 next_code = dict[code*dict_stride + next_char];
-                Dprintf(("--> code: %.3X + %.2X = %.3X\n", code, 
+                Dprintf(("--> code: %.3X + %.2X = %.3X\n", code,
                          next_char, next_code));
 
                 if (next_code)
@@ -161,8 +164,8 @@ int lzw_encode(const uint_8 *i_buf, uint_8 *o_buf, int i_len, int max_o_len)
             if (next_code && i_ptr == i_end)
                 next_char = end_of_info;
 
-            if (next_char == end_of_info) 
-            { 
+            if (next_char == end_of_info)
+            {
                 Dprintf(("--> next is EOI! (b)\n"));
             }
         }
@@ -173,18 +176,18 @@ int lzw_encode(const uint_8 *i_buf, uint_8 *o_buf, int i_len, int max_o_len)
         /*  should never be more than 7, and curr_size should be no more    */
         /*  than 12.                                                        */
         /* ---------------------------------------------------------------- */
-        curr_word |= code << curr_bits; 
+        curr_word |= code << curr_bits;
         curr_bits += curr_size;
-        Dprintf(("SEND %.4X %d curr: %.8X %2d\n", code, curr_size, 
+        Dprintf(("SEND %.4X %d curr: %.8X %2d\n", code, curr_size,
                  curr_word, curr_bits));
-        while (curr_bits > 8)
+        while (curr_bits >= 8)
         {
             /* Handle packaging data into 256-byte records */
-            if (o_ptr - last_len_byte == 256)
+            if (o_ptr - last_len_byte == MAX_BLOCK_BYTES)
             {
-                Dprintf(("last_len_byte=%.8X o_ptr=%.8X\n", last_len_byte, 
+                Dprintf(("last_len_byte=%.8X o_ptr=%.8X\n", last_len_byte,
                           o_ptr));
-                *last_len_byte = 255;
+                *last_len_byte = MAX_BLOCK_BYTES - 1;
                 last_len_byte  = o_ptr++;
             }
             if (o_ptr >= o_end)
@@ -202,10 +205,10 @@ int lzw_encode(const uint_8 *i_buf, uint_8 *o_buf, int i_len, int max_o_len)
     while (curr_bits > 0)  /* flush it ALL out. */
     {
         /* Handle packaging data into 256-byte records */
-        if (o_ptr - last_len_byte == 256)
+        if (o_ptr - last_len_byte == MAX_BLOCK_BYTES)
         {
             Dprintf(("last_len_byte=%.8X o_ptr=%.8X\n", last_len_byte, o_ptr));
-            *last_len_byte = 255;
+            *last_len_byte = MAX_BLOCK_BYTES - 1;
             last_len_byte  = o_ptr++;
         }
         if (o_ptr >= o_end)
@@ -222,7 +225,8 @@ int lzw_encode(const uint_8 *i_buf, uint_8 *o_buf, int i_len, int max_o_len)
     /*  is conservative by one character.                                   */
     /* -------------------------------------------------------------------- */
     *last_len_byte = o_ptr - last_len_byte - 1;
-    *o_ptr++ = 0;
+    if ( *last_len_byte )
+        *o_ptr++ = 0;
 
     Dprintf(("encoded %d bytes\n", o_ptr - o_buf));
 
@@ -237,22 +241,22 @@ overflow:
 #ifdef DEBUG
 # define Dprintf(x) jzp_printf x
 #else
-# define Dprintf(x) 
+# define Dprintf(x)
 #endif
 
-int lzw_encode2(const uint_8 *i_buf, const uint_8 *i_buf_alt,
-                uint_8 *o_buf, int i_len, int max_o_len)
+int lzw_encode2(const uint8_t *i_buf, const uint8_t *i_buf_alt,
+                uint8_t *o_buf, int i_len, int max_o_len)
 {
-    static uint_16 *dict = NULL;
+    static uint16_t *dict = NULL;
     static int      dict_size = 0;
     int i_idx = 0;
-    uint_8 *o_end = o_buf + max_o_len - 1; 
-    uint_8 *o_ptr; 
-    uint_8 *last_len_byte;
+    uint8_t *o_end = o_buf + max_o_len - 1;
+    uint8_t *o_ptr;
+    uint8_t *last_len_byte;
     int i;
     int code_size;
     int max_sym = 0, dict_stride;
-    uint_32 curr_word = 0;
+    uint32_t curr_word = 0;
     int curr_bits = 0;
     int code = 0, next_new_code, curr_size;
     int end_of_info, clear_code;
@@ -264,9 +268,9 @@ int lzw_encode2(const uint_8 *i_buf, const uint_8 *i_buf_alt,
     /* -------------------------------------------------------------------- */
     for (i = 0; i < i_len; i++)
     {
-        if (i_buf[i] > max_sym) 
+        if (i_buf[i] > max_sym)
             max_sym = i_buf[i];
-        if (i_buf_alt[i] > max_sym) 
+        if (i_buf_alt[i] > max_sym)
             max_sym = i_buf_alt[i];
     }
 
@@ -288,9 +292,9 @@ int lzw_encode2(const uint_8 *i_buf, const uint_8 *i_buf_alt,
     /* -------------------------------------------------------------------- */
     if (dict_size < dict_stride)
     {
-        if (dict) 
+        if (dict)
             free(dict);
-        dict      = CALLOC(uint_16, 4096 * dict_stride);
+        dict      = CALLOC(uint16_t, 4096 * dict_stride);
         dict_size = dict_stride;
     }
 
@@ -319,21 +323,21 @@ int lzw_encode2(const uint_8 *i_buf, const uint_8 *i_buf_alt,
         /*  If dictionary's full, send a clear code and flush dictionary.   */
         /*  Otherwise, patch the previous code+char into the dictionary.    */
         /* ---------------------------------------------------------------- */
-        if (next_new_code == 0x1000)
+        if ( i_idx != i_len && next_new_code == 0x1000 )
         {
             Dprintf(("CLEAR %.3X %d\n", clear_code, curr_size));
 
-            curr_word |= clear_code << curr_bits; 
+            curr_word |= clear_code << curr_bits;
             curr_bits += curr_size;
             while (curr_bits > 8)
             {
-                /* Handle packaging data into 256-byte records */
-                if (o_ptr - last_len_byte == 256)
+                /* Handle packaging data into MBB-byte records */
+                if (o_ptr - last_len_byte == MAX_BLOCK_BYTES)
                 {
-                    Dprintf(("last_len_byte=%.8X o_ptr=%.8X\n", 
+                    Dprintf(("last_len_byte=%.8X o_ptr=%.8X\n",
                               last_len_byte, o_ptr));
 
-                    *last_len_byte = 255;
+                    *last_len_byte = MAX_BLOCK_BYTES - 1;
                     last_len_byte  = o_ptr++;
                 }
                 if (o_ptr >= o_end)
@@ -346,10 +350,10 @@ int lzw_encode2(const uint_8 *i_buf, const uint_8 *i_buf_alt,
 
             curr_size = code_size + 1;
             next_new_code = (1 << code_size) + 2;
-            memset(dict, 0, 4096*sizeof(uint_16)*dict_stride);
-        } else
+            memset(dict, 0, 4096*sizeof(uint16_t)*dict_stride);
+        } else if ( i_idx != i_len )
         {
-            Dprintf(("new code: %.3X = %.3X + %.2X\n", next_new_code, 
+            Dprintf(("new code: %.3X = %.3X + %.2X\n", next_new_code,
                      code, next_char));
 
             dict[code*dict_stride + next_char] = next_new_code;
@@ -379,19 +383,19 @@ int lzw_encode2(const uint_8 *i_buf, const uint_8 *i_buf_alt,
                 if ((tmp = dict[code*dict_stride + i_buf[i_idx]]) != 0)
                 {
                     next_code = tmp;
-                    Dprintf(("--> code: %.3X + %.2X(a) = %.3X\n", code, 
+                    Dprintf(("--> code: %.3X + %.2X(a) = %.3X\n", code,
                              next_char, next_code));
-                } else 
+                } else
                 if ((tmp = dict[code*dict_stride + i_buf_alt[i_idx]]) != 0)
                 {
                     next_char = i_buf_alt[i_idx];
                     next_code = tmp;
-                    Dprintf(("--> code: %.3X + %.2X(b) = %.3X\n", code, 
+                    Dprintf(("--> code: %.3X + %.2X(b) = %.3X\n", code,
                              next_char, next_code));
                 } else
                 {
                     next_code = 0;
-                    Dprintf(("--> code: %.3X + %.2X(c) = %.3X\n", code, 
+                    Dprintf(("--> code: %.3X + %.2X(c) = %.3X\n", code,
                              next_char, next_code));
                 }
                 i_idx++;
@@ -402,8 +406,8 @@ int lzw_encode2(const uint_8 *i_buf, const uint_8 *i_buf_alt,
             if (next_code && i_idx == i_len)
                 next_char = end_of_info;
 
-            if (next_char == end_of_info) 
-            { 
+            if (next_char == end_of_info)
+            {
                 Dprintf(("--> next is EOI! (b)\n"));
             }
         }
@@ -414,18 +418,18 @@ int lzw_encode2(const uint_8 *i_buf, const uint_8 *i_buf_alt,
         /*  should never be more than 7, and curr_size should be no more    */
         /*  than 12.                                                        */
         /* ---------------------------------------------------------------- */
-        curr_word |= code << curr_bits; 
+        curr_word |= code << curr_bits;
         curr_bits += curr_size;
-        Dprintf(("SEND %.4X %d curr: %.8X %2d\n", code, curr_size, 
+        Dprintf(("SEND %.4X %d curr: %.8X %2d\n", code, curr_size,
                  curr_word, curr_bits));
         while (curr_bits > 8)
         {
-            /* Handle packaging data into 256-byte records */
-            if (o_ptr - last_len_byte == 256)
+            /* Handle packaging data into MBB-byte records */
+            if (o_ptr - last_len_byte == MAX_BLOCK_BYTES)
             {
-                Dprintf(("last_len_byte=%.8X o_ptr=%.8X\n", last_len_byte, 
+                Dprintf(("last_len_byte=%.8X o_ptr=%.8X\n", last_len_byte,
                           o_ptr));
-                *last_len_byte = 255;
+                *last_len_byte = MAX_BLOCK_BYTES - 1;
                 last_len_byte  = o_ptr++;
             }
             if (o_ptr >= o_end)
@@ -442,11 +446,11 @@ int lzw_encode2(const uint_8 *i_buf, const uint_8 *i_buf_alt,
     /* -------------------------------------------------------------------- */
     while (curr_bits > 0)  /* flush it ALL out. */
     {
-        /* Handle packaging data into 256-byte records */
-        if (o_ptr - last_len_byte == 256)
+        /* Handle packaging data into MBB-byte records */
+        if (o_ptr - last_len_byte == MAX_BLOCK_BYTES)
         {
             Dprintf(("last_len_byte=%.8X o_ptr=%.8X\n", last_len_byte, o_ptr));
-            *last_len_byte = 255;
+            *last_len_byte = MAX_BLOCK_BYTES - 1;
             last_len_byte  = o_ptr++;
         }
         if (o_ptr >= o_end)
@@ -485,9 +489,9 @@ overflow:
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                   Copyright (c) 2005, Joseph Zbiciak                     */
 /* ======================================================================== */

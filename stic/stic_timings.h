@@ -2,41 +2,41 @@
  * ============================================================================
  *  The STIC and System RAM control access to the GRAM, GROM and STIC
  *  registers.  The STIC also occasionally stalls the CPU with BUSRQ
- *  so it can fetch display cards from System RAM.  The STIC also 
+ *  so it can fetch display cards from System RAM.  The STIC also
  *  interrupts the CPU every time it reaches the bottom of the frame.
  *
  *  The following parameters control the STIC timing for interrupts and
- *  bus requests. 
+ *  bus requests.
  *
  *    FRAMCLKS          Cycles between interrupts.
  *
  *    INTRQ_HOLD        How long STIC asserts INTRQ for.  If the CPU
  *                      masks interrupts too long, it'll drop an interrupt.
- *                      
+ *
  *    BUSRQ_HOLD_*      How long the STIC holds BUSRQ for.  FIRST and NORMAL
  *                      refer to the first BUSRQ of the frame and the BUSRQs
  *                      in the body of the frame.  EXTRA refers to the 14th
  *                      BUSRQ that occurs when vertical delay == 0.
- *                      
+ *
  *    MUST_BUSAK_TIME   The cycle by which the CPU must respond to a BUSRQ.
  *                      If the CPU doesn't respond in time, the System RAM
  *                      won't advance the display FIFO and a display glitch
  *                      results.
- *  
+ *
  *
  *  When the display's active, the STIC has three main phases:
  *
  *   -- VBlank 1, where CPU can access both GRAM/GROM and STIC registers
- *   -- VBlank 2, where CPU can access only GRAM/GROM 
- *   -- Active display, where the CPU can access neither GRAM/GROM nor 
- *      STIC registers.  The STIC periodically stalls the CPU for 
+ *   -- VBlank 2, where CPU can access only GRAM/GROM
+ *   -- Active display, where the CPU can access neither GRAM/GROM nor
+ *      STIC registers.  The STIC periodically stalls the CPU for
  *      BACKTAB fetches from System RAM.
  *
  *  The following paramters define these periods:
- *  
+ *
  *    STIC_ACCESSIBLE   Time window when STIC registers are accessible
  *    GMEM_ACCESSIBLE   Time window when GRAM/GROM are accessible
- *  
+ *
  *
  *  And finally, the first frame after reset has different timing than the
  *  rest.  This actually affects a couple games with strange race conditions.
@@ -54,9 +54,9 @@
 /*#define NTSC_INTRQ_HOLD         (2920)*/
 #define NTSC_INTRQ_HOLD         (2907)  /* from Kevin Horton */
 
-#define NTSC_BUSRQ_HOLD_FIRST   (68)    /* First BUSRQ is really short?     */
-#define NTSC_BUSRQ_HOLD_NORMAL  (108)   /* Typical BUSRQs during display    */
-#define NTSC_BUSRQ_HOLD_EXTRA   (38)    /* 14th BUSRQ is half-length        */
+#define NTSC_BUSRQ_HOLD_FIRST   (57)    /* First BUSRQ is really short?     */
+#define NTSC_BUSRQ_HOLD_NORMAL  (110)   /* Typical BUSRQs during display    */
+#define NTSC_BUSRQ_HOLD_EXTRA   (44)    /* 14th BUSRQ is half-length        */
 #define NTSC_MUST_BUSAK_TIME    (68)    /* CPU must ACK a BUSRQ by here     */
 #define NTSC_BUSRQ_MARGIN       (STIC_BUSRQ_HOLD_NORMAL - STIC_MUST_BUSAK_TIME)
 
@@ -65,21 +65,24 @@
 
 #define NTSC_INITIAL_OFFSET     (2782)  /* Starting point of first frame.   */
 
-/* a stab at PAL timings */
-#define PAL_FRAMCLKS            (18957)
-#define PAL_FRAMDIFF            (PAL_FRAMCLKS - NTSC_FRAMCLKS)
+#define NTSC_SCANLINE           (57)
 
-#define PAL_INTRQ_HOLD          (2920 + PAL_FRAMDIFF)                     
-#define PAL_BUSRQ_HOLD_FIRST    (68)    /* First BUSRQ is really short?     */
-#define PAL_BUSRQ_HOLD_NORMAL   (108)   /* Typical BUSRQs during display    */
-#define PAL_BUSRQ_HOLD_EXTRA    (38)    /* 14th BUSRQ is half-length        */
-#define PAL_MUST_BUSAK_TIME     (68)    /* CPU must ACK a BUSRQ by here     */
+/* a stab at PAL timings */
+#define PAL_FRAMCLKS            (19968)
+
+#define PAL_INTRQ_HOLD          (6400)  /* Guess 100 scanlines              */
+#define PAL_BUSRQ_HOLD_FIRST    (64)    /* First BUSRQ is really short?     */
+#define PAL_BUSRQ_HOLD_NORMAL   (118)   /* Typical BUSRQs during display    */
+#define PAL_BUSRQ_HOLD_EXTRA    (60)    /* 14th BUSRQ is half-length        */
+#define PAL_MUST_BUSAK_TIME     (82)    /* CPU must ACK a BUSRQ by here     */
 #define PAL_BUSRQ_MARGIN        (STIC_BUSRQ_HOLD_NORMAL - STIC_MUST_BUSAK_TIME)
 
-#define PAL_STIC_ACCESSIBLE    (2900 + PAL_FRAMDIFF) /* STIC time window during vblank   */
-#define PAL_GMEM_ACCESSIBLE    (3796 + PAL_FRAMDIFF) /* GRAM/GROM time window during vbl */
+#define PAL_STIC_ACCESSIBLE    (PAL_INTRQ_HOLD - 7)  /* A guess */
+#define PAL_GMEM_ACCESSIBLE    (7456)   /* Guess 116.5 scanlines */
 
-#define PAL_INITIAL_OFFSET     (2782)  /* Starting point of first frame.   */
+#define PAL_INITIAL_OFFSET     (PAL_INTRQ_HOLD - 75) /* total guess */
+
+#define PAL_SCANLINE           (64)
 
 
 #define STIC_FRAMCLKS           (stic->pal ? PAL_FRAMCLKS          : NTSC_FRAMCLKS         )
@@ -89,11 +92,12 @@
 #define STIC_BUSRQ_HOLD_EXTRA   (stic->pal ? PAL_BUSRQ_HOLD_EXTRA  : NTSC_BUSRQ_HOLD_EXTRA )
 #define STIC_MUST_BUSAK_TIME    (stic->pal ? PAL_MUST_BUSAK_TIME   : NTSC_MUST_BUSAK_TIME  )
 #define STIC_BUSRQ_MARGIN       (stic->pal ? PAL_BUSRQ_MARGIN      : NTSC_BUSRQ_MARGIN     )
-                                                                                           
+
 #define STIC_STIC_ACCESSIBLE    (stic->pal ? PAL_STIC_ACCESSIBLE   : NTSC_STIC_ACCESSIBLE  )
 #define STIC_GMEM_ACCESSIBLE    (stic->pal ? PAL_GMEM_ACCESSIBLE   : NTSC_GMEM_ACCESSIBLE  )
-                                                                                           
+
 #define STIC_INITIAL_OFFSET     (stic->pal ? PAL_INITIAL_OFFSET    : NTSC_INITIAL_OFFSET   )
+#define STIC_SCANLINE           (stic->pal ? PAL_SCANLINE          : NTSC_SCANLINE         )
 
 #endif
 
@@ -108,9 +112,9 @@
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                 Copyright (c) 1998-2011, Joseph Zbiciak                  */
 /* ======================================================================== */

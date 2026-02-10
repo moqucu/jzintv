@@ -1,7 +1,7 @@
 /* Auto generated, do not edit */
 
 #include "cp1600/op_tables.h"
-const cp1600_ins_t fn_imm_2op[] =
+cp1600_ins_t *const fn_imm_2op[] =
 {
 /*0000*/     fn_invalid,
 /*0001*/     fn_MVO_ir,

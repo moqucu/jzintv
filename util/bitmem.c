@@ -10,7 +10,7 @@
 /* ======================================================================== */
 /*  BITREV -- Reverses the bits in a 32-bit number.                         */
 /* ======================================================================== */
-static uint_32 bitrev(uint_32 r)
+static uint32_t bitrev(uint32_t r)
 {
     r = (0xFFFF0000 & (r << 16)) | (0x0000FFFF & (r >> 16));
     r = (0xFF00FF00 & (r <<  8)) | (0x00FF00FF & (r >>  8));
@@ -36,8 +36,8 @@ bitmem_t *bitmem_create  (int org, int bits)
     }
 
     if (!(mem       = CALLOC(bitmem_t, 1        )) ||
-        !(mem->data = CALLOC(uint_32,  words + 2)) ||
-        !(mem->attr = CALLOC(uint_8,   bits     )))
+        !(mem->data = CALLOC(uint32_t, words + 3)) ||
+        !(mem->attr = CALLOC(uint8_t,  bits + 96)))
     {
         fprintf(stderr, "bitmem_create: Out of memory!\n");
         exit(1);
@@ -55,13 +55,13 @@ bitmem_t *bitmem_create  (int org, int bits)
 /*  BITMEM_LOAD  -- Loads a memory image into a bit-memory.                 */
 /* ======================================================================== */
 #define CHUNK (1024)
-void      bitmem_load    (bitmem_t *mem, FILE *f)
+void bitmem_load(bitmem_t *mem, FILE *f)
 {
-    uint_8  readbuf[CHUNK + 4];
-    int     bytes, i;
-    int     short_rd = 0;
-    uint_32 offset = 0;
-    uint_32 word;
+    uint8_t  readbuf[CHUNK + 4];
+    int      bytes, i;
+    int      short_rd = 0;
+    uint32_t offset = 0;
+    uint32_t word;
 
     /* -------------------------------------------------------------------- */
     /*  Keep reading until the file's empty or the memory's full.           */
@@ -98,13 +98,13 @@ void      bitmem_load    (bitmem_t *mem, FILE *f)
         /* ---------------------------------------------------------------- */
         if ((bytes >> 2) + offset > mem->size)
             bytes = (mem->size - offset) << 2;
-            
+
         /* ---------------------------------------------------------------- */
         /*  Put bytes together into words in big-endian order.              */
         /* ---------------------------------------------------------------- */
         for (i = 0; i < bytes; i += 4, offset++)
         {
-            word = (readbuf[i+0] << 24) | 
+            word = (readbuf[i+0] << 24) |
                    (readbuf[i+1] << 16) |
                    (readbuf[i+2] <<  8) |
                    (readbuf[i+3] <<  0);
@@ -124,10 +124,10 @@ void      bitmem_load    (bitmem_t *mem, FILE *f)
 /* ======================================================================== */
 /*  BITMEM_READ_FWD  -- Read a bit field in the forward direction.          */
 /* ======================================================================== */
-uint_32   bitmem_read_fwd(bitmem_t *mem, uint_32 addr, int bits)
+uint32_t bitmem_read_fwd(bitmem_t *mem, uint32_t addr, int bits)
 {
     int offset, lshift, rshift;
-    uint_32 data;
+    uint32_t data;
 
     /* -------------------------------------------------------------------- */
     /*  Calculate our offset and shift values from the bit-address.         */
@@ -141,13 +141,13 @@ uint_32   bitmem_read_fwd(bitmem_t *mem, uint_32 addr, int bits)
     /*  totally outside our memory, return 0.                               */
     /* -------------------------------------------------------------------- */
     offset -= mem->org;
-    if (offset < -1 || offset >= (int)mem->size) 
+    if (offset < -1 || offset >= (int)mem->size)
         return 0;
 
     /* -------------------------------------------------------------------- */
     /*  Extract the desired data as a left-justified series of bits.        */
     /* -------------------------------------------------------------------- */
-    data = LSHIFT(mem->data[offset    ], lshift) | 
+    data = LSHIFT(mem->data[offset    ], lshift) |
            RSHIFT(mem->data[offset + 1], rshift);
 
     /* -------------------------------------------------------------------- */
@@ -159,10 +159,10 @@ uint_32   bitmem_read_fwd(bitmem_t *mem, uint_32 addr, int bits)
 /* ======================================================================== */
 /*  BITMEM_READ_FWD  -- Read a bit field in the reverse direction.          */
 /* ======================================================================== */
-uint_32   bitmem_read_rev(bitmem_t *mem, uint_32 addr, int bits)
+uint32_t bitmem_read_rev(bitmem_t *mem, uint32_t addr, int bits)
 {
     int offset, lshift, rshift;
-    uint_32 data;
+    uint32_t data;
 
     /* -------------------------------------------------------------------- */
     /*  Calculate our offset and shift values from the bit-address.         */
@@ -176,13 +176,13 @@ uint_32   bitmem_read_rev(bitmem_t *mem, uint_32 addr, int bits)
     /*  totally outside our memory, return 0.                               */
     /* -------------------------------------------------------------------- */
     offset -= mem->org;
-    if (offset < -1 || offset >= (int)mem->size) 
+    if (offset < -1 || offset >= (int)mem->size)
         return 0;
 
     /* -------------------------------------------------------------------- */
     /*  Extract the desired data as a left-justified series of bits.        */
     /* -------------------------------------------------------------------- */
-    data = LSHIFT(mem->data[offset    ], lshift) | 
+    data = LSHIFT(mem->data[offset    ], lshift) |
            RSHIFT(mem->data[offset + 1], rshift);
 
     /* -------------------------------------------------------------------- */
@@ -199,15 +199,15 @@ uint_32   bitmem_read_rev(bitmem_t *mem, uint_32 addr, int bits)
 /* ======================================================================== */
 /*  BITMEM_SETATTR   -- Set attributes on a range of memory addresses.      */
 /* ======================================================================== */
-void      bitmem_setattr (bitmem_t *mem, uint_32 addr, int len, uint_8 attr)
+void bitmem_setattr(bitmem_t *mem, uint32_t addr, int len, uint8_t attr)
 {
-    uint_32 org32 = mem->org << 5;
+    uint32_t org32 = mem->org << 5;
 
     /* -------------------------------------------------------------------- */
     /*  Never let the user set AT_LOCAL.  We handle that ourselves.         */
     /* -------------------------------------------------------------------- */
     attr &= ~AT_LOCAL;
-    
+
     /* -------------------------------------------------------------------- */
     /*  Make sure address and len parameters are inside our bit-memory.     */
     /*  Clip the arguments to the memory boundaries if necessary.           */
@@ -219,10 +219,10 @@ void      bitmem_setattr (bitmem_t *mem, uint_32 addr, int len, uint_8 attr)
     } else
         addr -= org32;
 
-    if (len < 0 || addr > (mem->size << 5)) 
+    if (len < 0 || addr > (mem->size << 5))
         return;
 
-    if (addr + len > (mem->size << 5)) 
+    if (addr + len > (mem->size << 5))
         len = (mem->size << 5) - addr;
 
     /* -------------------------------------------------------------------- */
@@ -238,10 +238,10 @@ void      bitmem_setattr (bitmem_t *mem, uint_32 addr, int len, uint_8 attr)
 /* ======================================================================== */
 /*  BITMEM_CLRATTR   -- Clear attributes on a range of memory addresses.    */
 /* ======================================================================== */
-void      bitmem_clrattr (bitmem_t *mem, uint_32 addr, int len, uint_8 attr)
+void bitmem_clrattr(bitmem_t *mem, uint32_t addr, int len, uint8_t attr)
 {
-    uint_32 org32 = mem->org << 5;
-    
+    uint32_t org32 = mem->org << 5;
+
     /* -------------------------------------------------------------------- */
     /*  Make sure address and len parameters are inside our bit-memory.     */
     /*  Clip the arguments to the memory boundaries if necessary.           */
@@ -253,10 +253,10 @@ void      bitmem_clrattr (bitmem_t *mem, uint_32 addr, int len, uint_8 attr)
     } else
         addr -= org32;
 
-    if (len < 0 || addr > (mem->size << 5)) 
+    if (len < 0 || addr > (mem->size << 5))
         return;
 
-    if (addr + len > (mem->size << 5)) 
+    if (addr + len > (mem->size << 5))
         len = (mem->size << 5) - addr;
 
     /* -------------------------------------------------------------------- */
@@ -272,12 +272,12 @@ void      bitmem_clrattr (bitmem_t *mem, uint_32 addr, int len, uint_8 attr)
 /* ======================================================================== */
 /*  BITMEM_GETATTR   -- Get merged attributes for a range of addresses.     */
 /* ======================================================================== */
-uint_8    bitmem_getattr (bitmem_t *mem, uint_32 addr, int len)
+uint8_t bitmem_getattr(bitmem_t *mem, uint32_t addr, int len)
 {
-    uint_32 org32  = mem->org  << 5;
-    uint_32 size32 = mem->size << 5;
-    uint_8  attr   = AT_LOCAL;
-    
+    uint32_t org32  = mem->org  << 5;
+    uint32_t size32 = mem->size << 5;
+    uint8_t  attr   = AT_LOCAL;
+
     /* -------------------------------------------------------------------- */
     /*  Make sure address and len parameters are inside our bit-memory.     */
     /*  Clip the arguments to the memory boundaries if necessary.           */
@@ -320,9 +320,9 @@ uint_8    bitmem_getattr (bitmem_t *mem, uint_32 addr, int len)
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                 Copyright (c) 1998-1999, Joseph Zbiciak                  */
 /* ======================================================================== */

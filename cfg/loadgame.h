@@ -2,16 +2,15 @@
  * ============================================================================
  *  Title:    Generic Game Loading Logic
  *  Author:   J. Zbiciak
- *  $Id$
  * ============================================================================
- *  This code attempts to detect the type of the program file being loaded, 
- *  returning the binary image of the file and a type indicator if the 
+ *  This code attempts to detect the type of the program file being loaded,
+ *  returning the binary image of the file and a type indicator if the
  *  detection is successful.
  *
  *  It is also responsible for searching the game search path and for trying
  *  different extensions (.ROM, .BIN, .INT) on the provided filename.
- *  In a sense, this is similar to what DOS's COMMAND.COM does for a command 
- *  name, searching for "FOO.COM", "FOO.EXE" and "FOO.BAT" along all the 
+ *  In a sense, this is similar to what DOS's COMMAND.COM does for a command
+ *  name, searching for "FOO.COM", "FOO.EXE" and "FOO.BAT" along all the
  *  directories in the search path in response to the command "FOO."
  * ============================================================================
  *
@@ -29,7 +28,7 @@
 /* ======================================================================== */
 /*  READ_GAME                                                               */
 /* ======================================================================== */
-uint_8 *read_game
+uint8_t *read_game
 (
     const char *name,
     int        *type,
@@ -51,9 +50,9 @@ uint_8 *read_game
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                 Copyright (c) 1998-2004, Joseph Zbiciak                  */
 /* ======================================================================== */

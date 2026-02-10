@@ -13,8 +13,8 @@ as published by the Free Software Foundation; either version 2
 of the License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of 
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the 
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
@@ -54,22 +54,22 @@ using namespace std;
 /*  StringFIFO::getLine:  Return a line if one available, or false.         */
 /* ======================================================================== */
 bool
-StringFIFO::getLine(char *buf, int maxlen, bool &Ignore)
+StringFIFO::getLine(char *buf, int maxlen, IgnoreFlags &Ignore)
 {
     string *head;
     int len;
 
-    if (queue.empty()) 
+    if (queue.empty())
         return false;
 
-    Ignore = *Ignore_queue.begin();
+    Ignore = Ignore_queue.front();
     head   = &*queue.begin();
     len    = head->length();
 
     // todo: Convert to ParseError?
     // ..... No. Have Parser catch BufferOverflow and rethrow as ParseError.
     if (len >= maxlen)
-        throw BufferOverflow(len, maxlen); 
+        throw BufferOverflow(len, maxlen);
 
     strcpy(buf, head->c_str());
 
@@ -82,23 +82,23 @@ StringFIFO::getLine(char *buf, int maxlen, bool &Ignore)
 }
 
 bool
-StringFIFO::getLine(char **buf, int *buflen, bool &Ignore)
+StringFIFO::getLine(char **buf, int *buflen, IgnoreFlags &Ignore)
 {
     string *head;
     int len;
 
-    if (queue.empty()) 
+    if (queue.empty())
         return false;
 
-    Ignore = *Ignore_queue.begin();
+    Ignore = Ignore_queue.front();
     head   = &*queue.begin();
     len    = head->length();
 
     if (len >= *buflen)
     {
-        char *new_buf = (char *)malloc(len + 128);
+        char *new_buf = static_cast<char *>(malloc(len + 128));
         if (!new_buf)
-            throw BufferOverflow(len, *buflen); 
+            throw BufferOverflow(len, *buflen);
 
         free(*buf);
         *buflen = len + 128;
@@ -144,8 +144,8 @@ StringFIFO_fromFile::~StringFIFO_fromFile()
 /* ======================================================================== */
 /*  StringFIFO_fromFile::getLine actually reads the file.                   */
 /* ======================================================================== */
-bool 
-StringFIFO_fromFile::getLine(string &str, bool &Ignore)
+bool
+StringFIFO_fromFile::getLine(string &str, IgnoreFlags &Ignore)
 {
     // We allow "putLine" on a StringFIFO_fromFile.  The effect is to insert
     // new lines ahead of lines that we would be reading from the file.
@@ -171,20 +171,21 @@ StringFIFO_fromFile::getLine(string &str, bool &Ignore)
 
     getline(inFile, str);
 
-    if (inFile.fail()) 
+    if (inFile.fail())
     {
         str = "";  // at least zero out the string.
         return false;
     }
 
     lineNo++;
-    Ignore = false;
-    
+    Ignore.skip_macro = false;
+    Ignore.skip_parse = false;
+
     return true;
 }
 
 bool
-StringFIFO_fromFile::getLine(char *buf, int maxlen, bool &Ignore)
+StringFIFO_fromFile::getLine(char *buf, int maxlen, IgnoreFlags &Ignore)
 {
     string tmp;
     bool gotLine;
@@ -193,7 +194,7 @@ StringFIFO_fromFile::getLine(char *buf, int maxlen, bool &Ignore)
     {
         int len = tmp.length();
         if (len >= maxlen)
-            throw BufferOverflow(len, maxlen); 
+            throw BufferOverflow(len, maxlen);
 
         strcpy(buf, tmp.c_str());
     } else
@@ -202,7 +203,7 @@ StringFIFO_fromFile::getLine(char *buf, int maxlen, bool &Ignore)
 }
 
 bool
-StringFIFO_fromFile::getLine(char **buf, int *buflen, bool &Ignore)
+StringFIFO_fromFile::getLine(char **buf, int *buflen, IgnoreFlags &Ignore)
 {
     string tmp;
     bool gotLine;
@@ -212,9 +213,9 @@ StringFIFO_fromFile::getLine(char **buf, int *buflen, bool &Ignore)
         int len = tmp.length();
         if (len >= *buflen)
         {
-            char *new_buf = (char *)malloc(len + 128);
+            char *new_buf = static_cast<char *>(malloc(len + 128));
             if (!new_buf)
-                throw BufferOverflow(len, *buflen); 
+                throw BufferOverflow(len, *buflen);
 
             free(*buf);
             *buflen = len + 128;
@@ -223,7 +224,7 @@ StringFIFO_fromFile::getLine(char **buf, int *buflen, bool &Ignore)
 
         strcpy(*buf, tmp.c_str());
     } else
-        buf[0] = 0;
+        buf[0] = nullptr;
     return gotLine;
 }
 
@@ -233,7 +234,7 @@ StringFIFO_fromFile::getLine(char **buf, int *buflen, bool &Ignore)
 /*  are done.  StringFIFO_fromFile::isEmpty only checks the queue -- there  */
 /*  may be more available if somebody might "putLine".                      */
 /* ======================================================================== */
-bool 
+bool
 StringFIFO_fromFile::isEOF(void)
 {
     return queue.empty() && inFile.eof();
@@ -269,35 +270,32 @@ StringFIFO_toFile::~StringFIFO_toFile()
 /*  StringFIFO_toFile::getLine doesn't make sense, so error it out.         */
 /*  StringFIFO_toFile::ungetLine also.                                      */
 /* ======================================================================== */
-bool 
-StringFIFO_toFile::getLine(char *, int, bool&)
+bool
+StringFIFO_toFile::getLine(char *, int, IgnoreFlags&)
 {
     throw InternalError("StringFIFO", "getLine on StringFIFO_toFile attempted",
                         __FILE__, __LINE__);
-    return false;
 }
-bool 
-StringFIFO_toFile::getLine(char **, int *, bool&)
+bool
+StringFIFO_toFile::getLine(char **, int *, IgnoreFlags&)
 {
     throw InternalError("StringFIFO", "getLine on StringFIFO_toFile attempted",
                         __FILE__, __LINE__);
-    return false;
 }
-bool 
-StringFIFO_toFile::getLine(string&, bool&)
+bool
+StringFIFO_toFile::getLine(string&, IgnoreFlags&)
 {
     throw InternalError("StringFIFO", "getLine on StringFIFO_toFile attempted",
                         __FILE__, __LINE__);
-    return false;
 }
-void 
-StringFIFO_toFile::ungetLine(const char *, bool)
+void
+StringFIFO_toFile::ungetLine(const char *, IgnoreFlags)
 {
     throw InternalError("StringFIFO", "ungetLine on StringFIFO_toFile attempted",
                         __FILE__, __LINE__);
 }
-void 
-StringFIFO_toFile::ungetLine(const string &, bool)
+void
+StringFIFO_toFile::ungetLine(const string &, IgnoreFlags)
 {
     throw InternalError("StringFIFO", "ungetLine on StringFIFO_toFile attempted",
                         __FILE__, __LINE__);
@@ -307,25 +305,25 @@ StringFIFO_toFile::ungetLine(const string &, bool)
 /*  StringFIFO_toFile::putLine just writes the line out immediately.        */
 /*  It does NOT add an 'end of line' character.                             */
 /* ======================================================================== */
-void 
-StringFIFO_toFile::putLine(const char *buf, bool Ignore)
+void
+StringFIFO_toFile::putLine(const char *buf, IgnoreFlags Ignore)
 {
-    if (!Ignore)
+    if (!Ignore.skip_parse)
         outFile << buf;
 
     // oddball: we increment the line count here because "toFile" FIFOs
     // automagically "get" each line out to the file every time its put.
-    lineNo++; 
+    lineNo++;
 }
-void 
-StringFIFO_toFile::putLine(const string &str, bool Ignore)
+void
+StringFIFO_toFile::putLine(const string &str, IgnoreFlags Ignore)
 {
-    if (!Ignore)
+    if (!Ignore.skip_parse)
         outFile << str;
 
     // oddball: we increment the line count here because "toFile" FIFOs
     // automagically "get" each line out to the file every time its put.
-    lineNo++; 
+    lineNo++;
 }
 
 
@@ -337,10 +335,8 @@ char StringFIFO_fromCallback::hugeBuf[hbSize];
 /*  empty, then we go ahead and call the callback function.                 */
 /* ======================================================================== */
 bool
-StringFIFO_fromCallback::getLine(char *buf, int maxlen, bool &Ignore)
+StringFIFO_fromCallback::getLine(char *buf, int maxlen, IgnoreFlags &Ignore)
 {
-    int Ignore_int = 0;
-
     // We allow "putLine" on a StringFIFO_fromFile.  The effect is to insert
     // new lines ahead of lines that we would be reading from the file.
     // The "reexam" callback allows the other side to adjust this input
@@ -350,48 +346,52 @@ StringFIFO_fromCallback::getLine(char *buf, int maxlen, bool &Ignore)
         is_eof = false;
 
         bool ok = StringFIFO::getLine(buf, maxlen, Ignore);
-
-        Ignore_int = Ignore ? 1 : 0;
+        ignore_flags_t c_ignore;
+        c_ignore.skip_parse = Ignore.skip_parse;
+        c_ignore.skip_macro = Ignore.skip_macro;
 
         if (ok && reexam)
-            reexam(buf, maxlen, &Ignore_int, rx_opaque);
+            reexam(buf, maxlen, &c_ignore, rx_opaque);
 
-        Ignore = Ignore_int != 0 ? true : false;
+        Ignore.skip_parse = c_ignore.skip_parse;
+        Ignore.skip_macro = c_ignore.skip_macro;
         return ok;
     }
     endLoop();
 
     // Nothing in the queue.  Call the getline callback to see if we
-    // can get some more text.  
-    int gotLine = getline(buf, maxlen, &Ignore_int, gl_opaque);
+    // can get some more text.
+    ignore_flags_t c_ignore = { false, false };
+    int gotLine = getline(buf, maxlen, &c_ignore, gl_opaque);
 
-    Ignore = Ignore_int != 0 ? true : false;
+    Ignore.skip_parse = c_ignore.skip_parse;
+    Ignore.skip_macro = c_ignore.skip_macro;
 
-    if (gotLine == 0 && get_eof != NULL)
+    if (gotLine == 0 && get_eof != nullptr)
         is_eof = get_eof(ge_opaque) != 0;
     else
         is_eof = false;
 
-    if (gotLine != 0)   
+    if (gotLine != 0)
         lineNo++;
 
     return gotLine ? true : false;
 }
 bool
-StringFIFO_fromCallback::getLine(string &str, bool &Ignore)
+StringFIFO_fromCallback::getLine(string &str, IgnoreFlags &Ignore)
 {
     bool gotLine = getLine(hugeBuf, hbSize, Ignore);
-    
-    if (gotLine) 
+
+    if (gotLine)
         str = hugeBuf;
-    else         
+    else
         str = "";
 
     return gotLine ? true : false;
 }
 
 bool
-StringFIFO_fromCallback::getLine(char **buf, int *buflen, bool &Ignore)
+StringFIFO_fromCallback::getLine(char **buf, int *buflen, IgnoreFlags &Ignore)
 {
     // For now, limit to the larger of hbSize and *buflen.  *sigh*
 
@@ -404,9 +404,9 @@ StringFIFO_fromCallback::getLine(char **buf, int *buflen, bool &Ignore)
             int len = strlen(hugeBuf) + 1;
             if (len >= *buflen)
             {
-                char *new_buf = (char *)malloc(len + 128);
+                char *new_buf = static_cast<char *>(malloc(len + 128));
                 if (!new_buf)
-                    throw BufferOverflow(len, *buflen); 
+                    throw BufferOverflow(len, *buflen);
 
                 free(*buf);
                 *buflen = len + 128;
@@ -428,7 +428,7 @@ StringFIFO_fromCallback::getLine(char **buf, int *buflen, bool &Ignore)
 /*  calls to the getline callback.  Receiving new data either by getline    */
 /*  or calls to the putLine method will negage the EOF status.              */
 /* ======================================================================== */
-bool 
+bool
 StringFIFO_fromCallback::isEOF()
 {
     if (is_eof)
@@ -444,29 +444,29 @@ StringFIFO_fromCallback::isEOF()
 /*  StringFIFO_fromCallback::putLine just ensures is_eof is cleared before  */
 /*  stuffing stuff into the queue.  Ditto for ::ungetLine                   */
 /* ======================================================================== */
-void 
-StringFIFO_fromCallback::putLine(const char *buf, bool Ignore)
+void
+StringFIFO_fromCallback::putLine(const char *buf, IgnoreFlags Ignore)
 {
     is_eof = false;
 
     StringFIFO::putLine(buf, Ignore);
 }
-void 
-StringFIFO_fromCallback::putLine(const string &str, bool Ignore)
+void
+StringFIFO_fromCallback::putLine(const string &str, IgnoreFlags Ignore)
 {
     is_eof = false;
 
     StringFIFO::putLine(str, Ignore);
 }
-void 
-StringFIFO_fromCallback::ungetLine(const char *buf, bool Ignore)
+void
+StringFIFO_fromCallback::ungetLine(const char *buf, IgnoreFlags Ignore)
 {
     is_eof = false;
 
     StringFIFO::ungetLine(buf, Ignore);
 }
-void 
-StringFIFO_fromCallback::ungetLine(const string &str, bool Ignore)
+void
+StringFIFO_fromCallback::ungetLine(const string &str, IgnoreFlags Ignore)
 {
     is_eof = false;
 
@@ -485,9 +485,9 @@ StringFIFO_fromCallback::getLocation()
     if (get_pos)
     {
         const char *f = get_pos(&location.lineNo, gp_opaque);
-        if (f != NULL)
+        if (f != nullptr)
         {
-            if (location.fname != NULL && location.fname != fname) 
+            if (location.fname != nullptr && location.fname != fname)
                 delete[] location.fname;
 
             char *tmp = new char[strlen(f) + 1];

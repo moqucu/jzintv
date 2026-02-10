@@ -2,7 +2,6 @@
  * ============================================================================
  *  Title:    Controller pads via Joe Fisher's Classic Gaming Controller
  *  Author:   J. Zbiciak
- *  $Id$
  * ============================================================================
  *  Some code in this module comes from Joe Fisher's reference code.
  * ============================================================================
@@ -42,14 +41,14 @@ enum
     ERR_ALREADYRUNNING
 };
 
-const uint_8 CONTROLLER_0   = 0;
-const uint_8 CONTROLLER_1   = 1;
-const uint_8 CONTROLLER_2   = 2;
-const uint_8 CONTROLLER_3   = 3;
-const uint_8 TYPE_INTY      = 0xA0;
-const uint_8 TYPE_NES       = 0xA1;
-const uint_8 TYPE_SNES      = 0xA2;
-const uint_8 TYPE_ATARIJOY  = 0xA3;
+const uint8_t CONTROLLER_0   = 0;
+const uint8_t CONTROLLER_1   = 1;
+const uint8_t CONTROLLER_2   = 2;
+const uint8_t CONTROLLER_3   = 3;
+const uint8_t TYPE_INTY      = 0xA0;
+const uint8_t TYPE_NES       = 0xA1;
+const uint8_t TYPE_SNES      = 0xA2;
+const uint8_t TYPE_ATARIJOY  = 0xA3;
 
 
 /* ======================================================================== */
@@ -57,15 +56,15 @@ const uint_8 TYPE_ATARIJOY  = 0xA3;
 /* ======================================================================== */
 #include <windows.h>
 
-typedef int (*f_cgc_open) (uint_8);
-typedef int (*f_cgc_close)(void);
-typedef int (*f_cgc_read) (uint_8, uint_16*);
-typedef int (*f_cgc_error)(int, char*, long);
+typedef int f_cgc_open (uint8_t);
+typedef int f_cgc_close(void);
+typedef int f_cgc_read (uint8_t, uint16_t*);
+typedef int f_cgc_error(int, char*, long);
 
-LOCAL f_cgc_open  cgc_open  = NULL;
-LOCAL f_cgc_close cgc_close = NULL;
-LOCAL f_cgc_read  cgc_read  = NULL;
-LOCAL f_cgc_error cgc_error = NULL;
+LOCAL f_cgc_open  *cgc_open  = NULL;
+LOCAL f_cgc_close *cgc_close = NULL;
+LOCAL f_cgc_read  *cgc_read  = NULL;
+LOCAL f_cgc_error *cgc_error = NULL;
 LOCAL int did_cgc_init = 0;  /* 0 == need init, 1 == init, -1 == error */
 
 LOCAL void *cgc_dll_handle = NULL;
@@ -98,14 +97,16 @@ LOCAL int init_cgc_dll()
     /* -------------------------------------------------------------------- */
     /*  Get function pointers for the four interface functions we need.     */
     /* -------------------------------------------------------------------- */
-    cgc_open  = (f_cgc_open )GetProcAddress(cgc_dll_handle,"CGCOpen");
-    cgc_close = (f_cgc_close)GetProcAddress(cgc_dll_handle,"CGCClose");
-    cgc_read  = (f_cgc_read )GetProcAddress(cgc_dll_handle,"CGCGetRawIntyData");
-    cgc_error = (f_cgc_error)GetProcAddress(cgc_dll_handle,"CGCGetErrorString");
+    cgc_open  = (f_cgc_open *)GetProcAddress(cgc_dll_handle,"CGCOpen");
+    cgc_close = (f_cgc_close*)GetProcAddress(cgc_dll_handle,"CGCClose");
+    cgc_read  = (f_cgc_read *)GetProcAddress(cgc_dll_handle,
+                                             "CGCGetRawIntyData");
+    cgc_error = (f_cgc_error*)GetProcAddress(cgc_dll_handle,
+                                             "CGCGetErrorString");
 
     if (!cgc_open || !cgc_close || !cgc_read || !cgc_error)
     {
-        fprintf(stderr, 
+        fprintf(stderr,
                 "init_cgc:  Couldn't get these functions from CGC.DLL:\n\n"
                 "%s%s%s%s\n\n",
                 !cgc_open  ? "    CGCOpen()\n":"",
@@ -142,14 +143,14 @@ LOCAL int init_cgc_dll()
 /* ======================================================================== */
 /*  PAD_CGC_READ -- Returns the current state of the pads.                  */
 /* ======================================================================== */
-uint_32 pad_cgc_read(periph_t *p, periph_t *r, uint_32 a, uint_32 d)
+uint32_t pad_cgc_read(periph_t *p, periph_t *r, uint32_t a, uint32_t d)
 {
-    pad_cgc_t *pad = (pad_cgc_t*)p;
+    pad_cgc_t *const pad = PERIPH_AS(pad_cgc_t, p);
     int side = a & 1, ret;
-    uint_16 value;
+    uint16_t value;
 
-    UNUSED(r);    
-    UNUSED(d);    
+    UNUSED(r);
+    UNUSED(d);
 
     /* -------------------------------------------------------------------- */
     /*  Ignore accesses that are outside our address space.                 */
@@ -172,7 +173,7 @@ uint_32 pad_cgc_read(periph_t *p, periph_t *r, uint_32 a, uint_32 d)
         if (ret != CGC_OK)
         {
             cgc_error(ret, cgc_err_buf, sizeof(cgc_err_buf));
-            fprintf(stderr, "cgc_tick:  Error reading CGC: %s\n", 
+            fprintf(stderr, "cgc_tick:  Error reading CGC: %s\n",
                     cgc_err_buf);
             pad->num_errors++;
         }
@@ -183,11 +184,11 @@ uint_32 pad_cgc_read(periph_t *p, periph_t *r, uint_32 a, uint_32 d)
 /* ======================================================================== */
 /*  PAD_CGC_WRITE -- Looks for changes in I/O mode on PSG I/O ports.        */
 /* ======================================================================== */
-void pad_cgc_write(periph_t *p, periph_t *r, uint_32 a, uint_32 d)
+void pad_cgc_write(periph_t *p, periph_t *r, uint32_t a, uint32_t d)
 {
-    pad_cgc_t *pad = (pad_cgc_t*)p;
+    pad_cgc_t *const pad = PERIPH_AS(pad_cgc_t, p);
 
-    UNUSED(r);    
+    UNUSED(r);
 
     /* -------------------------------------------------------------------- */
     /*  Capture writes to the 'control' register in the PSG, looking for    */
@@ -210,8 +211,8 @@ void pad_cgc_write(periph_t *p, periph_t *r, uint_32 a, uint_32 d)
 /* ======================================================================== */
 int pad_cgc_win32_init
 (
-    pad_cgc_t       *pad,           /*  pad_cgc_t structure to initialize   */
-    uint_32         addr,           /*  Base address of pad.                */
+    pad_cgc_t      *pad,            /*  pad_cgc_t structure to initialize   */
+    uint32_t        addr,           /*  Base address of pad.                */
     int             cgc_num         /*  CGC number in system                */
 )
 {
@@ -227,7 +228,7 @@ int pad_cgc_win32_init
     pad->periph.max_tick = ~0U;
     pad->cgc_num         = cgc_num;
 
-    jzp_printf("pads_cgc:  CGC #%d mapped to $%.4X-$%.4X\n", 
+    jzp_printf("pads_cgc:  CGC #%d mapped to $%.4X-$%.4X\n",
             cgc_num, addr + 0xE, addr + 0xF);
 
     pad->periph.addr_base = addr;
@@ -235,14 +236,14 @@ int pad_cgc_win32_init
 
     pad->io  [0]          = 0;
     pad->io  [1]          = 0;
-                  
+
     return 0;
 }
 #else
 int pad_cgc_win32_init
 (
-    pad_cgc_t       *pad,           /*  pad_cgc_t structure to initialize   */
-    uint_32         addr,           /*  Base address of pad.                */
+    pad_cgc_t      *pad,            /*  pad_cgc_t structure to initialize   */
+    uint32_t        addr,           /*  Base address of pad.                */
     int             cgc_num         /*  CGC number in system                */
 )
 {
@@ -267,9 +268,9 @@ int pad_cgc_win32_init
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                 Copyright (c) 2004-+Inf, Joseph Zbiciak                  */
 /* ======================================================================== */

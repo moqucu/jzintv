@@ -112,28 +112,10 @@
 /*                                                                          */
 /* ======================================================================== */
 
-/* ======================================================================== */
-/*  This program is free software; you can redistribute it and/or modify    */
-/*  it under the terms of the GNU General Public License as published by    */
-/*  the Free Software Foundation; either version 2 of the License, or       */
-/*  (at your option) any later version.                                     */
-/*                                                                          */
-/*  This program is distributed in the hope that it will be useful,         */
-/*  but WITHOUT ANY WARRANTY; without even the implied warranty of          */
-/*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
-/*  General Public License for more details.                                */
-/*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
-/* ------------------------------------------------------------------------ */
-/*                 Copyright (c) 2002-+Inf, Joseph Zbiciak                  */
-/* ======================================================================== */
-
 
 #include "config.h"
 
-uint_8 grom[256 * 8];
+uint8_t grom[256 * 8];
 
 /* ======================================================================== */
 /*  READ_GROM -- Reads in a GROM image.  Detects whether it's a 16-bit or   */
@@ -155,7 +137,12 @@ LOCAL void read_grom(FILE *f)
     /* -------------------------------------------------------------------- */
     if (len == 2048)
     {
-        fread(grom, 1, 2048, f);
+        if (fread(grom, 1, 2048, f) != 2048)
+        {
+            perror("fread()");
+            fprintf(stderr, "Unable to read GROM\n");
+            exit(1);
+        }
         return;
     }
 
@@ -165,9 +152,15 @@ LOCAL void read_grom(FILE *f)
     if (len == 4096)
     {
         int i, nz = 0;
-        uint_8 temp[4096];
+        uint8_t temp[4096];
 
-        fread(temp, 1, 4096, f);
+        if (fread(temp, 1, 4096, f) != 4096)
+        {
+            perror("fread()");
+            fprintf(stderr, "Unable to read GROM\n");
+            exit(1);
+        }
+
 
         /* ---------------------------------------------------------------- */
         /*  Try to decode GROM as a big-endian ROM first.                   */
@@ -228,7 +221,7 @@ LOCAL void ascii_dump(FILE *f, int num_per_row, int digit_mode)
                 }
 
         fputc('\n', f);
-        
+
         /* ---------------------------------------------------------------- */
         /*  Output the 8 rows of characters.                                */
         /* ---------------------------------------------------------------- */
@@ -255,7 +248,7 @@ LOCAL void ascii_dump(FILE *f, int num_per_row, int digit_mode)
 /*  MINI_GIF -- writes out an 8x8 1bpp GIF87a file.  Does not employ LZW    */
 /*              compression (to avoid patent issues).                       */
 /* ======================================================================== */
-LOCAL const uint_8 mini_gif_header[] = 
+LOCAL const uint8_t mini_gif_header[] =
 {
     /* GIF Header */
     'G', 'I', 'F', '8', '7', 'a', /* GIF87a signature                       */
@@ -264,27 +257,27 @@ LOCAL const uint_8 mini_gif_header[] =
     0xF0,                         /* 1-bpp pixels, 8-bpp color map          */
     0x00,                         /* Background color = index #0            */
     0x00,                         /* Filler byte                            */
-                                                                           
-    /* Global Color Map */                                                 
+
+    /* Global Color Map */
     0xFF, 0xFF, 0xFF,             /* Index #0 == WHITE                      */
     0x00, 0x00, 0x00,             /* Index #1 == BLACK                      */
-                                                                           
-    /* Image Descriptor */                                                 
+
+    /* Image Descriptor */
     0x2C,                         /* Image separator character              */
     0x00, 0x00,                   /* Image left    = 0x0000                 */
     0x00, 0x00,                   /* Image top     = 0x0000                 */
     0x08, 0x00,                   /* Image width   = 0x0008                 */
     0x08, 0x00,                   /* Image height  = 0x0008                 */
     0x00,                         /* Use global color, sequential, 1bpp     */
-                                                                           
-    /* Start of compressed image */                                        
+
+    /* Start of compressed image */
     0x02,                         /* Initial code length = 2                */
     37                            /* "Compressed" block is always 37 bytes. */
 };
 
-LOCAL void mini_gif(FILE *f, uint_8 *bitmap)
+LOCAL void mini_gif(FILE *f, uint8_t *bitmap)
 {
-    uint_32 bitbuf = 0, bit;
+    uint32_t bitbuf = 0, bit;
     int     bitptr = 0;
     int     i;
 
@@ -326,7 +319,7 @@ LOCAL void mini_gif(FILE *f, uint_8 *bitmap)
             bitbuf >>= 8;
             bitptr  -= 8;
         }
-    } 
+    }
 
     bitbuf |= 0x05 << bitptr;   /* End of Information code = 101 */
     bitptr += 3;
@@ -334,13 +327,13 @@ LOCAL void mini_gif(FILE *f, uint_8 *bitmap)
     /* -------------------------------------------------------------------- */
     /*  Flush output.                                                       */
     /* -------------------------------------------------------------------- */
-    while (bitptr >= 0)   
+    while (bitptr >= 0)
     {
         fputc(0xFF & bitbuf, f);
         bitbuf >>= 8;
         bitptr  -= 8;
     }
-   
+
     /* -------------------------------------------------------------------- */
     /*  Terminate compressed data.                                          */
     /* -------------------------------------------------------------------- */
@@ -352,12 +345,13 @@ LOCAL void mini_gif(FILE *f, uint_8 *bitmap)
     fputc(0x3B, f);
 }
 
-const char hex[16] = "0123456789ABCDEF";
+const char hex[16] = { '0', '1', '2', '3', '4', '5', '6', '7', 
+                       '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
 
 /* ======================================================================== */
 /*  HTML_DUMP -- Outputs the HTML dump of the GROM to a file.               */
 /* ======================================================================== */
-LOCAL void html_dump(FILE *f, const char *filename, int x_dim, int y_dim, 
+LOCAL void html_dump(FILE *f, const char *filename, int x_dim, int y_dim,
                      int num_per_row, int font_size, int digit_mode)
 {
     int i, j;
@@ -371,7 +365,7 @@ LOCAL void html_dump(FILE *f, const char *filename, int x_dim, int y_dim,
 
     i = strlen(filename);
     gif_fn = (char *)malloc(i + 8);  /* Extra room for _XX.gif */
-    
+
     if (!gif_fn)
     {
         fprintf(stderr, "Out of memory in html_dump.\n");
@@ -407,37 +401,39 @@ LOCAL void html_dump(FILE *f, const char *filename, int x_dim, int y_dim,
         fprintf(f, "<TR>");
         for (j = 0; j < num_per_row; j++)
         {
-            char label[9];
+            const int tile = i + j;
+            char label[32];
 
-            if (i + j > 255)
+            if (tile > 255)
                 break;
 
-            sfx_ofs[1] = hex[0xF & ((i + j) >> 4)];
-            sfx_ofs[2] = hex[0xF & ((i + j) >> 0)];
+            sfx_ofs[1] = hex[0xF & (tile >> 4)];
+            sfx_ofs[2] = hex[0xF & (tile >> 0)];
 
             switch (digit_mode)
             {
-                case 1: snprintf(label, 9, "%d", i + j); break;
-                case 2: snprintf(label, 9, "%.2X", i + j); break;
-                case 3: snprintf(label, 9, "%.2X (%d)", i + j, i + j); break;
+                case 1: snprintf(label, sizeof(label), "%d", tile); break;
+                case 2: snprintf(label, sizeof(label), "%.2X", tile); break;
+                case 3: snprintf(label, sizeof(label), "%.2X (%d)", tile, tile);
+                        break;
                 default: label[0] = 0;
             }
 
             if (font_size == 0)
             {
-                fprintf(f, 
+                fprintf(f,
                     "<TD ALIGN=center BGCOLOR=#CCCCCC>%s<BR>"
                     "<IMG SRC=\"%s\" WIDTH=%d HEIGHT=%d></TD>",
                     label, gif_fn, x_dim, y_dim);
             } else
             {
-                fprintf(f, 
+                fprintf(f,
                     "<TD ALIGN=center BGCOLOR=#CCCCCC>"
                     "<FONT SIZE=%d>%s<BR>"
                     "<IMG SRC=\"%s\" WIDTH=%d HEIGHT=%d></TD>",
                     font_size, label, gif_fn, x_dim, y_dim);
             }
-            
+
             if ((gif = fopen(gif_fn, "wb")) == NULL)
             {
                 fprintf(stderr, "ERROR:  Could not open GIF file \"%s\" "
@@ -445,7 +441,7 @@ LOCAL void html_dump(FILE *f, const char *filename, int x_dim, int y_dim,
                 exit(1);
             }
 
-            mini_gif(gif, &grom[8 * (i + j)]);
+            mini_gif(gif, &grom[8 * tile]);
 
             fclose(gif);
         }
@@ -463,7 +459,7 @@ LOCAL void html_dump(FILE *f, const char *filename, int x_dim, int y_dim,
 /* ======================================================================== */
 LOCAL void usage(char *argv0)
 {
-    fprintf(stderr, 
+    fprintf(stderr,
       "Usage:  %s [flags] grom.bin\n"
       "\n"
       "        Recognized flags:\n"
@@ -478,7 +474,7 @@ LOCAL void usage(char *argv0)
       "        -y #        Displayed height for GIFs      (HTML mode only)\n"
       "        -r #        Cards per row                  (HTML mode only)\n"
       "        -f #        Relative font size for labels  (HTML mode only)\n"
-      "        grom.bin    Pathname for GROM.BIN file to show contents of\n", 
+      "        grom.bin    Pathname for GROM.BIN file to show contents of\n",
       argv0);
     exit(0);
 }
@@ -548,9 +544,9 @@ int main(int argc, char *argv[])
                     if (argv[n][2] != '\0')
                     {
                         num = atoi(&argv[n][2]);
-                    } else if (argc > 1 && 
+                    } else if (argc > 1 &&
                                (isdigit(argv[n + 1][0]) ||
-                                (argv[n + 1][0] == '-' && 
+                                (argv[n + 1][0] == '-' &&
                                  isdigit(argv[n + 1][1]))))
                     {
                         num = atoi(argv[++n]);
@@ -569,7 +565,7 @@ int main(int argc, char *argv[])
                         case 'r' : num_per_row = num; break;
                         case 'f' : font_size = num; break;
                     }
-                    
+
                     break;
                 }
                 case '?' : usage(argv[0]); break;
@@ -613,7 +609,7 @@ int main(int argc, char *argv[])
             exit(1);
         }
     }
-     
+
     /* -------------------------------------------------------------------- */
     /*  Make sure number-per-row is valid.                                  */
     /* -------------------------------------------------------------------- */
@@ -673,3 +669,21 @@ int main(int argc, char *argv[])
 
     return 0;
 }
+
+/* ======================================================================== */
+/*  This program is free software; you can redistribute it and/or modify    */
+/*  it under the terms of the GNU General Public License as published by    */
+/*  the Free Software Foundation; either version 2 of the License, or       */
+/*  (at your option) any later version.                                     */
+/*                                                                          */
+/*  This program is distributed in the hope that it will be useful,         */
+/*  but WITHOUT ANY WARRANTY; without even the implied warranty of          */
+/*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
+/*  General Public License for more details.                                */
+/*                                                                          */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
+/* ------------------------------------------------------------------------ */
+/*                 Copyright (c) 2002-+Inf, Joseph Zbiciak                  */
+/* ======================================================================== */

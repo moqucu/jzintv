@@ -2,7 +2,7 @@
 ## subMakefile for periph
 ##############################################################################
 
-periph/periph.o: periph/periph.c periph/periph.h periph/subMakefile config.h
+periph/periph.$(O): periph/periph.c periph/periph.h periph/subMakefile config.h
 
-OBJS+=periph/periph.o
+OBJS += periph/periph.$(O)
 

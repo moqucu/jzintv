@@ -50,8 +50,8 @@ icartrom_t icart;
                         } while(0)
 
 
-uint_8 bin_h[4096];
-uint_8 bin_l[4096];
+uint8_t bin_h[4096];
+uint8_t bin_l[4096];
 
 
 /* ======================================================================== */
@@ -59,7 +59,7 @@ uint_8 bin_l[4096];
 /* ======================================================================== */
 LOCAL void usage(void)
 {
-    fprintf(stderr, 
+    fprintf(stderr,
                                                                           "\n"
     "SPLIT_ROM"                                                           "\n"
     "Copyright 2004, Joseph Zbiciak"                                      "\n"
@@ -100,7 +100,7 @@ LOCAL void usage(void)
 /* ======================================================================== */
 LOCAL void license(void)
 {
-    fprintf(stderr, 
+    fprintf(stderr,
                                                                           "\n"
     "SPLIT_ROM"                                                           "\n"
     "Copyright 2004, Joseph Zbiciak"                                      "\n"
@@ -115,9 +115,9 @@ LOCAL void license(void)
     "MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU"   "\n"
     "General Public License for more details."                            "\n"
                                                                           "\n"
-    "You should have received a copy of the GNU General Public License"   "\n"
-    "along with this program; if not, write to the Free Software"         "\n"
-    "Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA."           "\n"
+"You should have received a copy of the GNU General Public License along" "\n"
+"with this program; if not, write to the Free Software Foundation, Inc.," "\n"
+"51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA."             "\n"
                                                                           "\n"
     "Run \"split_rom --help\" for usage information."                     "\n"
                                                                           "\n"
@@ -127,7 +127,7 @@ LOCAL void license(void)
 }
 
 #define MAX_FNAME  (1024)
-#define MAX_PREFIX (MAX_FNAME - 7)
+#define MAX_PREFIX (MAX_FNAME - 8)
 #define SUFFIX     "_%x%c.bin"
 
 char output_prefix_buf[MAX_PREFIX];
@@ -140,7 +140,7 @@ char output_name      [MAX_FNAME];
 /* ======================================================================== */
 int main(int argc, char *argv[])
 {
-    int c, option_idx = 0, value;
+    int c, option_idx = 0;
     char *output_prefix = NULL;
     int i;
     int sect, addr;
@@ -149,13 +149,9 @@ int main(int argc, char *argv[])
     /* -------------------------------------------------------------------- */
     /*  Parse command-line arguments.                                       */
     /* -------------------------------------------------------------------- */
-    while ((c = getopt_long(argc, argv, optchars, long_opts, &option_idx)) 
+    while ((c = getopt_long(argc, argv, optchars, long_opts, &option_idx))
             != EOF)
     {
-        value = 1;
-        if (optarg)
-            value = atoi(optarg);
-
         switch (c)
         {
             case 'h': case '?': usage();                break;
@@ -204,13 +200,14 @@ int main(int argc, char *argv[])
         assert(optind == argc - 1);
 
         output_prefix = output_prefix_buf;
-        strncpy(output_prefix, argv[optind], MAX_PREFIX);
+        strncpy(output_prefix, argv[optind], MAX_PREFIX - 1);
+        output_prefix[MAX_PREFIX - 1] = 0;
         ext = strchr(output_prefix, '.');   /* strip ALL extensions */
 
         if (*ext)
             *ext = '\0';
         else
-            fprintf(stderr, 
+            fprintf(stderr,
                     "Warning: Could not find extension(s) on '%s'\n",
                     argv[optind]);
     }
@@ -218,7 +215,7 @@ int main(int argc, char *argv[])
     /* -------------------------------------------------------------------- */
     /*  Read in the requested file.                                         */
     /* -------------------------------------------------------------------- */
-    icart_readfile(argv[optind], &icart);
+    icart_readfile(argv[optind], &icart, 1);
 
     /* -------------------------------------------------------------------- */
     /*  Scan the cart, looking for PRELOAD && READ on each 4K chunk.        */
@@ -227,7 +224,7 @@ int main(int argc, char *argv[])
     {
         int preload, readable;
         int csum_h, csum_l;
-        
+
         /* ---------------------------------------------------------------- */
         /*  Scan for preload/readable bits.  Take it if it has both at      */
         /*  least somewhere in this 4K range.                               */
@@ -254,20 +251,22 @@ int main(int argc, char *argv[])
             csum_l += bin_l[i] = 0xFF & (icart.image[addr]     );
         }
 
-        snprintf(output_name, MAX_FNAME, "%s" SUFFIX, output_prefix, sect, 'h');
+        snprintf(output_name, MAX_FNAME, "%s" SUFFIX, output_prefix,
+                 sect & 0xF, 'h');
         output_name[MAX_FNAME-1] = 0;
         printf("%s: %.5X\n", output_name, csum_h);
         if (!(f = fopen(output_name, "wb"))) { perror("fopen"); exit(1); }
         fwrite(bin_h, 1, 4096, f);
         fclose(f);
-         
-        snprintf(output_name, MAX_FNAME, "%s" SUFFIX, output_prefix, sect, 'l');
+
+        snprintf(output_name, MAX_FNAME, "%s" SUFFIX, output_prefix,
+                 sect & 0xF, 'l');
         output_name[MAX_FNAME-1] = 0;
         printf("%s: %.5X\n", output_name, csum_l);
         if (!(f = fopen(output_name, "wb"))) { perror("fopen"); exit(1); }
         fwrite(bin_l, 1, 4096, f);
         fclose(f);
-    }         
+    }
 
     return 0;
 }
@@ -283,9 +282,9 @@ int main(int argc, char *argv[])
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                 Copyright (c) 2002-2003, Joseph Zbiciak                  */
 /* ======================================================================== */

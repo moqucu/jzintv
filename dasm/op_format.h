@@ -4,9 +4,8 @@
  *
  *  Author:         J. Zbiciak
  *
- *  $Id$
  * ============================================================================
- *  This header contains bitfield structures that define the various 
+ *  This header contains bitfield structures that define the various
  *  CP-1600 opcode formats.  This header should be compatible w/ jzIntv's
  *  "op_decode.h".  Eventually, op_decode.h should factor into two headers,
  *  one of which is this one.
@@ -14,8 +13,8 @@
  */
 
 
-#ifndef _OP_FORMAT_H
-#define _OP_FORMAT_H
+#ifndef OP_FORMAT_H_
+#define OP_FORMAT_H_
 
 #include "config.h"
 
@@ -51,8 +50,8 @@
  *
  *  oo    -- Opcode field (dependent on format)
  *  sss   -- Source register,      R0 ... R7 (binary encoding)
- *  ddd   -- Destination register, R0 ... R7 (binary encoding)    
- *  0dd   -- Destination register, R0 ... R3 
+ *  ddd   -- Destination register, R0 ... R7 (binary encoding)
+ *  0dd   -- Destination register, R0 ... R3
  *  cccc  -- Condition codes (branches)
  *  x     -- External branch condition (0 == internal, 1 == examine BEXT)
  *  z     -- Branch displacement direction (1 == negative)
@@ -71,7 +70,7 @@
  *  n101  -- Less than                 Greater than or equal
  *  n110  -- Less than or equal        Greater than
  *  n111  -- Unequal sign and carry    Equal sign and carry
- *  
+ *
  *  Branch Return Registers  (bb)
  *  -----------------------
  *
@@ -101,7 +100,7 @@
  *     order.  If a non-incrementing data counter is used, both accesses are
  *     to the same address.  Otherwise, the counter is post-incremented with
  *     each access.  Indirect through R6 (stack addressing) is not allowed.
- * 
+ *
  *  Interruptibility notes:
  *
  *  -- Interrupts always occur after an instruction completes.  No instruction
@@ -112,7 +111,7 @@
  *     the transition from the current instruction to the next.
  *
  *  -- When the processor takes an interrupt, the current PC value is pushed
- *     on the stack.  The address jumped to for the interrupt is provided 
+ *     on the stack.  The address jumped to for the interrupt is provided
  *     by external hardware (similar to an 8080, if I recall correctly).
  *
  *  Status register/GSWD/RSWD notes:
@@ -247,7 +246,7 @@ typedef struct op_reg_1op
  *  OP_GSWD         -- Get status word
  *
  *  Notes:
- *   -- Only one instruction (GSWD) has this encoding.  
+ *   -- Only one instruction (GSWD) has this encoding.
  *   -- Aliases reg_1op encoding's 110 opcode.
  *   -- Very similar to nop_sin encoding (below)
  *
@@ -270,7 +269,7 @@ typedef struct op_gswd
  *  OP_NOP_SIN          -- NOP and SIN encoding
  *
  *  Notes:
- *   -- Only two instructions (NOP, SIN) have this encoding.  
+ *   -- Only two instructions (NOP, SIN) have this encoding.
  *   -- Aliases reg_1op encoding's 110 opcode.
  *   -- Very similar to gswd encoding (above)
  *
@@ -460,7 +459,7 @@ typedef struct op_imm_2op
  *  Decoder functions pick apart the data in the other op_XXX types and
  *  store it in an op_decoded structure.
  *
- *  The exact meaning ascribed to the various fields is dependent on the 
+ *  The exact meaning ascribed to the various fields is dependent on the
  *  original opcode format as well as the instruction in question.  This
  *  format exists only because it's more convenient for the CPU to deal with
  *  than the packed bitfields.
@@ -469,10 +468,10 @@ typedef struct op_imm_2op
 
 typedef struct op_decoded
 {
-    uint_16         imm0;               /* immediate value 0        */
-    uint_16         imm1;               /* immediate value 1        */
-    uint_16         reg0;               /* First register           */
-    uint_16         reg1;               /* Second register          */
+    uint16_t        imm0;               /* immediate value 0        */
+    uint16_t        imm1;               /* immediate value 1        */
+    uint16_t        reg0;               /* First register           */
+    uint16_t        reg1;               /* Second register          */
     int             op;                 /* Actual opcode            */
 } op_decoded;
 
@@ -538,9 +537,9 @@ typedef struct instr_t
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                 Copyright (c) 1998-2003, Joseph Zbiciak                  */
 /* ======================================================================== */

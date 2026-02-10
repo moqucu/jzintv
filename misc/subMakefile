@@ -2,13 +2,15 @@
 ## subMakefile for misc support routines
 ##############################################################################
 
-misc/crc16.o:      misc/crc16.h   misc/subMakefile config.h
-misc/crc32.o:      misc/crc32.h   misc/subMakefile config.h
-misc/avl.o:        misc/avl.h     misc/subMakefile config.h
-misc/ll.o:         misc/ll.h      misc/subMakefile config.h
-misc/jzprint.o:    misc/jzprint.h misc/subMakefile config.h
-misc/file_crc32.o: misc/crc32.h   misc/subMakefile config.h
+misc/crc16.$(O):      misc/crc16.h   misc/subMakefile config.h
+misc/crc32.$(O):      misc/crc32.h   misc/subMakefile config.h
+misc/avl.$(O):        misc/avl.h     misc/subMakefile config.h
+misc/ll.$(O):         misc/ll.h      misc/subMakefile config.h
+misc/jzprint.$(O):    misc/jzprint.h misc/subMakefile config.h misc/printer.h
+misc/file_crc32.$(O): misc/crc32.h   misc/subMakefile config.h lzoe/lzoe.h
+misc/types.$(O):      misc/types.h   misc/subMakefile config.h misc/printer.h
+misc/printer.$(O):    misc/printer.h
 
-OBJS += misc/crc32.o misc/crc16.o misc/avl.o misc/ll.o misc/jzprint.o
-OBJS += misc/file_crc32.o
+OBJS += misc/crc32.$(O) misc/crc16.$(O) misc/avl.$(O) misc/ll.$(O)
+OBJS += misc/file_crc32.$(O) misc/types.$(O) misc/jzprint.$(O) misc/printer.$(O)
 

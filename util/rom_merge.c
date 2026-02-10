@@ -13,7 +13,7 @@
 /*      -r  --replace   Allow later .ROMs to replace portions mapped by     */
 /*                      previous .ROMs.  (Default is error.)                */
 /* ======================================================================== */
-/*                 Copyright (c) 2002-2006, Joseph Zbiciak                  */
+/*                 Copyright (c) 2002-2017, Joseph Zbiciak                  */
 /* ======================================================================== */
 
 #include <stdio.h>
@@ -23,8 +23,7 @@
 #include "icart/icartrom.h"
 #include "icart/icartbin.h"
 #include "icart/icartfile.h"
-
-
+#include "metadata/metadata.h"
 
 static struct option long_opts[] =
 {
@@ -35,11 +34,12 @@ static struct option long_opts[] =
     {   "license",      0,      NULL,       'l'     },
     {   "cc3",          0,      NULL,       '3'     },
     {   "adv",          0,      NULL,       3       },
+    {   "strip",        0,      NULL,       's'     },
 
     {   NULL,           0,      NULL,       0       }
 };
 
-static const char *optchars = "frh?l3";
+static const char *optchars = "frh?l3s";
 
 /* -- should be defined in getopt.h --
 extern char *optarg;
@@ -49,7 +49,6 @@ extern int  optind, opterr, optopt;
 int force_overwrite = 0;
 int allow_replace   = 0;
 
-
 icartrom_t final_icart, temp_icart;
 
 #define GET_BIT(bv,i,b) do {                                    \
@@ -57,16 +56,16 @@ icartrom_t final_icart, temp_icart;
                             b = ((bv)[_ >> 5] >> (_ & 31)) & 1; \
                         } while(0)
 
-
 /* ======================================================================== */
 /*  MERGE_ICARTS     -- Given two icartrom_t's, copy the second into the    */
 /*                      first.  The "replace" argument controls whether     */
 /*                      the second ROM is allowed to replace segments in    */
 /*                      the first.                                          */
 /* ======================================================================== */
-LOCAL void merge_icarts(icartrom_t *dst, icartrom_t *src, int replace)
+LOCAL void merge_icarts(icartrom_t *dst, icartrom_t *src, int replace,
+                        int merge_metadata)
 {
-    uint_32 a, p, attr_src, attr_dst, b;
+    uint32_t a, p, attr_src, attr_dst, b;
 
     /* -------------------------------------------------------------------- */
     /*  Look through 256-word pages of 'src' for preload hunks to copy to   */
@@ -138,6 +137,24 @@ LOCAL void merge_icarts(icartrom_t *dst, icartrom_t *src, int replace)
             exit(1);
         }
     }
+
+    /* -------------------------------------------------------------------- */
+    /*  If we're asked to merge metadata, do so.                            */
+    /* -------------------------------------------------------------------- */
+    if (merge_metadata)
+    {
+        if (!dst->metadata)
+        {
+            dst->metadata = src->metadata;
+            src->metadata = NULL;
+        } else if (dst->metadata && src->metadata)
+        {
+            game_metadata_t *new_metadata =
+                merge_game_metadata(dst->metadata, src->metadata);
+            free_game_metadata(dst->metadata);
+            dst->metadata = new_metadata;
+        }
+    }
 }
 
 /* ======================================================================== */
@@ -145,10 +162,10 @@ LOCAL void merge_icarts(icartrom_t *dst, icartrom_t *src, int replace)
 /* ======================================================================== */
 LOCAL void usage(void)
 {
-    fprintf(stderr, 
+    fprintf(stderr,
                                                                           "\n"
     "ROM_MERGE"                                                           "\n"
-    "Copyright 2006, Joseph Zbiciak"                                      "\n"
+    "Copyright 2018, Joseph Zbiciak"                                      "\n"
                                                                           "\n"
     "Usage: \n"
     "    rom_merge [flags] file0.rom [file1.rom [file2.rom [...]]] out.rom\n"
@@ -158,12 +175,13 @@ LOCAL void usage(void)
     "input ROMs as a safety precaution."                                  "\n"
                                                                           "\n"
     "Flags:"                                                              "\n"
-    "    -f  --force     Allow output file to overwrite an input file."   "\n"
-    "    -r  --replace   Allow later .ROMs to replace portions mapped by" "\n"
-    "                    previous .ROMs.  (Default is error.)"            "\n"
-    "    -3  --cc3       Write a CC3 ROM header."                         "\n"
-    "    -l  --license   License information"                             "\n"
-    " -h -?  --help      This usage info"                                 "\n"
+    "    -f  --force        Allow output file to overwrite an input file.""\n"
+    "    -r  --replace      Allow later .ROMs to replace portions mapped by\n"
+    "                       previous .ROMs.  (Default is error.)"         "\n"
+    "    -3  --cc3          Write a CC3 ROM header."                      "\n"
+    "    -l  --license      License information"                          "\n"
+    " -h -?  --help         This usage info"                              "\n"
+    "    -s  --strip        Strip metadata from the result."              "\n"
                                                                           "\n"
     );
 
@@ -175,10 +193,10 @@ LOCAL void usage(void)
 /* ======================================================================== */
 LOCAL void license(void)
 {
-    fprintf(stderr, 
+    fprintf(stderr,
                                                                           "\n"
     "ROM_MERGE"                                                           "\n"
-    "Copyright 2006, Joseph Zbiciak"                                      "\n"
+    "Copyright 2018, Joseph Zbiciak"                                      "\n"
                                                                           "\n"
     "This program is free software; you can redistribute it and/or modify""\n"
     "it under the terms of the GNU General Public License as published by""\n"
@@ -190,9 +208,9 @@ LOCAL void license(void)
     "MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU"   "\n"
     "General Public License for more details."                            "\n"
                                                                           "\n"
-    "You should have received a copy of the GNU General Public License"   "\n"
-    "along with this program; if not, write to the Free Software"         "\n"
-    "Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA."           "\n"
+"You should have received a copy of the GNU General Public License along" "\n"
+"with this program; if not, write to the Free Software Foundation, Inc.," "\n"
+"51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA."             "\n"
                                                                           "\n"
     "Run \"rom_merge --help\" for usage information."                     "\n"
                                                                           "\n"
@@ -209,21 +227,19 @@ LOCAL void license(void)
 /* ======================================================================== */
 int main(int argc, char *argv[])
 {
-    int c, option_idx = 0, value;
+    int c, option_idx = 0;
     char *output_file;
     int i;
     ictype_t icart_type = ICART;
+    int merge_metadata = 1;
+    int last_input;
 
     /* -------------------------------------------------------------------- */
     /*  Parse command-line arguments.                                       */
     /* -------------------------------------------------------------------- */
-    while ((c = getopt_long(argc, argv, optchars, long_opts, &option_idx)) 
+    while ((c = getopt_long(argc, argv, optchars, long_opts, &option_idx))
             != EOF)
     {
-        value = 1;
-        if (optarg)
-            value = atoi(optarg);
-
         switch (c)
         {
             case 'f': force_overwrite = 1;              break;
@@ -232,6 +248,7 @@ int main(int argc, char *argv[])
             case 'l': license();                        break;
             case '3': icart_type = CC3_STD;             break;
             case  3 : icart_type = CC3_ADV;             break;
+            case 's': merge_metadata = 0;               break;
 
             default:
             {
@@ -242,13 +259,29 @@ int main(int argc, char *argv[])
     }
 
     /* -------------------------------------------------------------------- */
+    /*  If "rom_merge -s" with exactly one file, turn on "force_overwrite"  */
+    /* -------------------------------------------------------------------- */
+    last_input = argc - 2;
+    if (!merge_metadata && optind == argc - 1)
+    {
+        last_input = argc - 1;
+        force_overwrite = 1;
+    }
+
+    /* -------------------------------------------------------------------- */
     /*  Must have at least two additional arguments:  One input file and    */
     /*  one output file.                                                    */
+    /*                                                                      */
+    /*  Exception:  Allow "rom_merge -s foo.rom" to strip metadata.         */
     /* -------------------------------------------------------------------- */
-    if (optind + 2 > argc)
+    if (optind > last_input)
     {
-        fprintf(stderr, "ERROR:  Must provide at least one input file and "
-                        "one output file\n");
+        if (merge_metadata)
+            fprintf(stderr, "ERROR:  Must provide at least one input file and "
+                            "one output file\n");
+        else
+            fprintf(stderr, "ERROR:  Must provide input file name with "
+                            "rom_merge -s\n");
         exit(1);
     }
 
@@ -271,7 +304,7 @@ int main(int argc, char *argv[])
     /* -------------------------------------------------------------------- */
     output_file = argv[argc - 1];
 
-    for (i = optind; i < argc - 1; i++)
+    for (i = optind; i <= last_input; i++)
     {
         /* ---------------------------------------------------------------- */
         /*  Check for accidental over write of output file.                 */
@@ -292,12 +325,12 @@ int main(int argc, char *argv[])
         /* ---------------------------------------------------------------- */
         /*  Read in the requested file.                                     */
         /* ---------------------------------------------------------------- */
-        icart_readfile(argv[i], &temp_icart);
+        icart_readfile(argv[i], &temp_icart, 1);
 
         /* ---------------------------------------------------------------- */
         /*  Merge this image into our final image.                          */
         /* ---------------------------------------------------------------- */
-        merge_icarts(&final_icart, &temp_icart, allow_replace);
+        merge_icarts(&final_icart, &temp_icart, allow_replace, merge_metadata);
     }
 
     /* -------------------------------------------------------------------- */
@@ -319,9 +352,9 @@ int main(int argc, char *argv[])
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
-/*                 Copyright (c) 2002-2006, Joseph Zbiciak                  */
+/*                 Copyright (c) 2002-2018, Joseph Zbiciak                  */
 /* ======================================================================== */

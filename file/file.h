@@ -6,7 +6,7 @@
  *  This module contains routines for reading/writing files, including ROM
  *  images, CFG files, etc.
  *
- *  Currently, these routines operate on FILE*'s rather than on filenames,
+ *  Currently, these routines operate on LZFILE*'s rather than on filenames,
  *  since I'd like these to be able to work in structured files someday.
  *  (eg. so I can read a ROM image out of an archive, or such.)
  * ============================================================================
@@ -36,8 +36,8 @@ extern char *exe_path;
 /*                      if read is successful.  Returns 0 on success, -1    */
 /*                      of failure.                                         */
 /* ======================================================================== */
-int         file_read_rom16     (FILE *f, int len, uint_16 img[]);
-    
+int         file_read_rom16     (LZFILE *f, int len, uint16_t img[]);
+
 /* ======================================================================== */
 /*  FILE_READ_ROM8P2 -- Reads a 10-bit ROM image up to 64K x 16 in packed   */
 /*                      8 plus 2 format.  The first 'len' bytes are         */
@@ -51,7 +51,7 @@ int         file_read_rom16     (FILE *f, int len, uint_16 img[]);
 /*                      if read is successful.  Returns 0 on success, -1    */
 /*                      of failure.                                         */
 /* ======================================================================== */
-int         file_read_rom8p2    (FILE *f, int len, uint_16 img[]);
+int         file_read_rom8p2    (LZFILE *f, int len, uint16_t img[]);
 
 
 /* ======================================================================== */
@@ -61,7 +61,12 @@ int         file_read_rom8p2    (FILE *f, int len, uint_16 img[]);
 /*                      if read is successful.  Returns 0 on success, -1    */
 /*                      of failure.                                         */
 /* ======================================================================== */
-int         file_read_rom8      (FILE *f, int len, uint_16 img[]);
+int         file_read_rom8      (LZFILE *f, int len, uint16_t img[]);
+
+/* ======================================================================== */
+/*  FILE_LENGTH      -- Returns a file's length                             */
+/* ======================================================================== */
+long file_length( LZFILE *f );
 
 /* ======================================================================== */
 /*  FILE_EXISTS     -- Determines if a given file exists.                   */
@@ -80,7 +85,7 @@ int is_absolute_path(const char *fname);
 /*  PATH_FOPEN   -- Wrapper on fopen() that searches down a path.           */
 /*                  Warning:  Don't use this with mode = "w" or "wb".       */
 /* ======================================================================== */
-FILE *path_fopen(path_t *path, const char *fname, const char *mode);
+LZFILE *path_fopen(path_t *path, const char *fname, const char *mode);
 
 /* ======================================================================== */
 /*  EXISTS_IN_PATH -- Looks for file along the given path, returns the      */
@@ -100,6 +105,11 @@ path_t *append_path(path_t *path, const char *fname);
 path_t *parse_path_string(path_t *path, const char *pstr);
 
 /* ======================================================================== */
+/*  FREE_PATH                                                               */
+/* ======================================================================== */
+void free_path(path_t *path);
+
+/* ======================================================================== */
 /*  DUMP_SEARCH_PATH                                                        */
 /* ======================================================================== */
 void dump_search_path(path_t *path);
@@ -114,6 +124,11 @@ void dump_search_path(path_t *path);
 char *make_absolute_path(const char *cwd, const char *path);
 
 /* ======================================================================== */
+/*  GET_EXE_DIR      -- Get directory containing this executable.           */
+/* ======================================================================== */
+char *get_exe_dir(const char *const argv0);
+
+/* ======================================================================== */
 /*  LOAD_TEXT_FILE                                                          */
 /*                                                                          */
 /*  Loads a text file into a line-oriented structure.  Attempts to deal     */
@@ -125,18 +140,35 @@ char *make_absolute_path(const char *cwd, const char *path);
 /*                                                                          */
 /*  The text_file structure itself contains a pointer to the file body,     */
 /*  along with an array of offsets into that file.  Using offsets saves     */
-/*  RAM on machines where sizeof(char *) > sizeof(uint_32).                 */
+/*  RAM on machines where sizeof(char *) > sizeof(uint32_t).                */
 /*                                                                          */
 /*  Line numbers in this structure are 0-based, not 1-based.                */
 /* ======================================================================== */
 typedef struct text_file
 {
     const char *body;
-    uint_32    *line;
-    uint_32     lines;
+    uint32_t   *line;
+    uint32_t    lines;
 } text_file;
 
-text_file *load_text_file(FILE *f, int ts);
+text_file *load_text_file(LZFILE *f, int ts);
+
+/* ======================================================================== */
+/*  GENERATE_UNIQUE_FILENAME                                                */
+/*  Given a specification, generate a unique filename.                      */
+/* ======================================================================== */
+typedef struct unique_filename_t
+{
+    const char  *prefix;
+    const char  *suffix;
+    char        *f_name;
+    uint32_t     last_idx;
+    int          num_digits;
+    uint32_t     alloc;
+} unique_filename_t;
+
+FILE *open_unique_filename(unique_filename_t *spec);
+
 #endif
 
 /* ======================================================================== */
@@ -150,9 +182,9 @@ text_file *load_text_file(FILE *f, int ts);
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
-/*                 Copyright (c) 1998-2006, Joseph Zbiciak                  */
+/*                 Copyright (c) 1998-2020, Joseph Zbiciak                  */
 /* ======================================================================== */

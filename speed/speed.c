@@ -2,7 +2,6 @@
  * ============================================================================
  *  Title:    Speed control
  *  Author:   J. Zbiciak
- *  $Id: speed.c,v 1.10 1999/10/10 08:44:30 im14u2c Exp $
  * ============================================================================
  *  SPEED_T      -- Speed-control peripheral
  *  SPEED_TK     -- Main throttling agent.
@@ -26,10 +25,9 @@
 #include "speed.h"
 
 #define LATE_TOLERANCE     (256   * 1.e-6)
-#define MICROSEC_PER_FRAME (16688 * 1.e-6)
+#define MICROSEC_PER_FRAME (speed->pal ? (19968. * 1.e-6) : (16688. * 1.e-6))
 #define DELAY_THRESH       (1000  * 1.e-6)
 #define DELAY_THRESH2      (1000  * 1.e-6)
-#define TICK_MULTIPLE      (14934/3)
 #define MIN_THRESH         (0)
 
 /*
@@ -37,11 +35,11 @@
  *  SPEED_TK         -- Main throttling agent.
  * ============================================================================
  */
-uint_32 speed_tk(periph_t *p, uint_32 len)
+uint32_t speed_tk(periph_t *p, uint32_t len)
 {
-    speed_t         *speed = (speed_t*)p;
-    double          sec, elapsed;
-    double          now, then;
+    speed_t *const speed = PERIPH_AS(speed_t, p);
+    double   sec, elapsed;
+    double   now, then;
 
 
     /* -------------------------------------------------------------------- */
@@ -64,12 +62,13 @@ uint_32 speed_tk(periph_t *p, uint_32 len)
     now       = get_time() * speed->target_rate;
     then      = speed->last_time;    /*  When will THEN be NOW???  SOON!!!  */
     speed->last_time = now;
-    sec       = speed->pal ? (double)len : (double)len * (4.0 / 3579545.0);
+    sec       = speed->pal ? ((double)len / 1000000.)
+                           : ((double)len * (4.0 / 3579545.0));
     elapsed   = now - then;
 
     if (speed->threshold < MIN_THRESH)
         speed->threshold = MIN_THRESH;
-    
+
     /* -------------------------------------------------------------------- */
     /*  If more than 0.25 second has elapsed, assume that we've gotten      */
     /*  majorly pre-empted by the OS and just slip time so that we resync.  */
@@ -147,9 +146,9 @@ uint_32 speed_tk(periph_t *p, uint_32 len)
 /*jzp_printf("ahead=%8.6f burn=%8.6f DELAY_THRESH=%8.6f\n", ahead, burn, DELAY_THRESH);*/
             if (ahead > (speed->busywaits_ok ? DELAY_THRESH : DELAY_THRESH2))
                 plat_delay(floor(burn * 1e3));
-            else if (speed->busywaits_ok) 
+            else if (speed->busywaits_ok)
             {
-                do 
+                do
                 {
                     elapsed = get_time() * speed->target_rate - then;
                 } while (elapsed < until);
@@ -160,7 +159,7 @@ uint_32 speed_tk(periph_t *p, uint_32 len)
     now              = get_time() * speed->target_rate;
     elapsed          = now - then;
     speed->last_time = now;
-    len              = floor(elapsed * (speed->pal ? 1000000.0 : 894886.25) 
+    len              = floor(elapsed * (speed->pal ? 1000000.0 : 894886.25)
                                                                         + 0.5);
 
     return len;
@@ -203,8 +202,8 @@ int speed_init(speed_t *speed, gfx_t *gfx, stic_t *stic,
     speed->periph.peek      = NULL;
     speed->periph.poke      = NULL;
     speed->periph.tick      = speed_tk;
-    speed->periph.min_tick  = 14934;
-    speed->periph.max_tick  = 14934;
+    speed->periph.min_tick  = pal_mode ? 19968 : 14934;
+    speed->periph.max_tick  = pal_mode ? 19968 : 14934;
     speed->gfx              = gfx;
     speed->stic             = stic;
     speed->threshold        = 0;
@@ -225,10 +224,10 @@ int speed_init(speed_t *speed, gfx_t *gfx, stic_t *stic,
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
-/*                 Copyright (c) 1998-1999, Joseph Zbiciak                  */
+/*                 Copyright (c) 1998-2016, Joseph Zbiciak                  */
 /* ======================================================================== */
 

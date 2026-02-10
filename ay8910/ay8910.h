@@ -2,7 +2,6 @@
  * ============================================================================
  *  Title:    AY-8910 family Programmable Sound Generator
  *  Author:   J. Zbiciak
- *  $Id: ay8910.h,v 1.8 2000/01/10 17:13:16 im14u2c Exp $
  * ============================================================================
  *  This module implements the AY-8910 sound chip.
  * ============================================================================
@@ -10,8 +9,8 @@
  * ============================================================================
  */
 
-#ifndef _AY8910_H_
-#define _AY8910_H_
+#ifndef AY8910_H_
+#define AY8910_H_
 
 /*
  * ============================================================================
@@ -24,7 +23,7 @@
 struct ay8910_t
 {
     periph_t    periph;             /* Yup, it's a peripheral.  Go figure.  */
-    uint_16     reg[14];            /* The AY-891x's 14 internal registers. */
+    uint16_t    reg[14];            /* The AY-891x's 14 internal registers. */
     int         max[5];             /* Up-count cutoff: A, B, C, N, E.      */
     int         cnt[6];             /* Counter registers.  These behave as  */
                                     /*  upcounters that compare against     */
@@ -33,10 +32,10 @@ struct ay8910_t
 
     snd_buf_t   snd_buf;            /* Sound circular buffer.               */
 
-    sint_16    *cur_buf;            /* Current sound buffer.                */
+    int16_t    *cur_buf;            /* Current sound buffer.                */
     int         cur_len;            /* Fullness of current sound buffer.    */
 
-    uint_32     noise_rng;          /* Random-number generator for noise.   */
+    uint32_t    noise_rng;          /* Random-number generator for noise.   */
 
     int         env_cont;           /* Envelope CONTINUE flag               */
     int         env_atak;           /* Envelope ATTACK flag                 */
@@ -53,18 +52,19 @@ struct ay8910_t
     int         wind_ptr;           /* Window pointer.                      */
     int         rate, wind;         /* Sample rate, Window size.            */
     int         sys_clock;          /* System clock rate                    */
-    double      time_scale; 
-    double      scale_frc;      
+    double      time_scale;
+    double      scale_frc;
 
     /* Dynamic Digital Analyzer approach for matching sample rates.         */
     int         sample_frc;         /* Fractional error term.               */
 
-    uint_64     sound_current;      /* Sound is calc'd up until this time.  */
-    uint_64     unaccounted;
-    uint_64     accutick;           /* min time when simulating on write    */
+    uint64_t    sound_current;      /* Sound is calc'd up until this time.  */
+    uint64_t    unaccounted;
+    uint64_t    accutick;           /* min time when simulating on write    */
+    uint64_t   *cpu_time;           /* don't get ahead of CPU (HACK!)       */
 
-    char        *trace_filename;    /* Register trace file name             */
-    FILE        *trace;             /* Register trace file pointer          */
+    char       *trace_filename;     /* Register trace file name             */
+    FILE       *trace;              /* Register trace file pointer          */
 };
 
 
@@ -79,12 +79,12 @@ typedef struct ay8910_t ay8910_t;
  *  AY8910_READ      -- Read from device.
  * ============================================================================
  */
-uint_32 ay8910_read
+uint32_t ay8910_read
 (
-    periph_p        bus,        /*  Peripheral bus being read.          */
-    periph_p        req,        /*  Peripheral requesting read.         */
-    uint_32         addr,       /*  Address being read.                 */
-    uint_32         data        /*  Current state of data being read.   */
+    periph_t        *bus,       /*  Peripheral bus being read.          */
+    periph_t        *req,       /*  Peripheral requesting read.         */
+    uint32_t        addr,       /*  Address being read.                 */
+    uint32_t        data        /*  Current state of data being read.   */
 );
 
 /*
@@ -94,10 +94,10 @@ uint_32 ay8910_read
  */
 void ay8910_write
 (
-    periph_p        bus,        /*  Peripheral bus being written.       */
-    periph_p        req,        /*  Peripheral requesting write.        */
-    uint_32         addr,       /*  Address being written.              */
-    uint_32         data        /*  Data being written.                 */
+    periph_t        *bus,       /*  Peripheral bus being written.       */
+    periph_t        *req,       /*  Peripheral requesting write.        */
+    uint32_t        addr,       /*  Address being written.              */
+    uint32_t        data        /*  Data being written.                 */
 );
 
 /*
@@ -105,10 +105,10 @@ void ay8910_write
  *  AY8910_TICK      -- Tick the device.
  * ============================================================================
  */
-uint_32 ay8910_tick
+uint32_t ay8910_tick
 (
-    periph_p        bus,        /*  Peripheral bus being ticked.        */
-    uint_32         len
+    periph_t        *bus,       /*  Peripheral bus being ticked.        */
+    uint32_t        len
 );
 
 
@@ -120,14 +120,15 @@ uint_32 ay8910_tick
 
 int ay8910_init
 (
-    ay8910_t        *ay8910,    /*  Structure to initialize.        */
-    uint_32         addr,       /*  Base address of ay8910.         */
-    snd_t           *snd,       /*  Sound device to register w/.    */
+    ay8910_t       *ay8910,     /*  Structure to initialize.        */
+    uint32_t        addr,       /*  Base address of ay8910.         */
+    snd_t          *snd,        /*  Sound device to register w/.    */
     int             rate,       /*  Sampling rate.                  */
     int             wind,       /*  Averaging window.               */
     int             accutick,   /*  Averaging window.               */
     double          time_scale, /*  for --macho                     */
-    int             pal_mode    /*  0 == NTSC, 1 == PAL             */
+    int             pal_mode,   /*  0 == NTSC, 1 == PAL             */
+    uint64_t       *cpu_time    /*  HACK: don't get ahead of CPU    */
 );
 
 
@@ -144,9 +145,9 @@ int ay8910_init
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                 Copyright (c) 1998-1999, Joseph Zbiciak                  */
 /* ======================================================================== */

@@ -18,19 +18,19 @@
 typedef struct dasm0256_t
 {
     struct dasm0256_t *next;
-    uint_32 addr;       /* Address of decoded instr.                */
-    int     len;        /* Number of bits in this instr.            */
-    char    mnc[16];    /* Pointer to instruction mnemonic          */
-    char    op1[32];    /* Operand                                  */
-    int     bf;         /* Bitfield description for encoding        */
-    int     mode;       /* Mode that was in effect at disasm time   */
+    uint32_t addr;      /* Address of decoded instr.                */
+    int      len;       /* Number of bits in this instr.            */
+    char     mnc[16];   /* Pointer to instruction mnemonic          */
+    char     op1[32];   /* Operand                                  */
+    int      bf;        /* Bitfield description for encoding        */
+    int      mode;      /* Mode that was in effect at disasm time   */
 } dasm0256_t;
 
 typedef struct bf_desc_t
 {
-    uint_8      len;
-    uint_8      flag;   /* Bit 0 == Rev, 1 == Byte-Align, 2 == Mnemonic */
-    const char  *name;
+    uint8_t     len;
+    uint8_t     flag;   /* Bit 0 == Rev, 1 == Byte-Align, 2 == Mnemonic */
+    const char *name;
 } bf_desc_t;
 
 int bf_desc_ofs[16 * 4];
@@ -78,8 +78,8 @@ bf_desc_t bf_desc[] =
     {   8,  1,  "F3"            },
     {   8,  1,  "B4"            },
     {   8,  1,  "F4"            },
-    {   8,  1,  "B5"            },
-    {   8,  1,  "F5"            },
+    {   8,  1,  "Ampl Interp"   },
+    {   8,  1,  "Period Interp" },
     {   0,  0,  NULL            },
 
     /*  Opcode 0001, Mode 01    */
@@ -120,8 +120,8 @@ bf_desc_t bf_desc[] =
     {   8,  1,  "F3"            },
     {   8,  1,  "B4"            },
     {   8,  1,  "F4"            },
-    {   8,  1,  "B5"            },
-    {   8,  1,  "F5"            },
+    {   8,  1,  "Ampl Interp"   },
+    {   8,  1,  "Period Interp" },
     {   0,  0,  NULL            },
 
     /*  Opcode 0001, Mode 11    */
@@ -418,35 +418,35 @@ bf_desc_t bf_desc[] =
     {   8,  1,  "F5 8 MSBs"     },
     {   0,  0,  NULL            },
 
-    
+
     /*  Opcode 0111, Mode 00    */
     {   4,  0,  "BTrg MSBs"     },
     {   4,  4,  "JMP"           },
     {   8,  0,  "BTrg LSBs"     },
     {   0,  2,  "Align"         },
     {   0,  0,  NULL            },
-    
+
     /*  Opcode 0111, Mode 01    */
     {   4,  0,  "BTrg MSBs"     },
     {   4,  4,  "JMP"           },
     {   8,  0,  "BTrg LSBs"     },
     {   0,  2,  "Align"         },
     {   0,  0,  NULL            },
-    
+
     /*  Opcode 0111, Mode 10    */
     {   4,  0,  "BTrg MSBs"     },
     {   4,  4,  "JMP"           },
     {   8,  0,  "BTrg LSBs"     },
     {   0,  2,  "Align"         },
     {   0,  0,  NULL            },
-    
+
     /*  Opcode 0111, Mode 11    */
     {   4,  0,  "BTrg MSBs"     },
     {   4,  4,  "JMP"           },
     {   8,  0,  "BTrg LSBs"     },
     {   0,  2,  "Align"         },
     {   0,  0,  NULL            },
-        
+
 
     /*  Opcode 1000, Mode 00    */
     {   2,  0,  "Rpt MSBs"      },
@@ -586,35 +586,35 @@ bf_desc_t bf_desc[] =
     {   6,  1,  "F2 6 MSBs"     },
     {   0,  0,  NULL            },
 
-    
+
     /*  Opcode 1011, Mode 00    */
     {   4,  0,  "BTrg MSBs"     },
     {   4,  4,  "JSR"           },
     {   8,  0,  "BTrg LSBs"     },
     {   0,  2,  "Align"         },
     {   0,  0,  NULL            },
-    
+
     /*  Opcode 1011, Mode 01    */
     {   4,  0,  "BTrg MSBs"     },
     {   4,  4,  "JSR"           },
     {   8,  0,  "BTrg LSBs"     },
     {   0,  2,  "Align"         },
     {   0,  0,  NULL            },
-    
+
     /*  Opcode 1011, Mode 10    */
     {   4,  0,  "BTrg MSBs"     },
     {   4,  4,  "JSR"           },
     {   8,  0,  "BTrg LSBs"     },
     {   0,  2,  "Align"         },
     {   0,  0,  NULL            },
-    
+
     /*  Opcode 1011, Mode 11    */
     {   4,  0,  "BTrg MSBs"     },
     {   4,  4,  "JSR"           },
     {   8,  0,  "BTrg LSBs"     },
     {   0,  2,  "Align"         },
     {   0,  0,  NULL            },
-        
+
     /*  Opcode 1100, Mode 00    */
     {   4,  1,  "Repeat"        },
     {   4,  4,  "LOAD_C.00"     },
@@ -820,7 +820,7 @@ LOCAL void init_bf_desc(void)
         printf("Opcode %.1X, Mode %d%d:\n", i >> 2, (i >> 1) & 1, i & 1);
         for (j = bf_desc_ofs[i]; bf_desc[j].name; j++)
         {
-            printf("   %3d: %3d, %3d, %s\n", 
+            printf("   %3d: %3d, %3d, %s\n",
                     j, bf_desc[j].len, bf_desc[j].flag, bf_desc[j].name);
         }
     }
@@ -850,7 +850,7 @@ static symtab_t *symtab = NULL;
 /* ------------------------------------------------------------------------ */
 /*  BITFIELD         -- Render a bitfield into a string.                    */
 /* ------------------------------------------------------------------------ */
-LOCAL void bitfield(char *str, uint_32 bits, int len)
+LOCAL void bitfield(char *str, uint32_t bits, int len)
 {
     str[len] = 0;
     while (len)
@@ -872,7 +872,7 @@ static const char *sym_cmd[] =
     "org",
     "oper",
     "sym",
-    0 
+    0
 };
 
 #define REQ1_MAY2 if (nargs < 2 || v1 == -1 || (nargs == 3 && v2 == -1)) \
@@ -887,11 +887,11 @@ static const char *sym_cmd[] =
                   fprintf(stderr,"ERROR: %s requires 2 args, and the second "\
                           "args must be numeric\n", w[0]), exit(1)
 
-LOCAL void dasm0256_readsym(FILE *f, uint_32 *addr_lo, bitmem_t *mem)
+LOCAL void dasm0256_readsym(FILE *f, uint32_t *addr_lo, bitmem_t *mem)
 {
     char buf[1024], *s1, *s2;
     char *w[3] = { NULL, NULL, NULL };
-    int  v1, v2;
+    int  v1 = -1, v2 = -1;
     int  ws, is, i, tl, cmd, nargs;
 
     if (!mem && addr_lo)
@@ -1031,7 +1031,7 @@ LOCAL void dasm0256_readsym(FILE *f, uint_32 *addr_lo, bitmem_t *mem)
 /*  DASM0256_DECODE  -- decode the instruction at a given address.          */
 /*                      Fills a dasm0256_t struct, and returns # of bits.   */
 /* ------------------------------------------------------------------------ */
-static int brtbl[16] = { 0x0, 0x8, 0x4, 0xC, 0x2, 0xA, 0x6, 0xE, 
+static int brtbl[16] = { 0x0, 0x8, 0x4, 0xC, 0x2, 0xA, 0x6, 0xE,
                          0x1, 0x9, 0x5, 0xD, 0x3, 0xB, 0x7, 0xF };
 
 #define MNEMONIC(d,v)   strcpy((d)->mnc, (v));
@@ -1050,10 +1050,10 @@ static int brtbl[16] = { 0x0, 0x8, 0x4, 0xC, 0x2, 0xA, 0x6, 0xE,
 
 LOCAL int dasm0256_decode
 (
-    bitmem_t    *mem,       /* ROM image to decode from.        */
-    uint_32     addr,       /* Bit-Address to decode at.        */
-    dasm0256_t  *dasm,      /* Disassembly structure.           */
-    int         *mode       /* Mode bits from Opcode 8.         */
+    bitmem_t   *mem,        /* ROM image to decode from.        */
+    uint32_t    addr,       /* Bit-Address to decode at.        */
+    dasm0256_t *dasm,       /* Disassembly structure.           */
+    int        *mode        /* Mode bits from Opcode 8.         */
 )
 {
     int len = 0;
@@ -1068,7 +1068,7 @@ LOCAL int dasm0256_decode
     /* -------------------------------------------------------------------- */
     memset(dasm, 0, sizeof(dasm0256_t));
 
-    immed4 = bitmem_read_fwd(mem, addr,     4); MAKE_OPER(mem, addr,     4); 
+    immed4 = bitmem_read_fwd(mem, addr,     4); MAKE_OPER(mem, addr,     4);
     opcode = bitmem_read_fwd(mem, addr + 4, 4); MAKE_CODE(mem, addr + 4, 4);
     dasm->addr = addr;
     dasm->mode = *mode;
@@ -1123,7 +1123,7 @@ LOCAL int dasm0256_decode
             {
                 *mode &= ~0xF0;
                 *mode |= immed4 << 4;
-                
+
                 MNEMONIC(dasm,"SETPAGE");
                 OP1_NIB(dasm,immed4);
 
@@ -1146,7 +1146,7 @@ LOCAL int dasm0256_decode
 
             break;
         }
-                
+
         case 0x08:  /* SETMODE */
         {
             OP1_MODE(dasm, immed4);
@@ -1164,7 +1164,7 @@ LOCAL int dasm0256_decode
             if (bitmem_read_fwd(mem, maybe_btrg, 8) != 0)
                 MAKE_BTRG(mem, maybe_btrg, 1);
 
-            /* fall thru */
+            FALLTHROUGH_INTENDED;
         }
         case 0x0B:  /* JSR      */
         {
@@ -1178,7 +1178,7 @@ LOCAL int dasm0256_decode
             symtab_xref_addr(symtab, btrg << 3, dasm->addr);
 
             break;
-        } 
+        }
 
         default:
         {
@@ -1192,7 +1192,7 @@ LOCAL int dasm0256_decode
     /*  If this wasn't opcode 0, clear the page set by SETPAGE.             */
     /* -------------------------------------------------------------------- */
     if (opcode != 0x08) *mode &= ~0x0C;
-    if (opcode != 0x00) 
+    if (opcode != 0x00)
         *mode = (*mode & ~0xF0) | (((dasm->addr + dasm->len) >> 11) & 0xF0);
 
     /* -------------------------------------------------------------------- */
@@ -1210,15 +1210,15 @@ LOCAL void dasm0256_display(FILE *f, dasm0256_t *decoded, bitmem_t *bitmem)
     const char *label;
     char buf[64];
     int  i, j, k, l, bf_len, tot_len = 0;
-    uint_32 addr, addr_s;
+    uint32_t addr, addr_s;
 
     /* -------------------------------------------------------------------- */
     /*  First, find any labels that might've been assigned to this instr.   */
     /* -------------------------------------------------------------------- */
-    label = symtab_getsym(symtab, decoded->addr, 
+    label = symtab_getsym(symtab, decoded->addr,
                           IS_BTRG(bitmem, decoded->addr, 1) ? 'L' : 0, 0);
 
-    if (label)  
+    if (label)
     {
         symtab_dref_addr(symtab, decoded->addr);
         fputs("##-------------------------------------"
@@ -1230,7 +1230,7 @@ LOCAL void dasm0256_display(FILE *f, dasm0256_t *decoded, bitmem_t *bitmem)
             fprintf(f, "## %s:\n", label);
             label = symtab_getsym(symtab, decoded->addr, 0, i++);
         } while (label);
-    } else      
+    } else
     {
         fputc('\n', f);
         buf[0] = 0;
@@ -1241,7 +1241,7 @@ LOCAL void dasm0256_display(FILE *f, dasm0256_t *decoded, bitmem_t *bitmem)
     /* -------------------------------------------------------------------- */
     fprintf(f, "# $%.4X.%X  %-16s%-16s\n",
             decoded->addr >> 3, decoded->addr & 7, decoded->mnc, decoded->op1);
-    
+
     /* -------------------------------------------------------------------- */
     /*  Lastly, pull apart all of the bit fields to show the encoding.      */
     /* -------------------------------------------------------------------- */
@@ -1279,8 +1279,8 @@ LOCAL void dasm0256_display(FILE *f, dasm0256_t *decoded, bitmem_t *bitmem)
             fprintf(f, "  # $%.4X.%X .. $%.4X.%X:  %s%s%s\n",
                     (addr_s) >> 3, (addr_s) & 7,
                     (addr-1) >> 3, (addr-1) & 7,
-                    bf_desc[i].name, 
-                    bf_desc[i].flag & BF_BITREV ? " (br)" : "", 
+                    bf_desc[i].name,
+                    bf_desc[i].flag & BF_BITREV ? " (br)" : "",
                     j > 0 ? " (cont)" : "");
         }
     }
@@ -1290,7 +1290,7 @@ bitmem_t   *bitmem = NULL;
 dasm0256_t *decode_head = NULL, *decode_tail = NULL;
 int main(int argc, char *argv[])
 {
-    uint_32 addr_lo = 0x1000 << 3, addr_hi = 0x1000 << 3;
+    uint32_t addr_lo = 0x1000 << 3, addr_hi = 0x1000 << 3;
     int i, l;
     FILE *rom, *sym;
     int len, mode = 0;
@@ -1321,7 +1321,7 @@ int main(int argc, char *argv[])
         sym = fopen(argv[2], "r");
         if (!sym)
         {
-            fprintf(stderr,"ERROR:  Could not read symbol file '%s'\n", 
+            fprintf(stderr,"ERROR:  Could not read symbol file '%s'\n",
                     argv[2]);
             exit(1);
         }
@@ -1393,7 +1393,7 @@ int main(int argc, char *argv[])
 
         l = dasm0256_decode(bitmem, i + addr_lo, decoded, &mode);
 
-        if (!decode_tail) 
+        if (!decode_tail)
         {
             decode_head = decode_tail = decoded;
         } else
@@ -1408,7 +1408,7 @@ int main(int argc, char *argv[])
     /* -------------------------------------------------------------------- */
     fprintf(stderr, "Pass 2:  Displaying output.\n");
 
-    
+
     printf("##-------------------------------------"
            "---------------------------------------\n");
     printf("## Disassembled output");
@@ -1437,9 +1437,9 @@ int main(int argc, char *argv[])
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                 Copyright (c) 1998-2001, Joseph Zbiciak                  */
 /* ======================================================================== */

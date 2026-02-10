@@ -8,11 +8,16 @@
 %error-verbose
 
 %{
+/* Clang doesn't like the unreachable code in Bison's generated output. */
+#ifdef __clang__
+#pragma clang diagnostic ignored "-Wunreachable-code"
+#endif
 
 #include "config.h"
+#include "lzoe/lzoe.h"
 #include "bincfg/bincfg.h"
 #include "bincfg/bincfg_lex.h"
-
+#include "misc/types.h"
 
 static bc_diag_t *bc_diag_list = NULL;
 static char bc_errbuf[1024];
@@ -56,7 +61,6 @@ static void check_line(ll_t *l, void *opq)
 #define BC_DIAG(diag, section, line_no, diagmsg)                            \
         do {                                                                \
             bc_diag_t *err;                                                 \
-            ll_t *newlist;                                                  \
             int line_no_tmp = line_no;                                      \
                                                                             \
             bc_errbuf[sizeof(bc_errbuf)-1] = 0;                             \
@@ -64,7 +68,7 @@ static void check_line(ll_t *l, void *opq)
             if (yychar == TOK_ERROR_OOM)                                    \
                 BC_OOM_ERROR;                                               \
                                                                             \
-            ll_acton(&(bc_diag_list->l), check_line, (void*)&line_no_tmp);  \
+            LL_ACTON(bc_diag_list, check_line, (void*)&line_no_tmp);        \
                                                                             \
             if (line_no_tmp != -1)                                          \
             {                                                               \
@@ -78,8 +82,7 @@ static void check_line(ll_t *l, void *opq)
                 BC_CHKOOM(err->sect);                                       \
                 BC_CHKOOM(err->msg);                                        \
                                                                             \
-                newlist = ll_concat(&(bc_diag_list->l), &(err->l));         \
-                bc_diag_list = (bc_diag_t *)newlist;                        \
+                LL_CONCAT(bc_diag_list, err, bc_diag_t);                    \
             }                                                               \
         } while (0)
 
@@ -104,13 +107,14 @@ static const char *bc_saved_sec = NULL;
     char                *strv;
     bc_varlike_t        varlike;
     bc_varlike_types_t  varlike_type;
-    bc_var_t            *var_list;
-    bc_strnum_t         strnum;
+    cfg_var_t           *var_list;
+    val_strnum_t        strnum;
     bc_mac_watch_t      mac_watch;
     bc_macro_t          macro;
     bc_macro_t          *macro_list;
     bc_memspan_t        *memspan_list;
     bc_cfgfile_t        *cfgfile;
+    bc_memattr_page_t   memattr_page;
 };
 
 /* ------------------------------------------------------------------------ */
@@ -169,11 +173,12 @@ static const char *bc_saved_sec = NULL;
 %token TOK_DEC
 %token TOK_HEX
 %token TOK_NAME
+%token TOK_STRING
 %token TOK_ERROR_BAD
 %token <strv> TOK_ERROR_OOM
 
-%type <intv>            mac_reg hex_num dec_num memattr
-%type <strv>            string
+%type <intv>            mac_reg hex_num dec_num memattr_tok
+%type <strv>            string ident
 %type <varlike>         sec_varlike
 %type <varlike_type>    varlike_head
 %type <var_list>        var_list var_rec
@@ -187,6 +192,7 @@ static const char *bc_saved_sec = NULL;
 %type <memspan_list>    sec_memattr memattr_list memattr_rec
 %type <memspan_list>    sec_preload preload_list preload_rec
 %type <memspan_list>    sec_banksw  banksw_list  banksw_rec
+%type <memattr_page>    memattr_page
 
 %start config_file
 
@@ -230,37 +236,37 @@ config      :   config sec_memspan
                 {
                     case BC_VL_VARS:
                     {
-                        LL_CONCAT(bc_parsed_cfg->vars, $2.vars, bc_var_t);
+                        LL_CONCAT(bc_parsed_cfg->vars, $2.vars, cfg_var_t);
                         break;
                     }
 
                     case BC_VL_JOYSTICK:
                     {
-                        LL_CONCAT(bc_parsed_cfg->joystick, $2.vars, bc_var_t);
+                        LL_CONCAT(bc_parsed_cfg->joystick, $2.vars, cfg_var_t);
                         break;
                     }
 
                     case BC_VL_KEYS:
                     {
-                        LL_CONCAT(bc_parsed_cfg->keys[0], $2.vars, bc_var_t);
+                        LL_CONCAT(bc_parsed_cfg->keys[0], $2.vars, cfg_var_t);
                         break;
                     }
 
                     case BC_VL_CAPSLOCK:
                     {
-                        LL_CONCAT(bc_parsed_cfg->keys[1], $2.vars, bc_var_t);
+                        LL_CONCAT(bc_parsed_cfg->keys[1], $2.vars, cfg_var_t);
                         break;
                     }
 
                     case BC_VL_NUMLOCK:
                     {
-                        LL_CONCAT(bc_parsed_cfg->keys[2], $2.vars, bc_var_t);
+                        LL_CONCAT(bc_parsed_cfg->keys[2], $2.vars, cfg_var_t);
                         break;
                     }
 
                     case BC_VL_SCROLLLOCK:
                     {
-                        LL_CONCAT(bc_parsed_cfg->keys[3], $2.vars, bc_var_t);
+                        LL_CONCAT(bc_parsed_cfg->keys[3], $2.vars, cfg_var_t);
                         break;
                     }
 
@@ -324,8 +330,8 @@ sec_memspan :   sec_banksw
 /* ------------------------------------------------------------------------ */
 /*  SEC_BANKSW:  BANKSW sections only contain lists of bankswitched addrs.  */
 /* ------------------------------------------------------------------------ */
-bankswitch  :   TOK_SEC_BANKSWITCH { S("[bankswitch]"); } ;
-sec_banksw  :   bankswitch eoln banksw_list
+banksw_head :   TOK_SEC_BANKSWITCH { S("[bankswitch]"); } ;
+sec_banksw  :   banksw_head eoln banksw_list
             {
                 $$ = LL_REVERSE($3, bc_memspan_t);
             }
@@ -333,7 +339,7 @@ sec_banksw  :   bankswitch eoln banksw_list
 
 banksw_list :   banksw_list banksw_rec
             {
-                $$ = (bc_memspan_t*)ll_insert(&($1->l), &($2->l));
+                $$ = LL_INSERT($1, $2, bc_memspan_t);
             }
             |   banksw_rec         { $$ = $1;   }
             ;
@@ -369,8 +375,8 @@ banksw_rec  :   hex_num '-' hex_num eoln
 /*  SEC_MAPPING: MAPPING sections contain file ranges that map to address   */
 /*               ranges in the Intellivision and Intellicart memory maps.   */
 /* ------------------------------------------------------------------------ */
-mapping     :   TOK_SEC_MAPPING { S("[mapping]"); } ;
-sec_mapping :   mapping eoln mapping_list
+mapping_head:   TOK_SEC_MAPPING { S("[mapping]"); } ;
+sec_mapping :   mapping_head eoln mapping_list
             {
                 $$ = LL_REVERSE($3, bc_memspan_t);
             }
@@ -378,13 +384,13 @@ sec_mapping :   mapping eoln mapping_list
 
 mapping_list:   mapping_list mapping_rec
             {
-                $$ = (bc_memspan_t*)ll_insert(&($1->l), &($2->l));
+                $$ = LL_INSERT($1, $2, bc_memspan_t);
             }
             |   mapping_rec { $$ = $1; }
             ;
 
 
-mapping_rec :   hex_num '-' hex_num '=' hex_num eoln
+mapping_rec :   hex_num '-' hex_num '=' hex_num memattr_page
             {
                 $$ = CALLOC(bc_memspan_t, 1);
                 BC_CHKOOM($$);
@@ -392,22 +398,9 @@ mapping_rec :   hex_num '-' hex_num '=' hex_num eoln
                 $$->e_fofs = $3;
                 $$->s_addr = $5;
                 $$->e_addr = $5 + $3 - $1;
-                $$->flags  = BC_SPAN_PL | BC_SPAN_R;
-                $$->width  = 16;
-                $$->epage  = BC_SPAN_NOPAGE;
-                $$->f_name = NULL;
-            }
-            |   hex_num '-' hex_num '=' hex_num TOK_PAGE hex_num eoln
-            {
-                $$ = CALLOC(bc_memspan_t, 1);
-                BC_CHKOOM($$);
-                $$->s_fofs = $1;
-                $$->e_fofs = $3;
-                $$->s_addr = $5;
-                $$->e_addr = $5 + $3 - $1;
-                $$->flags  = BC_SPAN_PL | BC_SPAN_R | BC_SPAN_EP;
-                $$->width  = 16;
-                $$->epage  = $7;
+                $$->flags  = $6.flags | BC_SPAN_PL;
+                $$->width  = $6.width;
+                $$->epage  = $6.epage;
                 $$->f_name = NULL;
             }
             |   eoln
@@ -429,8 +422,8 @@ mapping_rec :   hex_num '-' hex_num '=' hex_num eoln
 /*               contain ECS-style bankswitched ROMs segments.  The syntax  */
 /*               is also different.                                         */
 /* ------------------------------------------------------------------------ */
-ecsbank     :   TOK_SEC_ECSBANK { S("[ecsbank]"); } ;
-sec_ecsbank :   ecsbank eoln ecsbank_list
+ecsbank_head:   TOK_SEC_ECSBANK { S("[ecsbank]"); } ;
+sec_ecsbank :   ecsbank_head eoln ecsbank_list
             {
                 $$ = LL_REVERSE($3, bc_memspan_t);
             }
@@ -438,7 +431,7 @@ sec_ecsbank :   ecsbank eoln ecsbank_list
 
 ecsbank_list:   ecsbank_list ecsbank_rec
             {
-                $$ = (bc_memspan_t*)ll_insert(&($1->l), &($2->l));
+                $$ = LL_INSERT($1, $2, bc_memspan_t);
             }
             |   ecsbank_rec { $$ = $1; }
             ;
@@ -475,8 +468,8 @@ ecsbank_rec :   hex_num ':' hex_num '-' hex_num '=' hex_num eoln
 /* ------------------------------------------------------------------------ */
 /*  SEC_MEMATTR: MEMATTR sections define regions of memory as RAM or WOM.   */
 /* ------------------------------------------------------------------------ */
-memattr     :   TOK_SEC_MEMATTR { S("[memattr]"); } ;
-sec_memattr :   memattr eoln memattr_list
+memattr_head:   TOK_SEC_MEMATTR { S("[memattr]"); } ;
+sec_memattr :   memattr_head eoln memattr_list
             {
                 $$ = LL_REVERSE($3, bc_memspan_t);
             }
@@ -485,12 +478,12 @@ sec_memattr :   memattr eoln memattr_list
 
 memattr_list:   memattr_list memattr_rec 
             {
-                $$ = (bc_memspan_t*)ll_insert(&($1->l), &($2->l));
+                $$ = LL_INSERT($1, $2, bc_memspan_t);
             }
             |   memattr_rec { $$ = $1; }
             ;
 
-memattr_rec :   hex_num '-' hex_num '=' memattr dec_num eoln
+memattr_rec :   hex_num '-' hex_num '=' memattr_page
             {
                 $$ = CALLOC(bc_memspan_t, 1);
                 BC_CHKOOM($$);
@@ -498,22 +491,9 @@ memattr_rec :   hex_num '-' hex_num '=' memattr dec_num eoln
                 $$->e_fofs = 0;
                 $$->s_addr = $1;
                 $$->e_addr = $3;
-                $$->flags  = $5 | ($6 < 16 ? BC_SPAN_N : 0);
-                $$->width  = $6;
-                $$->epage  = BC_SPAN_NOPAGE;
-                $$->f_name = NULL;
-            }
-            |   hex_num '-' hex_num eoln
-            {
-                $$ = CALLOC(bc_memspan_t, 1);
-                BC_CHKOOM($$);
-                $$->s_fofs = 0;
-                $$->e_fofs = 0;
-                $$->s_addr = $1;
-                $$->e_addr = $3;
-                $$->flags  = BC_SPAN_R;
-                $$->width  = 16;
-                $$->epage  = BC_SPAN_NOPAGE;
+                $$->flags  = $5.flags;
+                $$->width  = $5.width;
+                $$->epage  = $5.epage;
                 $$->f_name = NULL;
             }
             |   eoln
@@ -530,13 +510,36 @@ memattr_rec :   hex_num '-' hex_num '=' memattr dec_num eoln
             }
             ;
 
+memattr_page:   eoln
+            {
+                $$.flags = BC_SPAN_R;
+                $$.width = 16;
+                $$.epage = BC_SPAN_NOPAGE;
+            }
+            |   memattr_tok dec_num memattr_page
+            {
+                $$.flags =  $1 
+                         | ($2 < 16 ? BC_SPAN_N : 0)
+                         | ($3.flags & BC_SPAN_EP);
+                $$.width = $2;
+                $$.epage = $3.epage;
+            }
+            |   TOK_PAGE hex_num memattr_page
+            {
+                $$.flags = $3.flags | BC_SPAN_EP;
+                $$.width = $3.width;
+                $$.epage = $2;
+            }
+            ;
+
+
 /* ------------------------------------------------------------------------ */
 /*  SEC_PRELOAD: PRELOAD sections initialize Intellicart address ranges     */
 /*               without necessarily implying a mapping in Intellivision    */
 /*               address space.                                             */
 /* ------------------------------------------------------------------------ */
-preload     :   TOK_SEC_PRELOAD { S("[preload]"); } ;
-sec_preload :   preload eoln preload_list
+preload_head:   TOK_SEC_PRELOAD { S("[preload]"); } ;
+sec_preload :   preload_head eoln preload_list
             {
                 $$ = LL_REVERSE($3, bc_memspan_t);
             }
@@ -544,7 +547,7 @@ sec_preload :   preload eoln preload_list
 
 preload_list:   preload_list preload_rec
             {
-                $$ = (bc_memspan_t*)ll_insert(&($1->l), &($2->l));
+                $$ = LL_INSERT($1, $2, bc_memspan_t);
             }
             |   preload_rec { $$ = $1; }
             ;
@@ -570,6 +573,10 @@ preload_rec :   hex_num '-' hex_num '=' hex_num eoln
                 BC_DIAG(BC_DIAG_ERROR, "[preload]", 
                         bc_saved_lineno, bc_errbuf);
             }
+            |   eoln
+            {
+                $$ = NULL;
+            }
             ;
 
 /* ------------------------------------------------------------------------ */
@@ -593,8 +600,8 @@ preload_rec :   hex_num '-' hex_num '=' hex_num eoln
 /*      W <name> <list>         'W'atch a set of values with label <name>.  */
 /*                                                                          */
 /* ------------------------------------------------------------------------ */
-macro       :   TOK_SEC_MACRO { S("[macro]"); } ;
-sec_macro   :   macro eoln macro_list
+macro_head  :   TOK_SEC_MACRO { S("[macro]"); } ;
+sec_macro   :   macro_head eoln macro_list
             {
                 $$ = LL_REVERSE($3, bc_macro_t);
             }
@@ -602,7 +609,7 @@ sec_macro   :   macro eoln macro_list
 
 macro_list  :   macro_list macro_rec
             {
-                $$ = (bc_macro_t*)ll_insert(&($1->l), &($2->l));
+                $$ = LL_INSERT($1, $2, bc_macro_t);
             }
             |   macro_rec { $$ = $1; }
             ;
@@ -657,7 +664,7 @@ macro_line  :   mac_reg hex_num eoln
                 $$.arg.load.width = $3;
                 $$.arg.load.addr  = $4;
             }
-            |   TOK_MAC_WATCH string watch_list eoln
+            |   TOK_MAC_WATCH ident watch_list eoln
             {
                 $$.cmd            = BC_MAC_WATCH;
                 $$.arg.watch      = $3;
@@ -667,7 +674,22 @@ macro_line  :   mac_reg hex_num eoln
             {
                 $$.cmd = BC_MAC_POKE;
                 $$.arg.poke.addr  = $2;
+                $$.arg.poke.epage = BC_SPAN_NOPAGE;
                 $$.arg.poke.value = $3;
+            }
+            |   TOK_MAC_POKE hex_num TOK_PAGE hex_num hex_num eoln
+            {
+                $$.cmd = BC_MAC_POKE;
+                $$.arg.poke.addr  = $2;
+                $$.arg.poke.epage = $4;
+                $$.arg.poke.value = $5;
+            }
+            |   TOK_MAC_POKE hex_num ':' hex_num hex_num eoln
+            {
+                $$.cmd = BC_MAC_POKE;
+                $$.arg.poke.addr  = $2;
+                $$.arg.poke.epage = $4;
+                $$.arg.poke.value = $5;
             }
             |   TOK_MAC_INSPECT hex_num eoln
             {
@@ -710,14 +732,18 @@ watch_list  :   watch_list ',' watch_span
                 int new_spans, i;
 
                 new_spans = $1.spans + $3.spans;
-                new_size  = new_spans*sizeof(uint_16)*2;
+                new_size  = new_spans*sizeof(uint16_t)*2;
 
-                $$.addr  = (uint_16 *)realloc($1.addr, new_size);
+                $$.addr  = (uint16_t *)realloc($1.addr, new_size);
                 $$.spans = new_spans;
                 BC_CHKOOM($$.addr);
 
                 for (i = 0; i < $3.spans*2; i++)
                     $$.addr[i + 2*$1.spans] = $3.addr[i];
+
+                free($3.addr);
+                $3.addr = NULL;
+                $1.addr = NULL;
             }
             |   watch_span  { $$ = $1; }
             ;
@@ -729,7 +755,7 @@ watch_span  :   watch_addr
 watch_addr  :   hex_num
             {
                 $$.spans   = 1;
-                $$.addr    = CALLOC(uint_16, 2); BC_CHKOOM($$.addr);
+                $$.addr    = CALLOC(uint16_t, 2); BC_CHKOOM($$.addr);
                 $$.addr[0] = $1;
                 $$.addr[1] = $1;
             }
@@ -738,7 +764,7 @@ watch_addr  :   hex_num
 watch_range :   hex_num '-' hex_num
             {
                 $$.spans   = 1;
-                $$.addr    = CALLOC(uint_16, 2); BC_CHKOOM($$.addr);
+                $$.addr    = CALLOC(uint16_t, 2); BC_CHKOOM($$.addr);
                 $$.addr[0] = $1;
                 $$.addr[1] = $3;
             }
@@ -758,7 +784,7 @@ watch_range :   hex_num '-' hex_num
 sec_varlike :   varlike_head eoln var_list
             {
                 $$.type = $1;
-                $$.vars = LL_REVERSE($3, bc_var_t);
+                $$.vars = LL_REVERSE($3, cfg_var_t);
             }
             ;
 
@@ -772,14 +798,14 @@ varlike_head:   TOK_SEC_VARS       { $$=BC_VL_VARS;       S("[vars]"      ); }
 
 var_list    :   var_list var_rec
             {
-                $$ = (bc_var_t*)ll_insert(&($1->l), &($2->l));
+                $$ = LL_INSERT($1, $2, cfg_var_t);
             }
             |   var_rec { $$ = $1; }
             ;
 
-var_rec     :   string '=' strnum eoln
+var_rec     :   ident '=' strnum eoln
             {
-                $$ = CALLOC(bc_var_t, 1);
+                $$ = CALLOC(cfg_var_t, 1);
                 BC_CHKOOM($$);
 
                 $$->name = $1;
@@ -800,9 +826,9 @@ var_rec     :   string '=' strnum eoln
 /*  SEC_UNSUP:  Clean up the remaining section types that we might have     */
 /*              heard of, but don't do anything valuable with.              */
 /* ------------------------------------------------------------------------ */
-sec_unsup   :   unknown_sec eoln ;
+sec_unsup   :   unknown_head eoln ;
 
-unknown_sec :   TOK_SEC_DISASM   { S("[disasm]"); }
+unknown_head:   TOK_SEC_DISASM   { S("[disasm]"); }
             |   TOK_SEC_VOICES   { S("[voices]"); }
             |   TOK_SEC_UNKNOWN
             {
@@ -831,7 +857,11 @@ unknown_sec :   TOK_SEC_DISASM   { S("[disasm]"); }
 /*                                                                          */
 /*  HEX_NUM :   Token that (by context) is unambiguously a hex number.      */
 /*                                                                          */
-/*  STRING  :   Token that (by context) is unambiguously a string.          */
+/*  STRING  :   Token that (by context) is unambiguously a string, and may  */
+/*              be in quotes.                                               */
+/*                                                                          */
+/*  IDENT   :   Token that (by context) is unambiguously a string, and may  */
+/*              not be in quotes.                                           */
 /*                                                                          */
 /*  MEMATTR :   RAM, ROM or WOM.                                            */
 /*                                                                          */
@@ -849,28 +879,48 @@ unknown_sec :   TOK_SEC_DISASM   { S("[disasm]"); }
 /* ------------------------------------------------------------------------ */
 strnum      :   TOK_NAME
             {
-                $$.flag    = BC_VAR_STRING;
+                $$.flag    = VAL_STRING;
                 $$.str_val = strdup(bc_txt);  BC_CHKOOM($$.str_val);
                 $$.dec_val = 0;
                 $$.hex_val = 0;
+                val_try_parse_date( &($$) );
+            }
+            |   TOK_STRING
+            {
+                $$.flag    = VAL_STRING;
+                $$.str_val = strdup(bc_txt);  BC_CHKOOM($$.str_val);
+                $$.dec_val = 0;
+                $$.hex_val = 0;
+                val_try_parse_date( &($$) );
             }
             |   TOK_HEX
             {
-                $$.flag    = BC_VAR_STRING | BC_VAR_HEXNUM;
+                $$.flag    = VAL_STRING | VAL_HEXNUM;
                 $$.str_val = strdup(bc_txt);  BC_CHKOOM($$.str_val);
                 $$.dec_val = 0;
                 $$.hex_val = bc_hex;
             }
             |   TOK_DEC
             {
-                $$.flag    = BC_VAR_STRING | BC_VAR_HEXNUM | BC_VAR_DECNUM;
+                $$.flag    = VAL_STRING | VAL_HEXNUM | VAL_DECNUM;
                 $$.str_val = strdup(bc_txt);  BC_CHKOOM($$.str_val);
                 $$.dec_val = bc_dec;
                 $$.hex_val = bc_hex;
+
+                /* It *may* be a year, so try putting it in date too */
+                if ( bc_dec > 0 && bc_dec < 100 )
+                {
+                    $$.flag |= VAL_DATE;
+                    $$.date_val.year = bc_dec + 1900;
+                } else if ( bc_dec > 1900 && bc_dec < 1900 + 255 )
+                {
+                    $$.flag |= VAL_DATE;
+                    $$.date_val.year = bc_dec;
+                }
             }
             |   TOK_DECONLY
             {
-                $$.flag    = BC_VAR_STRING | BC_VAR_DECNUM;
+                $$.flag    = VAL_STRING | VAL_DECNUM;
                 $$.str_val = strdup(bc_txt);  BC_CHKOOM($$.str_val);
                 $$.dec_val = bc_dec;
                 $$.hex_val = 0;
@@ -885,13 +935,20 @@ hex_num     :   TOK_HEX     { $$ = bc_hex; }
             |   TOK_DEC     { $$ = bc_hex; }
             ;
 
-string      :   TOK_NAME    { $$ = strdup(bc_txt); BC_CHKOOM($$); }
+ident       :   TOK_NAME    { $$ = strdup(bc_txt); BC_CHKOOM($$); }
             |   TOK_HEX     { $$ = strdup(bc_txt); BC_CHKOOM($$); }
             |   TOK_DEC     { $$ = strdup(bc_txt); BC_CHKOOM($$); }
             |   TOK_DECONLY { $$ = strdup(bc_txt); BC_CHKOOM($$); }
             ;
 
-memattr     :   TOK_RAM     { $$ = BC_SPAN_RAM; }
+string      :   TOK_NAME    { $$ = strdup(bc_txt); BC_CHKOOM($$); }
+            |   TOK_STRING  { $$ = strdup(bc_txt); BC_CHKOOM($$); }
+            |   TOK_HEX     { $$ = strdup(bc_txt); BC_CHKOOM($$); }
+            |   TOK_DEC     { $$ = strdup(bc_txt); BC_CHKOOM($$); }
+            |   TOK_DECONLY { $$ = strdup(bc_txt); BC_CHKOOM($$); }
+            ;
+
+memattr_tok :   TOK_RAM     { $$ = BC_SPAN_RAM; }
             |   TOK_ROM     { $$ = BC_SPAN_ROM; }
             |   TOK_WOM     { $$ = BC_SPAN_WOM; }
             ;
@@ -912,7 +969,7 @@ error_tok   :   error
                         bc_dont_save    = 1;
                         bc_saved_tok    = yychar;
                         bc_saved_lineno = bc_line_no;
-                        bc_saved_sec    = bc_cursect ? bc_cursect:"<toplevel>";
+                        bc_saved_sec    = bc_cursect ? bc_cursect : "<toplevel>";
                     }
                 }
             }
@@ -920,14 +977,11 @@ error_tok   :   error
 %%
 
 /* ------------------------------------------------------------------------ */
-/*  YYERROR -- required by Bison/YACC.  Note that this can leak memory in   */
-/*             an OOM condition.  It's an acceptable irony, given we're     */
-/*             about to die anyway.                                         */
+/*  YYERROR -- required by Bison/YACC.                                      */
 /* ------------------------------------------------------------------------ */
 static void yyerror(const char *diagmsg)
 {
     bc_diag_t *err;
-    ll_t *p;
     const char *cursect = bc_cursect ? bc_cursect : "<internal>";
 
     err = CALLOC(bc_diag_t, 1);
@@ -941,11 +995,18 @@ static void yyerror(const char *diagmsg)
 
     err->line = bc_line_no;
     err->type = BC_DIAG_ERROR;
-    err->sect = strdup(cursect);    if (!err->sect) return;
-    err->msg  = strdup(bc_errbuf);  if (!err->msg ) return;
+    err->sect = strdup(cursect);    if (!err->sect) goto oom;
+    err->msg  = strdup(bc_errbuf);  if (!err->msg ) goto oom;
 
-    p = ll_concat(&(bc_diag_list->l), &(err->l));
-    bc_diag_list = (bc_diag_t*) p;
+    LL_CONCAT(bc_diag_list, err, bc_diag_t);
+    return;
+oom:
+    if (err)
+    {
+        CONDFREE(err->msg);
+        CONDFREE(err->sect);
+    }
+    CONDFREE(err);
 }
 
 /* ======================================================================== */
@@ -959,9 +1020,9 @@ static void yyerror(const char *diagmsg)
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                 Copyright (c) 2003-+Inf, Joseph Zbiciak                  */
 /* ======================================================================== */

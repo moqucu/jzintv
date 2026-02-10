@@ -11,20 +11,30 @@
 /************************************/
 
 #include "config.h"
-#include "util/symtab.h"
 #include "debug_dasm1600.h"
+
+/* ======================================================================== */
+/*  DEBUG_SYMB_FOR_ADDR  -- Returns symbol associated with and address, or  */
+/*                          NULL if there is none.  Performs no formatting. */
+/*                                                                          */
+/*  Prefers symbols that start w/out a '.' if available.                    */
+/* ======================================================================== */
+const char *debug_symb_for_addr
+(
+    const uint32_t addr
+);
 
 #define R2        "R%c",'0'+i2
 #define R3        "R%c",'0'+i3
 #define RB        "R%c",'4'+((w2>>8)&3)
 #define RR        "R%c",'0'+(i3&3)
-#define IM        "#$%04hX",(dbd==1?(w2&0xFF)|(w3<<8):w2)
+#define IM        "#$%04X",(dbd==1?(w2&0xFF)|(w3<<8):w2)
 
-#define ADDR        "%s", symb_for_addr(w2, symtab)
+#define ADDR        "%s", symb_for_addr(w2)
 #define DA          "%s", symb_for_addr(((w2 & 0x0FC) << 8) + \
-                                         (w3 & 0x3FF), symtab)
-#define DISPMINUS   "%s", symb_for_addr(addr + 1 - w2,  symtab)
-#define DISPPLUS    "%s", symb_for_addr(addr + 2 + w2,  symtab)
+                                         (w3 & 0x3FF))
+#define DISPMINUS   "%s", symb_for_addr(addr + 1 - w2)
+#define DISPPLUS    "%s", symb_for_addr(addr + 2 + w2)
 
 #define OPCODE(Q)      snprintf(display_buffer.opcode_field, \
                          sizeof(display_buffer.opcode_field),"%s",Q)
@@ -71,13 +81,13 @@ int set_symb_addr_format(int x)
     return 1;
 }
 
-static char *symb_for_addr(uint_32 addr, symtab_t *symtab)
+static char *symb_for_addr(const uint32_t addr)
 {
-    const char *symb;
+    const char *const symb = debug_symb_for_addr(addr);
     int fmt = symb_addr_format;
     int len;
 
-    if (!symtab || !(symb = symtab_getsym(symtab, addr, 0, 0)))
+    if (!symb)
     {
         fmt = 3;
         len = 0;
@@ -155,8 +165,7 @@ static int get_num_words(int op, int dbd)
 }
 
 
-int dasm1600(char *outbuf, int addr, int dbd, int w1, int w2, int w3,
-             symtab_t *symtab)
+int dasm1600(char *outbuf, int addr, int dbd, int w1, int w2, int w3)
 {
     int i1, i2, i3, sign;
     int s;
@@ -174,7 +183,7 @@ int dasm1600(char *outbuf, int addr, int dbd, int w1, int w2, int w3,
     display_buffer.operand2_field[0] = 0;
     display_buffer.comment_field[0] = 0;
 
-    snprintf(display_buffer.address_field,5,"%04hX",addr);
+    snprintf(display_buffer.address_field,5,"%04X",addr);
 
     s = get_num_words(w1,dbd);
 
@@ -182,20 +191,20 @@ int dasm1600(char *outbuf, int addr, int dbd, int w1, int w2, int w3,
     {
         case 1:
         {
-            snprintf(display_buffer.word1_field,5,"%04hX",w1);
+            snprintf(display_buffer.word1_field,5,"%04X",w1);
             break;
         }
         case 2:
         {
-            snprintf(display_buffer.word1_field,5,"%04hX",w1);
-            snprintf(display_buffer.word2_field,5,"%04hX",w2);
+            snprintf(display_buffer.word1_field,5,"%04X",w1);
+            snprintf(display_buffer.word2_field,5,"%04X",w2);
             break;
         }
         case 3:
         {
-            snprintf(display_buffer.word1_field,5,"%04hX",w1);
-            snprintf(display_buffer.word2_field,5,"%04hX",w2);
-            snprintf(display_buffer.word3_field,5,"%04hX",w3);
+            snprintf(display_buffer.word1_field,5,"%04X",w1);
+            snprintf(display_buffer.word2_field,5,"%04X",w2);
+            snprintf(display_buffer.word3_field,5,"%04X",w3);
             break;
         }
     }
@@ -371,8 +380,6 @@ int dasm1600(char *outbuf, int addr, int dbd, int w1, int w2, int w3,
             OPERAND1(R3);
             break;
         }
-
-        break;
         }
         break;
     }
@@ -437,7 +444,6 @@ int dasm1600(char *outbuf, int addr, int dbd, int w1, int w2, int w3,
             MAYBE2_2;
             break;
         }
-        break;
         }
         break;
     }
@@ -449,7 +455,7 @@ int dasm1600(char *outbuf, int addr, int dbd, int w1, int w2, int w3,
         OPERAND1(R2);
         }
         else
-        if ((w1 & 0x3) == 7)
+        if ((w1 & 0x7) == 7)
         {
         OPCODE("JR");
         OPERAND1(R2);
@@ -750,7 +756,6 @@ int dasm1600(char *outbuf, int addr, int dbd, int w1, int w2, int w3,
         }
         break;
     }
-    break;
     }
 
     snprintf(outbuf,1024,
@@ -766,6 +771,7 @@ int dasm1600(char *outbuf, int addr, int dbd, int w1, int w2, int w3,
             display_buffer.operand2_field,
             display_buffer.comment_field);
 
+    (void)labeladdr;
     return s;
 }
 

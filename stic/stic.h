@@ -2,20 +2,19 @@
  * ============================================================================
  *  Title:    STIC -- Standard Television Interface Chip, AY-3-8900
  *  Author:   J. Zbiciak
- *  $Id$
  * ============================================================================
  *  This module implements the STIC Chip.  Its functionality is currently
  *  far from complete.  For instance, I don't implement MOBs yet.
  * ============================================================================
  *  The STIC processor is active over several regions of memory:
  *
- *   0x0000 - 0x001F     -- MOB (Movable OBject) controls 
+ *   0x0000 - 0x001F     -- MOB (Movable OBject) controls
  *                          0x0000 + n  X Position, MOB #n
  *                          0x0008 + n  Y Position, MOB #n
  *                          0x0010 + n  Attribute Register, MOB #n
  *                          0x0018 + n  Collision Detect, MOB #n
  *
- *   0x0020 - 0x0021     -- STIC control registers  
+ *   0x0020 - 0x0021     -- STIC control registers
  *                          0x0020      Display Enable
  *                          0x0021      Graphics Mode
  *
@@ -31,22 +30,21 @@
  *   0x0200 - 0x035F     -- Background Card Table (BACKTAB)
  *
  *   0x3800 - 0x39FF     -- Graphics RAM
- *  
+ *
  *                          Note:  BACKTAB and GRAM are actually physically
  *                          separate.  This STIC implementation 'snoops'
  *                          these accesses for performance reasons.
  *
- *  For now, I handle all of the control register accesses into one 
+ *  For now, I handle all of the control register accesses into one
  *  peripheral entry and all bus-snooping accesses in a second peripheral
  *  entry.
  * ============================================================================
  */
 
-#ifndef _STIC_H
-#define _STIC_H 1
+#ifndef STIC_H_
+#define STIC_H_ 1
 
-#include "cp1600/req_bus.h"
-
+#include "cp1600/req_q.h"
 
 /*
  * ============================================================================
@@ -73,59 +71,79 @@ struct stic_t
     periph_t    stic_cr;
     periph_t    snoop_btab;
     periph_t    snoop_gram;
+    periph_t    alias_gram;
+
+    /* -------------------------------------------------------------------- */
+    /*  CPU accesses, INTAK, BUSAK can advance the STIC emulation state     */
+    /*  ahead of what the normal periph-tick functionality performs.  This  */
+    /*  keeps track of the 'effective now', which should be all of the      */
+    /*  periph_t notions of 'now'.                                          */
+    /* -------------------------------------------------------------------- */
+    uint64_t    eff_cycle;
+
+    /* -------------------------------------------------------------------- */
+    /*  Some other important times:                                         */
+    /* -------------------------------------------------------------------- */
+    uint64_t    gmem_accessible;    /* CPU can access GRAM/GROM.            */
+    uint64_t    stic_accessible;    /* CPU can access STIC registers        */
+    uint64_t    vid_enable_cutoff;  /* Last cycle for vid-enable handshake  */
+    uint64_t    next_frame_render;  /* Cycle of next graphics render.       */
+    uint64_t    last_frame_intrq;   /* Most recent INTRQ cycle.             */
+    uint64_t    next_frame_intrq;   /* Next INTRQ coming up.                */
 
     /* -------------------------------------------------------------------- */
     /*  We just keep a raw image of the STIC registers and decode manually  */
     /* -------------------------------------------------------------------- */
-    uint_32     raw [0x40];
-    uint_8      gmem[0x140 * 8];
+    uint32_t    raw [0x40];
+    uint8_t     gmem[0x200 * 8];
 
     /* -------------------------------------------------------------------- */
     /*  We store several bitmaps and display lists.                         */
     /* -------------------------------------------------------------------- */
-    int         fifo_ptr;                   /* Video FIFO pointer.          */
-    uint_16     btab_sr [240];              /* BACKTAB as it is in Sys. RAM */
-    uint_16     btab    [240];              /* BACKTAB as STIC sees it      */
-    uint_32     last_bg [12];               /* Last background color by row */
- /* uint_32     bt_img  [240*8]; */         /* BACKTAB 4-bpp display list.  */
-    uint_8      bt_bmp  [240*8];            /* BACKTAB 1-bpp display list.  */
-    uint_32     mob_img [ 16*16  / 8];      /* Expanded/mirrored MOB 4bpp.  */
-    uint_16     mob_bmp [8][16];            /* Expanded/mirrored MOBs 1bpp. */
-    uint_32     mpl_img [192*224 / 8];      /* MOB image.                   */
-    uint_32     mpl_vsb [192*224 /32];      /* MOB visibility bitmap.       */
-    uint_32     mpl_pri [192*224 /32];      /* MOB priority bitmap.         */
-    uint_32     xbt_img [192*112 / 8];      /* Re-tiled BACKTAB image.      */
-    uint_32     xbt_bmp [192*112 /32];      /* Re-tiled BACKTAB 1-bpp.      */
-    uint_32     image   [192*224 / 8];      /* Final 192x224 image, 4-bpp.  */
+    int         fifo_rd_ptr;            /* How far into BTAB STIC's fetched */
+    int         fifo_wr_ptr;            /* Next loc to copy to in shadow.   */
+    int         busrq_count;            /* Number of BUSRQs so far.         */
+    uint16_t    btab_sr [240];              /* BACKTAB as it is in Sys. RAM */
+    uint16_t    btab    [240];              /* BACKTAB as STIC sees it      */
+    uint16_t    btab_pr [240];              /* Prev BACKTAB as STIC sees it */
+    uint32_t    last_bg [12];               /* Last background color by row */
+ /* uint32_t    bt_img  [240*8]; */         /* BACKTAB 4-bpp display list.  */
+    uint8_t     bt_bmp  [240*8];            /* BACKTAB 1-bpp display list.  */
+    uint32_t    mob_img [ 16*16  / 8];      /* Expanded/mirrored MOB 4bpp.  */
+    uint16_t    mob_bmp [8][16];            /* Expanded/mirrored MOBs 1bpp. */
+    uint32_t    mpl_img [192*224 / 8];      /* MOB image.                   */
+    uint32_t    mpl_vsb [192*224 /32];      /* MOB visibility bitmap.       */
+    uint32_t    mpl_pri [192*224 /32];      /* MOB priority bitmap.         */
+    uint32_t    xbt_img [192*112 / 8];      /* Re-tiled BACKTAB image.      */
+    uint32_t    xbt_bmp [192*112 /32];      /* Re-tiled BACKTAB 1-bpp.      */
+    uint32_t    image   [192*224 / 8];      /* Final 192x224 image, 4-bpp.  */
 
-    uint_8      *disp;
-    gfx_t       *gfx;
+    uint8_t    *disp;
+    gfx_t      *gfx;
 
     /* -------------------------------------------------------------------- */
     /*  IRQ and BUSRQ generation.                                           */
     /* -------------------------------------------------------------------- */
-    req_bus_t   *req_bus;       /* Bus for INTRQ, BUSRQ, INTAK, BUSAK.      */
+    req_q_t    *req_q;          /* Bus for INTRQ, BUSRQ, INTAK, BUSAK.      */
 
     /* -------------------------------------------------------------------- */
     /*  STIC internal flags.                                                */
     /* -------------------------------------------------------------------- */
-    void        (*upd)(struct stic_t*); /* Update fxn for curr disp mode.   */
-    uint_8      phase;          /* 0 == Start of VBlank, 1 == Start of Pic  */
-    uint_8      cp_row;         /* Row to copy at BUSAK                     */
-    uint_8      ve_post;        /* Where vid-enables are posted.            */
-    uint_8      vid_enable;     /* Must be set every vsync to enable vid.   */
-    uint_8      mode, p_mode;   /* 1 == FG/BG mode, 0 == Color Stack.       */
-    uint_8      bt_dirty;       /* BACKTAB is dirty.                        */
-    uint_8      gr_dirty;       /* GRAM is dirty.                           */
-    uint_8      ob_dirty;       /* MOBs are dirty.                          */
-    uint_8      rand_regs;      /* Flag: Randomize registers on reset       */
-    uint_8      pal;            /* Flag: 0 == NTSC, 1 == PAL                */
+    void      (*upd)(struct stic_t*);   /* Update fxn for curr disp mode.   */
+    uint8_t     prev_vid_enable;    /* Previous video enable.               */
+    uint8_t     vid_enable;     /* Must be set every vsync to enable vid.   */
+    uint8_t     mode, p_mode;   /* 1 == FG/BG mode, 0 == Color Stack.       */
+    uint8_t     bt_dirty;       /* BACKTAB is dirty.                        */
+    uint8_t     gr_dirty;       /* GRAM is dirty.                           */
+    uint8_t     ob_dirty;       /* MOBs are dirty.                          */
+    uint8_t     rand_mem;       /* Flag: Randomize regs, memory on startup  */
+    uint8_t     pal;            /* Flag: 0 == NTSC, 1 == PAL                */
+    uint8_t     movie_active;   /* Suppress dropping frames if movie active */
+    uint8_t     is_hidden;      /* Drop frames if hidden but no movie.      */
+    uint8_t     type;           /* Normal STIC or STIC1A.                   */
+    uint8_t     gram_size;      /* 0 = 64, 1 = 128, 2 = 256 cards           */
+    uint16_t    gram_mask;      /* Address mask for GRAM.                   */
     int         drop_frame;     /* Frames to drop because we're behind.     */
-    uint_64     gmem_accessible;/* CPU can access GRAM/GROM.                */
-    uint_64     stic_accessible;/* CPU can access STIC registers            */
-    uint_64     next_busrq;     /* Time of next STIC->CPU bus request.      */
-    uint_64     next_irq;       /* Time of next STIC->CPU Interrupt request */
-    uint_64     next_phase;     /* Don't switch phases until after this     */
 
     /* -------------------------------------------------------------------- */
     /*  Performance monitoring.  :-)                                        */
@@ -135,7 +153,7 @@ struct stic_t
         double  full_update;
         double  draw_btab;
         double  draw_mobs;
-        double  fix_bord; 
+        double  fix_bord;
         double  merge_planes;
         double  push_vid;
         double  mob_colldet;
@@ -146,12 +164,12 @@ struct stic_t
     /* -------------------------------------------------------------------- */
     /*  Demo recording                                                      */
     /* -------------------------------------------------------------------- */
-    demo_t      *demo;
+    demo_t     *demo;
 
     /* -------------------------------------------------------------------- */
     /*  Debugger support                                                    */
     /* -------------------------------------------------------------------- */
-    uint_32     debug_flags;
+    uint32_t    debug_flags;
 };
 
 #ifndef STIC_T_
@@ -171,7 +189,19 @@ typedef struct stic_t stic_t;
 #define STIC_DBG_CTRL_ACCESS_WINDOW     (1 <<  3)
 #define STIC_DBG_GMEM_ACCESS_WINDOW     (1 <<  4)
 #define STIC_HALT_ON_BLANK              (1 <<  5)
+#define STIC_GRAMSHOT                   (1 <<  6)
+#define STIC_DBG_REQS                   (1 <<  7)
+#define STIC_HALT_ON_BUSRQ_DROP         (1 <<  8)
+#define STIC_HALT_ON_INTRM_DROP         (1 <<  9)
 
+/*
+ * ============================================================================
+ *  STIC types:
+ *      STIC_8900       Standard STIC
+ *      STIC_STIC1A     STIC1A chip from INTV88/TutorVision
+ * ============================================================================
+ */
+enum stic_type { STIC_8900, STIC_STIC1A };
 
 /*
  * ============================================================================
@@ -182,20 +212,44 @@ typedef struct stic_t stic_t;
 
 int stic_init
 (
-    stic_t          *stic,
-    uint_16         *grom_img,
-    req_bus_t       *irq,
-    gfx_t           *gfx,
-    demo_t          *demo,
-    int             rand_regs,
-    int             pal_mode
+    stic_t         *const stic,
+    uint16_t       *const grom_img,
+    req_q_t        *const req_q,
+    gfx_t          *const gfx,
+    demo_t         *const demo,
+    int             const rand_regs,
+    int             const pal_mode,
+    int             const gram_size,
+    enum stic_type  const stic_type
 );
 
-uint_32 stic_tick
+uint32_t stic_tick
 (
-    periph_p        per,
-    uint_32         len
+    periph_t *const per,
+    const uint32_t len
 );
+
+/*
+ * ============================================================================
+ *  STIC_RESYNC  -- Resynchronize STIC internal state after a load.
+ * ============================================================================
+ */
+void stic_resync(stic_t *const stic);
+
+/*
+ * ============================================================================
+ *  STIC_GRAM_TO_GIF -- Generate GIF containing the current GRAM contents.
+ * ============================================================================
+ */
+void stic_gram_to_gif(const stic_t *const stic);
+
+/*
+ * ============================================================================
+ *  STIC_GRAM_TO_TEXT -- Display textual representation of GRAM.
+ * ============================================================================
+ */
+void stic_gram_to_text(const stic_t *const stic, const int start, 
+                       const int count, const int disp_width);
 
 #endif
 
@@ -210,9 +264,9 @@ uint_32 stic_tick
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
-/*                 Copyright (c) 1998-2011, Joseph Zbiciak                  */
+/*                 Copyright (c) 1998-2019, Joseph Zbiciak                  */
 /* ======================================================================== */

@@ -24,12 +24,12 @@ static ser_hier_t *ser_hier = NULL;
 /* ======================================================================== */
 void ser_register
 (
-    ser_hier_t  *hier,      /*  What namespace to put this under.           */
-    const char  *name,      /*  What name to give to the object.            */
-    void        *object,    /*  Pointer to the object itself.               */
+    ser_hier_t *hier,       /*  What namespace to put this under.           */
+    const char *name,       /*  What name to give to the object.            */
+    void       *object,     /*  Pointer to the object itself.               */
     ser_type_t  type,       /*  8/16/32 bit, scalar, string, array,etc.     */
     int         length,     /*  Length of object if an array.               */
-    uint_32     flags       /*  mandatory/optional/informative/init         */
+    uint32_t    flags       /*  mandatory/optional/informative/init         */
 )
 {
     ser_list_t *new_rec, *node, *prev;
@@ -66,7 +66,7 @@ void ser_register
 
     if (prev) prev->next     = new_rec;
     else      hier->obj_list = new_rec;
-    
+
     /* -------------------------------------------------------------------- */
     /*  If this key has its INIT flag set, set it in the hierarchies that   */
     /*  contain it.  If it does not have its INIT flag set, set the NONINIT */
@@ -134,15 +134,15 @@ ser_hier_t *ser_new_hierarchy
 /* ======================================================================== */
 /*  SER_GET_INT                                                             */
 /* ======================================================================== */
-uint_64 ser_get_int(void *object, ser_type_t type, void **next)
+uint64_t ser_get_int(void *object, ser_type_t type, void **next)
 {
-    uint_64 value;
+    uint64_t value;
     union
     {
-        uint_8  *pu8;   sint_8  *ps8;
-        uint_16 *pu16;  sint_16 *ps16;
-        uint_32 *pu32;  sint_32 *ps32;
-        uint_64 *pu64;  sint_64 *ps64;
+        uint8_t  *pu8;   int8_t  *ps8;
+        uint16_t *pu16;  int16_t *ps16;
+        uint32_t *pu32;  int32_t *ps32;
+        uint64_t *pu64;  int64_t *ps64;
         void    *v;
     } ptr;
 
@@ -173,7 +173,7 @@ static char ser_int_buf[20];
 /* ======================================================================== */
 /*  SER_INT_TO_STR                                                          */
 /* ======================================================================== */
-char *ser_int_to_str(uint_64 value, ser_type_t type, uint_32 flags, int fix)
+char *ser_int_to_str(uint64_t value, ser_type_t type, uint32_t flags, int fix)
 {
     const char *format;
     static char ffmt[10];
@@ -196,9 +196,9 @@ char *ser_int_to_str(uint_64 value, ser_type_t type, uint_32 flags, int fix)
 
         switch (type)
         {
-            case ser_u8 : case ser_u16: 
+            case ser_u8 : case ser_u16:
             case ser_u32: case ser_u64: snprintf(ffmt,9,"%%%dllu", fix); break;
-            case ser_s8 : case ser_s16: 
+            case ser_s8 : case ser_s16:
             case ser_s32: case ser_s64: snprintf(ffmt,9,"%%%dlld", fix); break;
             default: fprintf(stderr, "ser_int_to_str called w/ bad type %d\n",
                              (int)type);
@@ -209,9 +209,9 @@ char *ser_int_to_str(uint_64 value, ser_type_t type, uint_32 flags, int fix)
     {
         switch (type)
         {
-            case ser_u8 : case ser_u16: 
+            case ser_u8 : case ser_u16:
             case ser_u32: case ser_u64: format = "%llu"; break;
-            case ser_s8 : case ser_s16: 
+            case ser_s8 : case ser_s16:
             case ser_s32: case ser_s64: format = "%lld"; break;
             default: fprintf(stderr, "ser_int_to_str called w/ bad type %d\n",
                              (int)type);
@@ -236,16 +236,16 @@ void ser_print_array
     int         indent
 )
 {
-    int     i, l, col;
+    int      i, l, col;
     void    *p;
-    uint_64 v;
+    uint64_t v;
     char    *s;
 
-    fprintf(f, "%*s%s =\n%*s{\n%*s", 
+    fprintf(f, "%*s%s =\n%*s{\n%*s",
             indent, "", obj->name, indent, "", indent + 4, "");
 
     col = indent + 4;
-    
+
     p = obj->object;
     for (i = 0; i < obj->length; i++)
     {
@@ -282,8 +282,8 @@ void ser_print_int
     int         indent
 )
 {
-    fprintf(f, "%*s%s = %s;\n", indent, "", obj->name, 
-            ser_int_to_str(ser_get_int(obj->object, obj->type, NULL), 
+    fprintf(f, "%*s%s = %s;\n", indent, "", obj->name,
+            ser_int_to_str(ser_get_int(obj->object, obj->type, NULL),
                            obj->type, obj->flags, 0));
 
     return;
@@ -299,7 +299,7 @@ void ser_print_string
     int         indent
 )
 {
-    fprintf(f, "%*s%s = \"%s\";\n", indent, "", obj->name, 
+    fprintf(f, "%*s%s = \"%s\";\n", indent, "", obj->name,
             obj->object ? (char *)obj->object : NULL);
 
     return;
@@ -313,7 +313,7 @@ void ser_print_hierarchy(FILE *f, ser_hier_t *node, int init, int indent)
 {
     ser_list_t *object;
     ser_hier_t *child;
- 
+
     /* -------------------------------------------------------------------- */
     /*  Do this in two passes:  Catch all the initialization stuff first    */
     /*  and then capture all the rest.  This isn't necessary, but it's a    */
@@ -396,9 +396,9 @@ void ser_print_hierarchy(FILE *f, ser_hier_t *node, int init, int indent)
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                 Copyright (c) 1998-1999, Joseph Zbiciak                  */
 /* ======================================================================== */

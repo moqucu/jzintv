@@ -2,7 +2,6 @@
  * ============================================================================
  *  Title:    Peripheral Subsystem
  *  Author:   J. Zbiciak
- *  $Id: periph.c,v 1.22 2001/02/03 02:34:21 im14u2c Exp $
  * ============================================================================
  *  PERIPH_NEW       -- Creates a new peripheral bus
  *  PERIPH_DELETE    -- Disposes a peripheral bus
@@ -15,7 +14,7 @@
  *
  *   -- Bus-wide information stored in a periph_bus_t
  *   -- Per-device information stored in a periph_t
- * 
+ *
  *  Peripherals wishing to use the peripheral subsystem need to 'extend'
  *  periph_t by declaring a structure which has a periph_t as its first
  *  element.  This extended structure can then be passed into the periph_*
@@ -29,20 +28,21 @@
 #include "periph.h"
 #include "serializer/serializer.h"
 
+#define DEBUG_TICK 0
 
 /*
  * ============================================================================
  *  PERIPH_NEW       -- Creates a new peripheral bus
  * ============================================================================
  */
-periph_bus_p periph_new
+periph_bus_t *periph_new
 (
     int addr_size,              /*  Address size (in bits)              */
     int data_size,              /*  Data size (in bits)                 */
     int decode_shift            /*  Decode granularity control          */
 )
 {
-    periph_bus_p    bus;
+    periph_bus_t    *bus;
     int             bins, i;
 
     /* -------------------------------------------------------------------- */
@@ -62,7 +62,7 @@ periph_bus_p periph_new
     bus = CALLOC(periph_bus_t, 1);
 
     if (!bus)
-    {   
+    {
         fprintf(stderr,"FATAL:  cannot allocate memory for periph bus.\n");
         exit(1);
     }
@@ -74,13 +74,14 @@ periph_bus_p periph_new
     bus->data_mask = ~(~0U << addr_size);
 
     bus->decode_shift = decode_shift;
+    bus->pend_reset   = false;
 
     bus->list = 0;
     bins = addr_size - decode_shift;
 
     if (! (bus->rd[0] = CALLOC(periph_t *, MAX_PERIPH_BIN << bins)) ||
         ! (bus->wr[0] = CALLOC(periph_t *, MAX_PERIPH_BIN << bins)) )
-    {   
+    {
         fprintf(stderr,"FATAL:  cannot allocate memory for periph bus.\n");
         exit(1);
     }
@@ -90,8 +91,8 @@ periph_bus_p periph_new
     /* -------------------------------------------------------------------- */
     for (i = 1; i < MAX_PERIPH_BIN; i++)
     {
-        bus->rd[i] = bus->rd[i - 1] + (1 << bins);
-        bus->wr[i] = bus->wr[i - 1] + (1 << bins);
+        bus->rd[i] = bus->rd[i - 1] + (1u << bins);
+        bus->wr[i] = bus->wr[i - 1] + (1u << bins);
     }
 
 
@@ -127,10 +128,10 @@ periph_bus_p periph_new
  */
 void periph_delete
 (
-    periph_bus_p bus                /*  Peripheral bus to dispose           */
+    periph_bus_t *bus               /*  Peripheral bus to dispose           */
 )
 {
-    periph_p curr, next;
+    periph_t *curr, *next;
 
     /* -------------------------------------------------------------------- */
     /*  Avoid recursion by marking ourselves busy.                          */
@@ -151,7 +152,7 @@ void periph_delete
     }
 
     /* -------------------------------------------------------------------- */
-    /*  Next free the periph_p array ande bus itself.                       */
+    /*  Next free the periph_t* array ande bus itself.                      */
     /* -------------------------------------------------------------------- */
     free(bus->rd[0]);
     free(bus->wr[0]);
@@ -165,14 +166,14 @@ void periph_delete
  */
 void periph_register
 (
-    periph_bus_p    bus,        /*  Peripheral bus being registered on. */
-    periph_p        periph,     /*  Peripheral being (re)registered.    */
-    uint_32         addr_lo,    /*  Low end of address range.           */
-    uint_32         addr_hi,    /*  High end of address range.          */
+    periph_bus_t    *bus,       /*  Peripheral bus being registered on. */
+    periph_t        *periph,    /*  Peripheral being (re)registered.    */
+    uint32_t        addr_lo,    /*  Low end of address range.           */
+    uint32_t        addr_hi,    /*  High end of address range.          */
     const char      *name       /*  Name of peripheral.                 */
 )
 {
-    uint_32 bin, addr;
+    uint32_t bin, addr;
     int i;
     static int unnamed = 0;
     char buf[32];
@@ -190,12 +191,12 @@ void periph_register
     /* -------------------------------------------------------------------- */
     /*  Make sure we're not registering ourself on ourself.                 */
     /* -------------------------------------------------------------------- */
-    if ((periph_p) bus == periph)
+    if ((periph_t *) bus == periph)
     {
         fprintf(stderr, "FATAL:  Loopback peripheral registry not allowed!\n");
         exit(1);
     }
-    
+
     /* -------------------------------------------------------------------- */
     /*  If this is the first time we've registered this peripheral, add it  */
     /*  to our linked list of peripherals.  Since order isn't greatly       */
@@ -213,13 +214,13 @@ void periph_register
         /* ---------------------------------------------------------------- */
         if (periph->tick)
         {
-            periph_p tick;
+            periph_t *tick;
 
             tick = bus->tickable;
             if (!tick)
             {
                 bus->tickable = periph;
-            } else 
+            } else
             {
                 while (tick->tickable)
                     tick = tick->tickable;
@@ -236,8 +237,11 @@ void periph_register
             snprintf(buf, 32, "Unnamed %d\n", ++unnamed);
             name = buf;
         }
-        strncpy(periph->name, name, sizeof(periph->name) - 1);
-        periph->name[15] = 0;
+        int copy_amount = sizeof(periph->name);
+        int name_bytes = strlen(name) + 1;
+        if (copy_amount > name_bytes) copy_amount = name_bytes;
+        memcpy(periph->name, name, copy_amount);
+        periph->name[sizeof(periph->name) - 1] = 0;
 
         /* ---------------------------------------------------------------- */
         /*  Now register this guy for serialization.                        */
@@ -255,7 +259,8 @@ void periph_register
     /*  Poke the device into our address decode structures.                 */
     /* -------------------------------------------------------------------- */
     if (periph->read)
-    for (addr = addr_lo; addr <= addr_hi; addr += 1 << bus->decode_shift)
+    for (addr = addr_lo & ( -(1u << bus->decode_shift) );
+         addr <= addr_hi; addr += 1u << bus->decode_shift)
     {
         bin = (addr & bus->addr_mask) >> bus->decode_shift;
 
@@ -264,20 +269,21 @@ void periph_register
                 break;
 
         if (i == MAX_PERIPH_BIN)
-        {   
+        {
             fprintf(stderr, "FATAL:  >%d read devices in address range "
                             "%.8x..%.8x\n",
                             MAX_PERIPH_BIN,
-                            bin << bus->decode_shift, 
+                            bin << bus->decode_shift,
                             ((bin + 1) << bus->decode_shift) - 1);
             exit(1);
         }
-        
+
         bus->rd[i][bin] = periph;
     }
 
     if (periph->write)
-    for (addr = addr_lo; addr <= addr_hi; addr += 1 << bus->decode_shift)
+    for (addr = addr_lo & ( -(1u << bus->decode_shift) );
+         addr <= addr_hi; addr += 1u << bus->decode_shift)
     {
         bin = (addr & bus->addr_mask) >> bus->decode_shift;
 
@@ -286,19 +292,19 @@ void periph_register
                 break;
 
         if (i == MAX_PERIPH_BIN)
-        {   
+        {
             fprintf(stderr, "FATAL:  >%d write devices in address range "
                             "%.8x..%.8x\n",
                             MAX_PERIPH_BIN,
-                            bin << bus->decode_shift, 
+                            bin << bus->decode_shift,
                             ((bin + 1) << bus->decode_shift) - 1);
             exit(1);
         }
-        
+
         bus->wr[i][bin] = periph;
     }
 
-    jzp_printf("%-16s [0x%.4X...0x%.4X]\n", periph->name, 
+    jzp_printf("%-16s [0x%.4X...0x%.4X]\n", name,
             addr_lo & bus->addr_mask, addr_hi & bus->addr_mask);
 }
 
@@ -308,21 +314,21 @@ void periph_register
  *  PERIPH_READ      -- Perform a read on a peripheral bus
  * ============================================================================
  */
-uint_32 periph_read
+uint32_t periph_read
 (
-    periph_p    bus,        /*  Peripheral bus being read.          */
-    periph_p    req,        /*  Peripheral requesting the read.     */
-    uint_32     addr,       /*  Address being read.                 */
-    uint_32     data1
+    periph_t    *bus,       /*  Peripheral bus being read.          */
+    periph_t    *req,       /*  Peripheral requesting the read.     */
+    uint32_t    addr,       /*  Address being read.                 */
+    uint32_t    data1
 )
 {
-    periph_bus_p    busp = (periph_bus_p)bus;
-    periph_p        periph;
-    uint_32         bin;
+    periph_bus_t    *busp = (periph_bus_t *)bus;
+    periph_t        *periph;
+    uint32_t        bin;
     int             i;
-    uint_32         data = busp->data_mask;
+    uint32_t        data = busp->data_mask;
 
-    UNUSED(data1);    
+    UNUSED(data1);
 
     /* -------------------------------------------------------------------- */
     /*  Any peripheral which forwards a read/write request is required to   */
@@ -343,7 +349,7 @@ uint_32 periph_read
     {
         periph = busp->rd[i][bin];
         if (!periph->busy)
-            data &= periph->read(periph, bus, 
+            data &= periph->read(periph, bus,
                     (addr - periph->addr_base) & periph->addr_mask, data);
     }
 
@@ -357,21 +363,21 @@ uint_32 periph_read
  *  PERIPH_PEEK      -- Perform a read on a peripheral bus w/out side effects
  * ============================================================================
  */
-uint_32 periph_peek
+uint32_t periph_peek
 (
-    periph_p    bus,        /*  Peripheral bus being read.          */
-    periph_p    req,        /*  Peripheral requesting the read.     */
-    uint_32     addr,       /*  Address being read.                 */
-    uint_32     data1
+    periph_t    *bus,       /*  Peripheral bus being read.          */
+    periph_t    *req,       /*  Peripheral requesting the read.     */
+    uint32_t    addr,       /*  Address being read.                 */
+    uint32_t    data1
 )
 {
-    periph_bus_p    busp = (periph_bus_p)bus;
-    periph_p        periph;
-    uint_32         bin;
+    periph_bus_t    *busp = (periph_bus_t *)bus;
+    periph_t        *periph;
+    uint32_t        bin;
     int             i;
-    uint_32         data = busp->data_mask;
+    uint32_t        data = busp->data_mask;
 
-    UNUSED(data1);    
+    UNUSED(data1);
 
     /* -------------------------------------------------------------------- */
     /*  Any peripheral which forwards a read/write request is required to   */
@@ -392,7 +398,7 @@ uint_32 periph_peek
     {
         periph = busp->rd[i][bin];
         if (!periph->busy)
-            data &= periph->peek(periph, bus, 
+            data &= periph->peek(periph, bus,
                     (addr - periph->addr_base) & periph->addr_mask, data);
     }
 
@@ -409,16 +415,16 @@ uint_32 periph_peek
  */
 void periph_write
 (
-    periph_p        bus,        /*  Peripheral bus being written.       */
-    periph_p        req,        /*  Peripheral requesting the write.    */
-    uint_32         addr,       /*  Address being written.              */
-    uint_32         data        /*  Data being written.                 */
+    periph_t        *bus,       /*  Peripheral bus being written.       */
+    periph_t        *req,       /*  Peripheral requesting the write.    */
+    uint32_t        addr,       /*  Address being written.              */
+    uint32_t        data        /*  Data being written.                 */
 )
 {
-    periph_bus_p    busp = (periph_bus_p)bus;
-    periph_p        periph;
-    uint_32         bin;
-    int             i; 
+    periph_bus_t    *busp = (periph_bus_t *)bus;
+    periph_t        *periph;
+    uint32_t        bin;
+    int             i;
 
     /* -------------------------------------------------------------------- */
     /*  Any peripheral which forwards a read/write request is required to   */
@@ -438,11 +444,10 @@ void periph_write
     {
         periph = busp->wr[i][bin];
         if (!periph->busy)
-            periph->write(periph, bus, 
+            periph->write(periph, bus,
                           (addr-periph->addr_base) & periph->addr_mask, data);
 
     }
-
 
     bus->busy = 0;
     bus->req  = NULL;
@@ -455,16 +460,16 @@ void periph_write
  */
 void periph_poke
 (
-    periph_p        bus,        /*  Peripheral bus being written.       */
-    periph_p        req,        /*  Peripheral requesting the write.    */
-    uint_32         addr,       /*  Address being written.              */
-    uint_32         data        /*  Data being written.                 */
+    periph_t        *bus,       /*  Peripheral bus being written.       */
+    periph_t        *req,       /*  Peripheral requesting the write.    */
+    uint32_t        addr,       /*  Address being written.              */
+    uint32_t        data        /*  Data being written.                 */
 )
 {
-    periph_bus_p    busp = (periph_bus_p)bus;
-    periph_p        periph;
-    uint_32         bin;
-    int             i; 
+    periph_bus_t    *busp = (periph_bus_t *)bus;
+    periph_t        *periph;
+    uint32_t        bin;
+    int             i;
 
     /* -------------------------------------------------------------------- */
     /*  Any peripheral which forwards a read/write request is required to   */
@@ -484,11 +489,10 @@ void periph_poke
     {
         periph = busp->wr[i][bin];
         if (!periph->busy)
-            periph->poke(periph, bus, 
+            periph->poke(periph, bus,
                           (addr-periph->addr_base) & periph->addr_mask, data);
 
     }
-
 
     bus->busy = 0;
     bus->req  = NULL;
@@ -499,18 +503,18 @@ void periph_poke
  *  PERIPH_TICK      -- Perform a tick on a peripheral bus
  * ============================================================================
  */
-uint_32 periph_tick
+uint32_t periph_tick
 (
-    periph_p        bus,        /*  Peripheral bus being ticked.        */
-    uint_32         len         /*  How much time has passed.           */
+    periph_t        *bus,       /*  Peripheral bus being ticked.        */
+    uint32_t        len         /*  How much time has passed.           */
 )
 {
-    periph_bus_p    busp = (periph_bus_p)bus;
-    periph_p        tick;
-    uint_32         step, diff;
-    uint_32         elapsed = 0, ticked;
-    uint_64         now = bus->now, soon;
+    periph_bus_t    *busp = (periph_bus_t *)bus;
+    periph_t        *tick;
+    uint32_t        elapsed = 0, ticked;
 
+    uint64_t        now  = bus->now;    /* Where we currently are       */
+    uint64_t        soon = now + len;   /* What we're trying to get to */
 
     bus->busy = 1;
 
@@ -553,15 +557,13 @@ uint_32 periph_tick
     /*  the beginning of the process, and the peripherals then stagger      */
     /*  to catch up as they can.                                            */
     /* -------------------------------------------------------------------- */
-    
+
     /* -------------------------------------------------------------------- */
     /*  Iterate until we've used up all of our time.                        */
     /* -------------------------------------------------------------------- */
-    soon = bus->now;
-    bus->now = now += len;
-    while (elapsed < len)
+    do
     {
-        step = len - elapsed;
+        uint64_t until = soon;
 
         /* ---------------------------------------------------------------- */
         /*  Pass 1:  Iterate through the list of tickables looking for      */
@@ -581,49 +583,40 @@ uint_32 periph_tick
             /*  Is this device tickable from the standpoint of its minimum  */
             /*  tick length?  If not, then don't even consider it.          */
             /* ------------------------------------------------------------ */
-            if (tick->now + tick->min_tick >= now)
+            if (tick->now + tick->min_tick >= until)
                 continue;
 
             /* ------------------------------------------------------------ */
             /*  Does this peripheral represent a new constraint on our      */
             /*  tick size?  If so, then adjust our tick step size.          */
             /* ------------------------------------------------------------ */
-            diff = now - tick->now;     /* How far apart we are.            */
+            if (until > tick->now + tick->max_tick)
+                until = tick->now + tick->max_tick;
 
-
-            if (diff > tick->max_tick)  /* Bounded by the periph's max tick */
-                diff = tick->max_tick;
-
-            if (step > diff)            /* Apply the constraint.            */
-                step = diff;
-
-#if 0
-jzp_printf("[%-16s] now=%6u  tick->now=%6u  diff=%6u  step=%6u\n",tick->name,(unsigned)now,(unsigned)tick->now, (unsigned)diff, (unsigned)step);
+#if DEBUG_TICK
+jzp_printf("[%-16s] tick->now=%6llu min=%6u max=%6u | now=%6lld until=%6lld \n",tick->name,(unsigned long long)tick->now,(unsigned)tick->min_tick, (unsigned)tick->max_tick, (unsigned long long)now, (unsigned long long)until); jzp_flush();
 #endif
-
             ticked++;
         }
 
-/*jzp_printf("now=%d step=%d\n", (int)now, (int)step);*/
+#if DEBUG_TICK
+jzp_printf("now=%llu until=%llu soon=%llu\n", (unsigned long long)now, (unsigned long long)until, (unsigned long long)soon);
+#endif
+
         /* ---------------------------------------------------------------- */
         /*  If nobody was considered for ticking, get out of here.          */
         /* ---------------------------------------------------------------- */
         if (!ticked)
             break;
-        
-        /* ---------------------------------------------------------------- */
-        /*  Sanity check.                                                   */
-        /* ---------------------------------------------------------------- */
-        assert(step);
-        soon += step;   /* When will then be now?  SOON! */
 
         /* ---------------------------------------------------------------- */
-        /*  Pass 2:  Actually tick all peripherals by the size of the       */
-        /*  tick step we calculated in pass 1.                              */
+        /*  Pass 2:  Actually tick all peripherals as close as we can to    */
+        /*  the cycle determined by the tick-step in pass 1.                */
         /* ---------------------------------------------------------------- */
-        for (tick = busp->tickable, ticked = 0 ; tick ; tick = tick->tickable)
+        ticked = 0;
+        for (tick = busp->tickable ; tick ; tick = tick->tickable)
         {
-            uint_32 periph_step;
+            uint32_t periph_step;
 
             /* ------------------------------------------------------------ */
             /*  If the peripheral's already busy, skip it.                  */
@@ -637,7 +630,7 @@ jzp_printf("[%-16s] now=%6u  tick->now=%6u  diff=%6u  step=%6u\n",tick->name,(un
             /*  'now', but we're trying to step all of time forward to a    */
             /*  fixed destination.                                          */
             /* ------------------------------------------------------------ */
-            periph_step = soon - tick->now;
+            periph_step = until >= tick->now ? until - tick->now : 0;
 
             /* ------------------------------------------------------------ */
             /*  Is this tick step larger than the peripheral's min_tick?    */
@@ -647,19 +640,22 @@ jzp_printf("[%-16s] now=%6u  tick->now=%6u  diff=%6u  step=%6u\n",tick->name,(un
             if (tick->min_tick > periph_step || tick->now > soon)
                 continue;   /*  Nope:  Skip it. */
 
-#if 0
-jzp_printf("ticking %16s with step %.8X, now = %.8X\n", tick->name, periph_step, (uint_32)tick->now);
+            /* ------------------------------------------------------------ */
+            /*  Bound the tick size by the peripheral's maximum tick value. */
+            /* ------------------------------------------------------------ */
+            if (periph_step > tick->max_tick) 
+                periph_step = tick->max_tick;
+#if DEBUG_TICK
+jzp_printf("ticking %16s with step %u, tick->now=%llu\n", tick->name, periph_step, (unsigned long long)tick->now); jzp_flush();
 #endif
-
-            /* ------------------------------------------------------------ */
-            /*  Go ahead and tick the peripheral.  Bound the tick size by   */
-            /*  the peripheral's maximum tick value.                        */
-            /* ------------------------------------------------------------ */
-            if (periph_step > tick->max_tick) periph_step = tick->max_tick;
 
             tick->busy++;
             periph_step = tick->tick(tick, periph_step);
-            tick->now += abs(periph_step);
+
+            tick->now += periph_step;
+#if DEBUG_TICK
+jzp_printf("tick result: %u, tick->now=%llu\n", periph_step, (unsigned long long)tick->now); jzp_flush();
+#endif
             tick->busy--;
 
             /* ------------------------------------------------------------ */
@@ -671,15 +667,17 @@ jzp_printf("ticking %16s with step %.8X, now = %.8X\n", tick->name, periph_step,
             ticked += periph_step != 0;
         }
 
-        /* ---------------------------------------------------------------- */
-        /*  Update the elapsed time, and break out if nobody ticked.        */
-        /* ---------------------------------------------------------------- */
-        elapsed += step;
+        now = until;
 
-        if (!ticked) break;
-    }
+    } while (now < soon && ticked);
 
     bus->busy = 0;
+
+    elapsed = now - bus->now;
+    bus->now = now;
+
+    if (busp->pend_reset)
+        periph_reset(busp);
 
     return elapsed;
 }
@@ -691,10 +689,16 @@ jzp_printf("ticking %16s with step %.8X, now = %.8X\n", tick->name, periph_step,
  */
 void periph_reset
 (
-    periph_bus_p    bus
+    periph_bus_t    *bus
 )
 {
-    periph_p        p;
+    periph_t        *p;
+
+    if (bus->periph.busy)
+    {
+        bus->pend_reset = true;
+        return;
+    }
 
     bus->periph.busy = 1;
 
@@ -702,13 +706,14 @@ void periph_reset
 
     while (p)
     {
-        if (p->reset) 
+        if (p->reset)
             p->reset(p);
-        
-        p = p->next; 
+
+        p = p->next;
     }
 
     bus->periph.busy = 0;
+    bus->pend_reset  = false;
 }
 
 
@@ -719,7 +724,7 @@ void periph_reset
  */
 void periph_ser_register
 (
-    periph_p    per,
+    periph_t    *per,
     ser_hier_t  *hier
 )
 {
@@ -754,9 +759,9 @@ void periph_ser_register
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                 Copyright (c) 1998-1999, Joseph Zbiciak                  */
 /* ======================================================================== */

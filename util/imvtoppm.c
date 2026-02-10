@@ -16,7 +16,7 @@ mvi_t movie;
  *  GFX_STIC_PALETTE -- The STIC palette.
  * ============================================================================
  */
-uint_8 palette[17][3] = 
+uint8_t palette[17][3] =
 {
     /* -------------------------------------------------------------------- */
     /*  I generated these colors by directly eyeballing my television       */
@@ -47,9 +47,9 @@ uint_8 palette[17][3] =
     { 0xFF, 0x80, 0x80 },
 };
 
-uint_8 curr[MVI_MAX_X * MVI_MAX_Y];
-uint_8 lbuf[MVI_MAX_X * 2][3];
-uint_8 bbox[8][4];
+uint8_t curr[MVI_MAX_X * MVI_MAX_Y];
+uint8_t lbuf[MVI_MAX_X * 2][3];
+uint8_t bbox[8][4];
 
 
 int main(int argc, char *argv[])
@@ -106,9 +106,12 @@ int main(int argc, char *argv[])
 #ifdef HAS_LINK
         if (fr > 0 && (flag & MVI_FR_SAME) == MVI_FR_SAME)
         {
-            link(fprev, fname);
-            fr++;
-            continue;
+            if (link(fprev, fname) == 0)
+            {
+                fr++;
+                continue;
+            }
+            /* If link failed, pretend like we didn't try... */
         }
 #endif
 
@@ -185,7 +188,7 @@ int main(int argc, char *argv[])
 
         fr++;
     }
-    
+
     printf("\nDone!\n");
 
     return 0;

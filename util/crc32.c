@@ -4,6 +4,7 @@
 /* ======================================================================== */
 
 #include "config.h"
+#include "lzoe/lzoe.h"
 #include "file/file.h"
 #include "misc/crc32.h"
 #include "misc/file_crc32.h"
@@ -18,7 +19,7 @@ int main(int argc, char *argv[])
 
     while (0<--argc)
     {
-        uint_32 crc = file_crc32(*++argv);
+        uint32_t crc = file_crc32(*++argv);
         printf("%.8X  %s\n", crc, *argv);
     }
 

@@ -2,7 +2,6 @@
  * ============================================================================
  *  Title:    Controller pads
  *  Author:   J. Zbiciak
- *  $Id: pads.c,v 1.18 1999/10/10 08:44:29 im14u2c Exp $
  * ============================================================================
  *  This module implements the controller pads.
  *  Pads are peripherals that extend periph_t.
@@ -38,7 +37,7 @@ int pads_intv2pc_ports_ok = 0;
  *                  Don't bother returning an error if we fail.  Just abort.
  * ===========================================================================
  */
-LOCAL int init_ports(uint_32 base)
+LOCAL int init_ports(uint32_t base)
 {
     int bit = 0;
 
@@ -79,13 +78,13 @@ LOCAL int init_ports(uint_32 base)
  *  PAD_INTV2PC_TICK -- Reads from a dummy pad
  * ============================================================================
  */
-uint_32 pad_intv2pc_tick(periph_t *p, uint_32 len)
+uint32_t pad_intv2pc_tick(periph_t *p, uint32_t len)
 {
-    pad_intv2pc_t   *pad  = (pad_intv2pc_t*)p;
-    uint_32 base  = pad->io_base;
-    int     state = pad->rd_state++ & 7;
-    int     side  = (state & 4) == 4;
-    uint_32 val   = pad->rd_val;
+    pad_intv2pc_t *const pad = PERIPH_AS(pad_intv2pc_t, p);
+    uint32_t base  = pad->io_base;
+    int      state = pad->rd_state++ & 7;
+    int      side  = (state & 4) == 4;
+    uint32_t val   = pad->rd_val;
 
     /* -------------------------------------------------------------------- */
     /*  Synchronous delays while we read the INTV2PC are bad.  Instead, we  */
@@ -105,9 +104,9 @@ uint_32 pad_intv2pc_tick(periph_t *p, uint_32 len)
             /* ------------------------------------------------------------ */
             /*  Phase 0:  Select low-nybble for this controller side.       */
             /* ------------------------------------------------------------ */
-            outb((2<<side)|1, base);        
+            outb((2<<side)|1, base);
             break;
-        
+
         case 1:
             /* ------------------------------------------------------------ */
             /*  Phase 1:  Read it back and mask it.                         */
@@ -122,7 +121,7 @@ uint_32 pad_intv2pc_tick(periph_t *p, uint_32 len)
             /* ------------------------------------------------------------ */
             /*  Phase 2:  Select high-nybble for this controller side.      */
             /* ------------------------------------------------------------ */
-            outb((2<<side)|0, base); 
+            outb((2<<side)|0, base);
             break;
 
         case 3:
@@ -152,12 +151,12 @@ uint_32 pad_intv2pc_tick(periph_t *p, uint_32 len)
 /* ======================================================================== */
 /*  PAD_INTV2PC_READ -- Returns the current state of the pads.              */
 /* ======================================================================== */
-uint_32 pad_intv2pc_read(periph_t *p, periph_t *r, uint_32 a, uint_32 d)
+uint32_t pad_intv2pc_read(periph_t *p, periph_t *r, uint32_t a, uint32_t d)
 {
-    pad_intv2pc_t *pad = (pad_intv2pc_t*)p;
+    pad_intv2pc_t *const pad = PERIPH_AS(pad_intv2pc_t, p);
 
-    UNUSED(r);    
-    UNUSED(d);    
+    UNUSED(r);
+    UNUSED(d);
 
     /* -------------------------------------------------------------------- */
     /*  Ignore accesses that are outside our address space.                 */
@@ -177,11 +176,11 @@ uint_32 pad_intv2pc_read(periph_t *p, periph_t *r, uint_32 a, uint_32 d)
  *  PAD_INTV2PC_WRITE    -- Looks for changes in I/O mode on PSG I/O ports.
  * ============================================================================
  */
-void pad_intv2pc_write(periph_t *p, periph_t *r, uint_32 a, uint_32 d)
+void pad_intv2pc_write(periph_t *p, periph_t *r, uint32_t a, uint32_t d)
 {
-    pad_intv2pc_t *pad = (pad_intv2pc_t*)p;
+    pad_intv2pc_t *const pad = PERIPH_AS(pad_intv2pc_t, p);
 
-    UNUSED(r);    
+    UNUSED(r);
 
     /* -------------------------------------------------------------------- */
     /*  Capture writes to the 'control' register in the PSG, looking for    */
@@ -204,9 +203,9 @@ void pad_intv2pc_write(periph_t *p, periph_t *r, uint_32 a, uint_32 d)
 /* ======================================================================== */
 int pad_intv2pc_init
 (
-    pad_intv2pc_t   *pad,           /*  mem_t structure to initialize       */
-    uint_32         addr,           /*  Base address of pad.                */
-    uint_32         io_base         /*  I/O address of INTV2PC, or 0.       */
+    pad_intv2pc_t  *pad,            /*  mem_t structure to initialize       */
+    uint32_t        addr,           /*  Base address of pad.                */
+    uint32_t        io_base         /*  I/O address of INTV2PC, or 0.       */
 )
 {
     if (io_base > 0)
@@ -229,7 +228,7 @@ int pad_intv2pc_init
         pad->periph.min_tick = 3579545 / (4*4*480); /* 480Hz scanning rate. */
         pad->periph.max_tick = 3579545 / (4*4*480); /* (times 4 states)     */
 
-        pad->io_base         = io_base;       
+        pad->io_base         = io_base;
     } else
     {
         /* ---------------------------------------------------------------- */
@@ -238,7 +237,7 @@ int pad_intv2pc_init
         fprintf(stderr, "ERROR:  INTV2PC with no io_base?\n");
         return -1;
     }
-    jzp_printf("pads_intv2pc:  INTV2PC on port 0x%.3X mapped to $%.4X-$%.4X\n", 
+    jzp_printf("pads_intv2pc:  INTV2PC on port 0x%.3X mapped to $%.4X-$%.4X\n",
             io_base, addr + 0xE, addr + 0xF);
 
     pad->periph.addr_base = addr;
@@ -250,16 +249,16 @@ int pad_intv2pc_init
     pad->side[1]          = 0xFF;
     pad->io  [0]          = 0;
     pad->io  [1]          = 0;
-                  
+
     return 0;
 }
 #else
 
 int pad_intv2pc_init
 (
-    pad_intv2pc_t   *pad,           /*  mem_t structure to initialize       */
-    uint_32         addr,           /*  Base address of pad.                */
-    uint_32         io_base         /*  I/O address of INTV2PC, or 0.       */
+    pad_intv2pc_t  *pad,            /*  mem_t structure to initialize       */
+    uint32_t        addr,           /*  Base address of pad.                */
+    uint32_t        io_base         /*  I/O address of INTV2PC, or 0.       */
 )
 {
     UNUSED(pad); UNUSED(addr); UNUSED(io_base);
@@ -281,9 +280,9 @@ int pad_intv2pc_init
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                 Copyright (c) 1998-1999, Joseph Zbiciak                  */
 /* ======================================================================== */

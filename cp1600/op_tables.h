@@ -5,7 +5,7 @@
  *
  *  DEC_FORMAT          -- Decode format for entire instruction space
  *
- *  FN_IND_2OP          -- Indirect  -> Register 2-op 
+ *  FN_IND_2OP          -- Indirect  -> Register 2-op
  *  FN_DIR_2OP          -- Direct    -> Register 2-op
  *  FN_IMM_2OP          -- Immediate -> Register 2-op
  *  FN_COND_BR          -- Conditional branches
@@ -18,8 +18,8 @@
  * ============================================================================
  */
 
-#ifndef _OP_TABLES_H
-#define _OP_TABLES_H
+#ifndef OP_TABLES_H_
+#define OP_TABLES_H_
 
 #include "config.h"
 #include "periph/periph.h"
@@ -27,16 +27,16 @@
 #include "cp1600/op_decode.h"
 #include "cp1600/op_exec.h"
 
-extern const uint_8 dec_format[];
-extern const cp1600_ins_t fn_ind_2op[];
-extern const cp1600_ins_t fn_dir_2op[];
-extern const cp1600_ins_t fn_imm_2op[];
-extern const cp1600_ins_t fn_cond_br[];
-extern const cp1600_ins_t fn_reg_2op[];
-extern const cp1600_ins_t fn_rot_1op[];
-extern const cp1600_ins_t fn_reg_1op[];
-extern const cp1600_ins_t fn_impl_1op_a[];
-extern const cp1600_ins_t fn_impl_1op_b[];
+extern const uint8_t dec_format[];
+extern cp1600_ins_t *const fn_ind_2op[];
+extern cp1600_ins_t *const fn_dir_2op[];
+extern cp1600_ins_t *const fn_imm_2op[];
+extern cp1600_ins_t *const fn_cond_br[];
+extern cp1600_ins_t *const fn_reg_2op[];
+extern cp1600_ins_t *const fn_rot_1op[];
+extern cp1600_ins_t *const fn_reg_1op[];
+extern cp1600_ins_t *const fn_impl_1op_a[];
+extern cp1600_ins_t *const fn_impl_1op_b[];
 
 #endif
 
@@ -51,9 +51,9 @@ extern const cp1600_ins_t fn_impl_1op_b[];
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                 Copyright (c) 1998-1999, Joseph Zbiciak                  */
 /* ======================================================================== */

@@ -4,15 +4,15 @@ TITLE:      Frankenstein Cross Assemblers;
 VERSION:    2.0;
 DESCRIPTION: "  Reconfigurable Cross-assembler producing Intel (TM)
         Hex format object records.  ";
-KEYWORDS:   cross-assemblers, 1805, 2650, 6301, 6502, 6805, 6809, 
+KEYWORDS:   cross-assemblers, 1805, 2650, 6301, 6502, 6805, 6809,
         6811, tms7000, 8048, 8051, 8096, z8, z80;
 SYSTEM:     UNIX, MS-Dos ;
 FILENAME:   fryylex.c;
-WARNINGS:   "This software is in the public domain.  
-        Any prior copyright claims are relinquished.  
+WARNINGS:   "This software is in the public domain.
+        Any prior copyright claims are relinquished.
 
-        This software is distributed with no warranty whatever.  
-        The author takes no responsibility for the consequences 
+        This software is distributed with no warranty whatever.
+        The author takes no responsibility for the consequences
         of its use.
 
         Yacc (or Bison) required to compile."  ;
@@ -32,10 +32,11 @@ COMPILERS:  Microport Sys V/AT, ATT Yacc, Turbo C V1.5, Bison (CUG disk 285)
 */
 
 #include "config.h"
+#include "lzoe/lzoe.h"
 #include "file/file.h"
 #include "frasmdat.h"
 #include "fraytok.h"
-#include "types.h"
+#include "as1600_types.h"
 #include "protos.h"
 #include "intermed.h"
 #include "../imasm/c_wrap.h"
@@ -44,19 +45,24 @@ COMPILERS:  Microport Sys V/AT, ATT Yacc, Turbo C V1.5, Bison (CUG disk 285)
 #define DEBUG 0
 #endif
 
-    extern YYSTYPE yylval; 
+    extern YYSTYPE yylval;
 
     enum symflag {Symopcode, Symsym} whichsym = Symopcode;
 
     enum labelarrayflag { LAno, LAmaybe, LAyes } labelarray = LAno;
 
-    FILE *yyin;
+    LZFILE *yyin;
 
     static char *fryybuf  = NULL;
     static int   fryy_bs  = 0;
     static char *frainptr = NULL;
 
     enum readacts nextreadact = Nra_normal;
+
+enum If_Mode elseifstk[IFSTKDEPTH], endifstk[IFSTKDEPTH];
+int expmacstk[IFSTKDEPTH];
+struct fstkel infilestk[FILESTKDPTH];
+int currfstk;
 
 struct rptlist
 {
@@ -74,7 +80,6 @@ struct rptstack
     int              skip;
 };
 
-
 #define MAXRPTNEST (16)
 
 static struct rptstack rpt[MAXRPTNEST];
@@ -83,7 +88,7 @@ static int    frarptnum = 0, frarptstarting = FALSE;
 static struct rptlist *rpt_curr = NULL, *rpt_head = NULL, *rpt_tail = NULL;
 
 LOCAL void frarptpop(void)
-/* 
+/*
     description: deletes the current "repeat line" buffer
     return  nothing
 */
@@ -119,8 +124,8 @@ LOCAL void frarptpop(void)
     }
 }
 
-int frarptnxt()
-/* 
+int frarptnxt(void)
+/*
     description: return next line from repeat buffer.
     return  TRUE    got a line
             FALSE   no line available from loop buffer
@@ -130,25 +135,29 @@ int frarptnxt()
     if (rpt_curr == NULL)
         return FALSE;
 
-    /* If we're returning from the loop buffer, then forget if we're        */
-    /* starting a new REPEAT block, since we already remembered its start   */
-    frarptstarting = FALSE;
-    
-    /* Return next line from loop buffer, if available */
+    /* Remember the first line of a REPEAT block. */
+    if (frarptstarting)
+    {
+        assert(frarptact > 0);
+        frarptstarting = FALSE;
+        rpt[frarptact - 1].head = rpt_curr;
+    }
+
+    /* Return next line from loop buffer, if available. */
     assert(rpt_curr->len < fryy_bs);
     strcpy(fryybuf, rpt_curr->buf);
 
-    /* fake our current line number */
+    /* Fake our current line number. */
     infilestk[currfstk].line = rpt_curr->line;
 
-    /* move to next pointer.  */
-    rpt_curr = rpt_curr->next; 
+    /* Move to next pointer.  */
+    rpt_curr = rpt_curr->next;
 
     return 1;
 }
 
 void frarptadd(char *buf)
-/* 
+/*
     description: add a line onto the repeat buffer chain.
     return  nothing
 */
@@ -183,7 +192,7 @@ void frarptbreak(void)
     emit_comment(0, "  Break Taken");
 }
 
-void frarptendr()   /* begin actually looping repeat block */
+void frarptendr(void)   /* begin actually looping repeat block */
 {
     if (frarptact <= 0)
     {
@@ -210,7 +219,7 @@ void frarptpush(int rptcnt)
     {
         fraerror("Maximum REPEAT nesting exceeded");
         return;
-    } 
+    }
 
     rpt[frarptact].num  = frarptnum;
     rpt[frarptact].cnt  = frarptcnt;
@@ -231,34 +240,41 @@ void frarptreset(void)
 
 int fraignore = FALSE;
 
-LOCAL int fra_reexamine(char *buf, int maxlen, int *ignore, void *u)
+LOCAL int fra_reexamine(char *buf, int maxlen, ignore_flags_t *ignore, void *u)
 {
-    extern int fraifskip, frarptskip;
+    extern int fraifskip, frarptskip, fraexpmac;
     UNUSED(buf);
     UNUSED(maxlen);
     UNUSED(u);
 
-//printf("reexamining %s\n", buf);
-    if (ignore) *ignore |= (fraifskip != FALSE) || (frarptskip != FALSE);
-//printf("ignore = %d\n", (fraifskip != FALSE) || (frarptskip != FALSE));
+    if (ignore) 
+    {
+//printf("reexamining %s  (i=%d,%d)\n", buf, ignore->skip_parse, ignore->skip_macro);
+        ignore->skip_parse |= (fraifskip != FALSE) || (frarptskip != FALSE);
+        ignore->skip_macro = ignore->skip_parse && !fraexpmac;
+//printf("ignore = %d,%d\n", ignore->skip_parse, ignore->skip_macro);
+    }
 
     return 1;
 }
 
-int fra_next_line(char *buf, int maxlen, int *ignore, void *u)
+int fra_next_line(char *buf, int maxlen, ignore_flags_t *ignore, void *u)
 /*
     description read a line, on end of file, pop the include file stack.
     return  TRUE    got a line
             FALSE   end of input
 */
 {
-    extern int fraifskip, frarptskip;
+    extern int fraifskip, frarptskip, fraexpmac;
     UNUSED(u);
 
-    if (ignore) *ignore = (fraifskip != FALSE) || (frarptskip != FALSE);
+    if (ignore)
+    {
+        ignore->skip_parse |= (fraifskip != FALSE) || (frarptskip != FALSE);
+        ignore->skip_macro = ignore->skip_parse && !fraexpmac;
+    }
 
-
-    while( fgets(buf, maxlen, yyin) == (char *)NULL)
+    while( lzoe_fgets(buf, maxlen, yyin) == (char *)NULL)
     {
         if(currfstk == 0)
         {
@@ -266,7 +282,7 @@ int fra_next_line(char *buf, int maxlen, int *ignore, void *u)
         }
         else
         {
-            fclose(yyin);
+            lzoe_fclose(yyin);
             yyin = infilestk[--currfstk].fpt;
             emit_exiting_file(infilestk[currfstk].fnm);
         }
@@ -285,10 +301,10 @@ const char *fra_get_pos(int *line, void *u)
 }
 
 int  fra_get_eof(void *u)
-{ 
+{
     UNUSED(u);
 
-    if (currfstk == 0 && feof(infilestk[currfstk].fpt))
+    if (currfstk == 0 && lzoe_feof(infilestk[currfstk].fpt))
         return 1;
 
     return 0;
@@ -300,7 +316,7 @@ void fra_rpt_err(const char *buf, void *u)
     emit_raw_error(buf);
 }
 
-struct parser_callbacks imasm_hooks = 
+struct parser_callbacks imasm_hooks =
 {
     fra_next_line, NULL,
     fra_get_pos,   NULL,
@@ -317,9 +333,9 @@ int frareadrec(void)
             TRUE    end of input
 */
 {
-    int ignore = 0;
+    ignore_flags_t ignore = { 0, 0 };
     extern int fraignore;
-    
+
     fryybuf[0] = 0;
 
     /* Get next line from loop buffer, if any. */
@@ -337,9 +353,9 @@ int frareadrec(void)
         return TRUE;
     }
 
-    fraignore = ignore != 0 ? TRUE : FALSE;
+    fraignore = ignore.skip_parse != 0 ? TRUE : FALSE;
 
-    if (frarptact > 0 && !ignore)
+    if (frarptact > 0 && !ignore.skip_parse)
         frarptadd(fryybuf);
 
     return FALSE;
@@ -348,13 +364,15 @@ int frareadrec(void)
 static int currtok=0; /* subscript of next token to return */
 static int intokcnt=0; /* number of tokens in queue */
 
+enum errtype_t {Yetprint, Yetsymbol, Yetreserved, Yetopcode,
+        Yetconstant, Yetstring, Yetunprint, Yetinvalid };
+
 typedef struct
 {
     char *textstrt, *textend;
     YYSTYPE  lvalv;
-    int tokv; 
-    enum {Yetprint, Yetsymbol, Yetreserved, Yetopcode, 
-        Yetconstant, Yetstring, Yetunprint, Yetinvalid } errtype;
+    int tokv;
+    enum errtype_t errtype;
 } sq_type;
 
 static sq_type *scanqueue, *lasttokfetch, *nexttokload;
@@ -491,7 +509,7 @@ static char * statelab[] = {
         "22 bslash appos",
         "23 greater than (NE)",
         };
-            
+
 static char *actlab[] = {
         " 0 skip/no op",
         " 1 load EOL token",
@@ -544,12 +562,12 @@ static struct
     STATE 0 =   {start of label}
 */
     {
-    /* SKIP    */   /* SPACE   */   /* NL      */   /* LETTER  */ 
-    /* QUOTE   */   /* OTHER   */   /* DOLLAR  */   /* PERCENT */ 
-    /* APP     */   /* BIN     */   /* OCT     */   /* DEC     */ 
-    /* SEMIC   */   /* LT      */   /* EQ      */   /* GT      */ 
-    /* AT      */   /* HEXU    */   /* B       */   /* D       */ 
-    /* H       */   /* OQ      */   /* HEXL    */   /* BL      */ 
+    /* SKIP    */   /* SPACE   */   /* NL      */   /* LETTER  */
+    /* QUOTE   */   /* OTHER   */   /* DOLLAR  */   /* PERCENT */
+    /* APP     */   /* BIN     */   /* OCT     */   /* DEC     */
+    /* SEMIC   */   /* LT      */   /* EQ      */   /* GT      */
+    /* AT      */   /* HEXU    */   /* B       */   /* D       */
+    /* H       */   /* OQ      */   /* HEXL    */   /* BL      */
     /* DL      */   /* BSLASH  */
     {0, 0, FALSE},  {0, 3, FALSE},  {1, 0, FALSE},  {2, 2, TRUE},
     {2,11, FALSE},  {5, 3, FALSE},  {33, 5, FALSE}, {33, 9, FALSE},
@@ -570,7 +588,7 @@ static struct
     {0, 1, FALSE},  {0, 1, FALSE},  {0, 1, FALSE},  {0, 1, FALSE},
     {0, 1, FALSE},  {0, 1, FALSE},  {0, 1, FALSE},  {0, 1, FALSE},
     {0, 1, FALSE},  {0, 1, FALSE},  {0, 1, FALSE},  {0, 1, FALSE},
-    {0, 1, FALSE},  {0, 1, FALSE} 
+    {0, 1, FALSE},  {0, 1, FALSE}
     },
 
 /*
@@ -583,7 +601,7 @@ static struct
     {3, 1, FALSE},  {3,14, FALSE},  {3, 3, TRUE},   {3,13, FALSE},
     {3, 3, TRUE},   {4, 2, FALSE},  {4, 2, FALSE},  {4, 2, FALSE},
     {4, 2, FALSE},  {4, 2, FALSE},  {4, 2, FALSE},  {4, 2, FALSE},
-    {4, 2, FALSE},  {3, 3, TRUE} 
+    {4, 2, FALSE},  {3, 3, TRUE}
     },
 
 /*
@@ -758,7 +776,7 @@ static struct
 /*
     STATE 16 =  {base 8 maybe}
 */
-    {   
+    {
     {0,16, FALSE},  {29, 3, FALSE}, {29, 3, TRUE},  {29, 3, TRUE},
     {29, 3, TRUE},  {29, 3, TRUE},  {29, 3, TRUE},  {29, 3, TRUE},
     {29, 3, TRUE},  {24,16, FALSE}, {24,16, FALSE}, {24,17, FALSE},
@@ -771,7 +789,7 @@ static struct
 /*
     STATE 17 =  {base10 maybe}
 */
-    {   
+    {
     {0,17, FALSE},  {29, 3, FALSE}, {29, 3, TRUE},  {29, 3, TRUE},
     {29, 3, TRUE},  {29, 3, TRUE},  {29, 3, TRUE},  {29, 3, TRUE},
     {29, 3, TRUE},  {24,17, FALSE}, {24,17, FALSE}, {24,17, FALSE},
@@ -784,7 +802,7 @@ static struct
 /*
     STATE 18 =  {hex}
 */
-    {   
+    {
     {0,18, FALSE},  {34, 3, FALSE}, {34, 3, TRUE},  {34, 3, TRUE},
     {34, 3, TRUE},  {34, 3, TRUE},  {34, 3, TRUE},  {34, 3, TRUE},
     {34, 3, TRUE},  {24,18, FALSE}, {24,18, FALSE}, {24,18, FALSE},
@@ -797,7 +815,7 @@ static struct
 /*
     STATE 19 =  {bin or hex}
 */
-    {   
+    {
     {0,19, FALSE},  {27, 3, FALSE}, {27, 3, TRUE},  {27, 3, TRUE},
     {27, 3, TRUE},  {27, 3, TRUE},  {27, 3, TRUE},  {27, 3, TRUE},
     {27, 3, TRUE},  {31,18, TRUE},  {31,18, TRUE},  {31,18, TRUE},
@@ -810,7 +828,7 @@ static struct
 /*
     STATE 20 =  {dec or hex}
 */
-    {   
+    {
     {0,20, FALSE},  {29, 3, FALSE}, {29, 3, TRUE},  {29, 3, TRUE},
     {29, 3, TRUE},  {29, 3, TRUE},  {29, 3, TRUE},  {29, 3, TRUE},
     {29, 3, TRUE},  {32,18, TRUE},  {32,18, TRUE},  {32,18, TRUE},
@@ -858,7 +876,7 @@ static struct
     {0,  3, TRUE},  {0, 3, TRUE}
     },
 };
-    
+
 #define YEXL 32
 static char yytext[YEXL];
 
@@ -892,7 +910,8 @@ int yylex(void)
     char *thistokstart = NULL;
     register char nextchar;
     int charset;
-    int consaccum = 0, consbase = 0;
+    int64_t consaccum = 0;
+    int consbase = 0;
 
     if (!fryybuf || fryy_bs < 4096)
     {
@@ -911,6 +930,7 @@ again:
             emit_entering_file(infilestk[++currfstk].fnm);
             yyin = infilestk[currfstk].fpt;
             nextreadact = Nra_normal;
+            FALLTHROUGH_INTENDED;
         case Nra_normal:
             if(frareadrec())
             {
@@ -922,7 +942,7 @@ again:
         case Nra_end:  /* pop file and access previous */
             if(currfstk > 0)
             {
-                fclose(yyin);
+                lzoe_fclose(yyin);
                 yyin = infilestk[--currfstk].fpt;
                 emit_exiting_file(infilestk[currfstk].fnm);
                 if(frareadrec())
@@ -945,7 +965,7 @@ again:
 
         if(listflag) emit_listed_line(fryybuf);
         else         emit_unlisted_line();
-        
+
         if (fraignore)
             goto again;  /* don't scan it! */
 
@@ -974,7 +994,8 @@ again:
 
         while( (nextchar = *frainptr++) != '\0' )
         {
-            charset = chartrantab[nextchar & 0x7f];
+            charset = nextchar & 0x80 ? CXC03_LETTER /* Treat > 0x80 as letters */
+                                      : chartrantab[nextchar & 0x7f];
             do {
                 thisact =  & characttab [scanstate][charset];
 
@@ -1000,7 +1021,7 @@ again:
                     nexttokload->tokv = EOL;
                     nexttokload->errtype = Yetunprint;
                     nexttokload++;
-                    intokcnt++; 
+                    intokcnt++;
                     break;
 
                 case 2: /* start string */
@@ -1030,7 +1051,7 @@ again:
                         }
                         nexttokload->textend = frainptr;
                         nexttokload++;
-                        intokcnt++; 
+                        intokcnt++;
                     }
                     break;
 
@@ -1039,7 +1060,7 @@ again:
                     break;
 
                 case 5: /* load single char token */
-                    if (labelarray == LAmaybe && nextchar == '[' 
+                    if (labelarray == LAmaybe && nextchar == '['
                             && whichsym == Symopcode)
                     {
                         labelarray = LAyes;
@@ -1047,14 +1068,14 @@ again:
                     }
                     if (labelarray == LAyes && nextchar == ']')
                     {
-                        labelarray = LAno;
+                        labelarray = LAmaybe;
                         whichsym   = Symopcode;
                     }
                     nexttokload->lvalv.longv = 0;
                     nexttokload->tokv = nextchar;
                     nexttokload->errtype = Yetprint;
                     nexttokload++;
-                    intokcnt++; 
+                    intokcnt++;
                     break;
 
                 case 6: /* load EQ token */
@@ -1074,7 +1095,7 @@ again:
                         *tptrstr++ = '\0';
                         if(whichsym == Symopcode)
                         {
-                            for(ytp = thistokstart; *ytp != '\0'; 
+                            for(ytp = thistokstart; *ytp != '\0';
                                 ytp++)
                             {
                                 if(islower(*ytp))
@@ -1082,9 +1103,9 @@ again:
                                     *ytp = toupper(*ytp);
                                 }
                             }
-                            nexttokload->lvalv.intv 
+                            nexttokload->lvalv.intv
                                 = tempov = findop(thistokstart);
-                            nexttokload->tokv = 
+                            nexttokload->tokv =
                                 optab[tempov].token;
                             nexttokload->errtype = Yetopcode;
                             whichsym = Symsym;
@@ -1099,7 +1120,7 @@ again:
                             }
                             else
                             {
-                                nexttokload->lvalv.intv 
+                                nexttokload->lvalv.intv
                                     = symp->value;
                                 nexttokload->errtype = Yetreserved;
                             }
@@ -1142,7 +1163,7 @@ again:
                     break;
 
                 case 13: /* load Constant token */
-                    nexttokload->lvalv.longv = 
+                    nexttokload->lvalv.longv =
                         consaccum;
                     nexttokload->tokv = CONSTANT;
                     nexttokload->errtype = Yetconstant;
@@ -1179,7 +1200,7 @@ again:
 
                 case 18: /* load String token (double quoted) */
                     *tptrstr++  = '\0';
-                    nexttokload->lvalv.strng = 
+                    nexttokload->lvalv.strng =
                         thistokstart;
                     nexttokload->tokv = STRING;
                     nexttokload->errtype = Yetstring;
@@ -1197,7 +1218,7 @@ again:
                         nexttokload->errtype = Yetconstant;
                     } else
                     {
-                        nexttokload->lvalv.strng = 
+                        nexttokload->lvalv.strng =
                             thistokstart;
                         nexttokload->tokv = STRING;
                         nexttokload->errtype = Yetstring;
@@ -1334,7 +1355,7 @@ again:
                 case 33: /* set text start */
                     nexttokload->textstrt = frainptr;
                     break;
-                
+
                 case 34: /* token choke */
                     nexttokload->lvalv.longv = 0L;
                     nexttokload->tokv = KTK_invalid;
@@ -1370,7 +1391,7 @@ again:
 
 
 int yyerror(char *str)
-/*  
+/*
     description first pass - output a parser error to intermediate file
 */
 {
@@ -1405,15 +1426,15 @@ int yyerror(char *str)
             (
                 infilestk[currfstk].fnm, infilestk[currfstk].line, ERROR,
                 "%s at/before character \"%c\"",
-                str, lasttokfetch->tokv 
+                str, lasttokfetch->tokv
             );
         }
         break;
 
-    case Yetsymbol: 
-    case Yetreserved: 
-    case Yetopcode: 
-    case Yetconstant: 
+    case Yetsymbol:
+    case Yetreserved:
+    case Yetopcode:
+    case Yetconstant:
         erryytextex(SYMBOL);
         emit_warnerr
         (
@@ -1423,7 +1444,7 @@ int yyerror(char *str)
         );
         break;
 
-    case Yetinvalid: 
+    case Yetinvalid:
         erryytextex(SYMBOL);
         emit_warnerr
         (

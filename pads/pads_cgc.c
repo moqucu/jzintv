@@ -2,7 +2,6 @@
  * ============================================================================
  *  Title:    Controller pads via Joe Fisher's Classic Gaming Controller
  *  Author:   J. Zbiciak
- *  $Id$
  * ============================================================================
  *  Some code in this module comes from Joe Fisher's reference code.
  * ============================================================================
@@ -23,8 +22,8 @@
 /* ======================================================================== */
 int pad_cgc_init
 (
-    pad_cgc_t       *pad,           /*  pad_cgc_t structure to initialize   */
-    uint_32         addr,           /*  Base address of pad.                */
+    pad_cgc_t      *pad,            /*  pad_cgc_t structure to initialize   */
+    uint32_t        addr,           /*  Base address of pad.                */
     int             cgc_num,        /*  CGC number in system (Win32)        */
     const char *    cgc_dev         /*  CGC number in system (Linux)        */
 )
@@ -35,17 +34,34 @@ int pad_cgc_init
     return pad_cgc_win32_init(pad, addr, cgc_num);
 #endif
 
-#if defined(linux) || defined(macosx)
+#if defined(PLAT_LINUX) || defined(PLAT_MACOS)
     UNUSED(cgc_num);
     return pad_cgc_linux_init(pad, addr, cgc_dev);
 #endif
-                  
-#if !defined(WIN32) && !defined(linux) && !defined(macosx)
+
+#if !defined(CGC_SUPPORTED)
     UNUSED(pad); UNUSED(addr); UNUSED(cgc_num); UNUSED(cgc_dev);
     fprintf(stderr, "Error:  CGC not supported on this platform.\n");
     return -1;
 #endif
 }
+
+#if defined(PLAT_LINUX) || defined(PLAT_MACOS)
+/* Weak version, to allow omitting the CGC support from SDL-less builds more
+   easily on Linux / Mac. */
+int __attribute__((weak))pad_cgc_linux_init
+(
+    pad_cgc_t   *pad,
+    uint32_t     addr,
+    const char  *cgc_dev
+)
+{
+    UNUSED(pad);
+    UNUSED(addr);
+    UNUSED(cgc_dev);
+    return 0;
+}
+#endif
 
 
 /* ======================================================================== */
@@ -59,10 +75,9 @@ int pad_cgc_init
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                 Copyright (c) 2004-+Inf, Joseph Zbiciak                  */
 /* ======================================================================== */
-

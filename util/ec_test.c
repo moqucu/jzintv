@@ -1,8 +1,8 @@
 #include <config.h>
 #include "util/ecscable.h"
 
-uint_16 data[65536];
-uint_16 exec[4096];
+uint16_t data[65536];
+uint16_t exec[4096];
 void dump_data(int ofs, int len)
 {
     FILE *f;
@@ -31,7 +31,7 @@ double elapsed(int restart)
     static struct timeval start;
     static int init = 0;
     struct timeval now;
-    uint_32 usec, sec;
+    uint32_t usec, sec;
 
     if (!init || restart)
     {
@@ -82,7 +82,7 @@ int main()
         fprintf(stderr, "Error during download 0\n");
         exit(1);
     }
-    printf("%7.1f kbps\n", 16*4096. / elapsed(0)); 
+    printf("%7.1f kbps\n", 16*4096. / elapsed(0));
 
     printf("%-60s", "Re-downloading the EXEC ROM as words... "); fflush(stdout);
     memset(data, 0, 8192);
@@ -92,7 +92,7 @@ int main()
         fprintf(stderr, "Error during download 1\n");
         exit(1);
     }
-    printf("%7.1f kbps\n", 16*4096. / elapsed(0)); 
+    printf("%7.1f kbps\n", 16*4096. / elapsed(0));
 
     ec_video(&ec, 1); /* enable active video */
     if (memcmp(exec, data, 8192))
@@ -110,7 +110,7 @@ int main()
         fprintf(stderr, "Error during download 2\n");
         exit(1);
     }
-    printf("%7.1f kbps\n", 10*4096. / elapsed(0)); 
+    printf("%7.1f kbps\n", 10*4096. / elapsed(0));
 
     if (memcmp(exec, data, 8192))
     {
@@ -127,7 +127,7 @@ int main()
         fprintf(stderr, "Error during download 3\n");
         exit(1);
     }
-    printf("%7.1f kbps\n", 8*4096. / elapsed(0)); 
+    printf("%7.1f kbps\n", 8*4096. / elapsed(0));
 
     for (i = 0; i < 4096; i++)
     {
@@ -152,7 +152,7 @@ int main()
         fprintf(stderr, "Error during upload 4a\n");
         exit(1);
     }
-    printf("%7.1f kbps\n", 16*4096. / elapsed(0)); 
+    printf("%7.1f kbps\n", 16*4096. / elapsed(0));
     printf("%-60s", "Downloading random data as words from Intellicart... ");
     elapsed(1);
     if (ec_download(&ec, 0x1000, 0x1000, data + 0x1000, 16, 1))
@@ -160,7 +160,7 @@ int main()
         fprintf(stderr, "Error during download 5a\n");
         exit(1);
     }
-    printf("%7.1f kbps\n", 16*4096. / elapsed(0)); 
+    printf("%7.1f kbps\n", 16*4096. / elapsed(0));
     if (memcmp(data, data + 0x1000, 0x1000 * 2))
     {
         dump_data(0x0, 0x2000);
@@ -175,7 +175,7 @@ int main()
         fprintf(stderr, "Error during download 6a\n");
         exit(1);
     }
-    printf("%7.1f kbps\n", 10*4096. / elapsed(0)); 
+    printf("%7.1f kbps\n", 10*4096. / elapsed(0));
     for (i = 0; i < 0x2000; i++)
         data[i] &= 0x3FF;
     if (memcmp(data, data + 0x1000, 0x1000 * 2))
@@ -192,7 +192,7 @@ int main()
         fprintf(stderr, "Error during download 7a\n");
         exit(1);
     }
-    printf("%7.1f kbps\n", 8*4096. / elapsed(0)); 
+    printf("%7.1f kbps\n", 8*4096. / elapsed(0));
     for (i = 0; i < 0x2000; i++)
         data[i] &= 0xFF;
     if (memcmp(data, data + 0x1000, 0x1000 * 2))
@@ -215,7 +215,7 @@ int main()
         fprintf(stderr, "Error during upload 4b\n");
         exit(1);
     }
-    printf("%7.1f kbps\n", 10*4096. / elapsed(0)); 
+    printf("%7.1f kbps\n", 10*4096. / elapsed(0));
     printf("%-60s", "Downloading random data as words from Intellicart... ");
     elapsed(1);
     if (ec_download(&ec, 0x1000, 0x1000, data + 0x1000, 16, 1))
@@ -223,7 +223,7 @@ int main()
         fprintf(stderr, "Error during download 5b\n");
         exit(1);
     }
-    printf("%7.1f kbps\n", 16*4096. / elapsed(0)); 
+    printf("%7.1f kbps\n", 16*4096. / elapsed(0));
     if (memcmp(data, data + 0x1000, 0x1000 * 2))
     {
         dump_data(0x0, 0x2000);
@@ -238,7 +238,7 @@ int main()
         fprintf(stderr, "Error during download 6b\n");
         exit(1);
     }
-    printf("%7.1f kbps\n", 10*4096. / elapsed(0)); 
+    printf("%7.1f kbps\n", 10*4096. / elapsed(0));
     if (memcmp(data, data + 0x1000, 0x1000 * 2))
     {
         dump_data(0x0, 0x2000);
@@ -253,7 +253,7 @@ int main()
         fprintf(stderr, "Error during download 7b\n");
         exit(1);
     }
-    printf("%7.1f kbps\n", 8*4096. / elapsed(0)); 
+    printf("%7.1f kbps\n", 8*4096. / elapsed(0));
     for (i = 0; i < 0x2000; i++)
         data[i] &= 0xFF;
     if (memcmp(data, data + 0x1000, 0x1000 * 2))
@@ -276,7 +276,7 @@ int main()
         fprintf(stderr, "Error during upload 4c\n");
         exit(1);
     }
-    printf("%7.1f kbps\n", 8*4096. / elapsed(0)); 
+    printf("%7.1f kbps\n", 8*4096. / elapsed(0));
     printf("%-60s", "Downloading random data as words from Intellicart... ");
     elapsed(1);
     if (ec_download(&ec, 0x1000, 0x1000, data + 0x1000, 16, 1))
@@ -284,7 +284,7 @@ int main()
         fprintf(stderr, "Error during download 5c\n");
         exit(1);
     }
-    printf("%7.1f kbps\n", 16*4096. / elapsed(0)); 
+    printf("%7.1f kbps\n", 16*4096. / elapsed(0));
     if (memcmp(data, data + 0x1000, 0x1000 * 2))
     {
         dump_data(0x0, 0x2000);
@@ -299,7 +299,7 @@ int main()
         fprintf(stderr, "Error during download 6c\n");
         exit(1);
     }
-    printf("%7.1f kbps\n", 10*4096. / elapsed(0)); 
+    printf("%7.1f kbps\n", 10*4096. / elapsed(0));
     if (memcmp(data, data + 0x1000, 0x1000 * 2))
     {
         dump_data(0x0, 0x2000);
@@ -314,7 +314,7 @@ int main()
         fprintf(stderr, "Error during download 7c\n");
         exit(1);
     }
-    printf("%7.1f kbps\n", 8*4096. / elapsed(0)); 
+    printf("%7.1f kbps\n", 8*4096. / elapsed(0));
     if (memcmp(data, data + 0x1000, 0x1000 * 2))
     {
         dump_data(0x0, 0x2000);
@@ -336,7 +336,7 @@ int main()
         fprintf(stderr, "Error during upload 8\n");
         exit(1);
     }
-    printf("%7.1f kbps\n", 16*32. / elapsed(0)); 
+    printf("%7.1f kbps\n", 16*32. / elapsed(0));
     printf("%-60s", "Downloading random data as words from Intellivision... ");
     elapsed(1);
     if (ec_download(&ec, 0x0340, 0x0020, data + 0x0020, 16, 1))
@@ -344,7 +344,7 @@ int main()
         fprintf(stderr, "Error during download 9\n");
         exit(1);
     }
-    printf("%7.1f kbps\n", 16*32. / elapsed(0)); 
+    printf("%7.1f kbps\n", 16*32. / elapsed(0));
     if (memcmp(data, data + 0x0020, 0x0020 * 2))
     {
         dump_data(0x0, 0x2000);
@@ -359,7 +359,7 @@ int main()
         fprintf(stderr, "Error during download 10\n");
         exit(1);
     }
-    printf("%7.1f kbps\n", 10*32. / elapsed(0)); 
+    printf("%7.1f kbps\n", 10*32. / elapsed(0));
     for (i = 0; i < 0x0040; i++)
         data[i] &= 0x3FF;
     if (memcmp(data, data + 0x0020, 0x0020 * 2))
@@ -376,7 +376,7 @@ int main()
         fprintf(stderr, "Error during download 11\n");
         exit(1);
     }
-    printf("%7.1f kbps\n", 8*32. / elapsed(0)); 
+    printf("%7.1f kbps\n", 8*32. / elapsed(0));
     for (i = 0; i < 0x0040; i++)
         data[i] &= 0xFF;
     if (memcmp(data, data + 0x0020, 0x0020 * 2))

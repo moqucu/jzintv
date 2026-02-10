@@ -2,20 +2,6 @@
 /*  DIS-1600  Advanced(?) CP-1600 Disassembler.                             */
 /*  By Joseph Zbiciak                                                       */
 /* ------------------------------------------------------------------------ */
-/*  This program is free software; you can redistribute it and/or modify    */
-/*  it under the terms of the GNU General Public License as published by    */
-/*  the Free Software Foundation; either version 2 of the License, or       */
-/*  (at your option) any later version.                                     */
-/*                                                                          */
-/*  This program is distributed in the hope that it will be useful,         */
-/*  but WITHOUT ANY WARRANTY; without even the implied warranty of          */
-/*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
-/*  General Public License for more details.                                */
-/*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
-/* ------------------------------------------------------------------------ */
 /*                   Copyright (c) 2006, Joseph Zbiciak                     */
 /* ======================================================================== */
 
@@ -65,7 +51,7 @@ extern symtab_t   *symtab;
 /* ======================================================================== */
 /*  INSTRUCTION MNEMONICS                                                   */
 /* ======================================================================== */
-typedef enum mnm_t 
+typedef enum mnm_t
 {
     M_err = 0,
     M_HLT,  M_SDBD, M_EIS,  M_DIS,          M_TCI,  M_CLRC, M_SETC,
@@ -103,8 +89,8 @@ extern mnm_t mnm_jsr[8];
 /*  Note:  Some attempt is made to avoid namespace collision w/ jzIntv      */
 /*  source code names, in case I re-integrate this w/ jzIntv someday.       */
 /* ======================================================================== */
-typedef enum oper_type 
-{ 
+typedef enum oper_type
+{
     OP_NONE = 0,                /* No operand.                              */
     OP_REG,                     /* CPU register.                            */
     OP_IMMED,                   /* Immediate constant.                      */
@@ -115,8 +101,8 @@ typedef enum oper_type
 typedef struct dis_oper_t
 {
     oper_type_t type;
-    uint_16     op;             /* address, reg# or value                   */
-    uint_16     flags;          /* flags associated w/ operand.             */
+    uint16_t    op;             /* address, reg# or value                   */
+    uint16_t    flags;          /* flags associated w/ operand.             */
 } dis_oper_t;
 
 typedef enum { CMT_DFLT = 0, CMT_MED, CMT_LONG } cmt_len_t;
@@ -144,26 +130,26 @@ typedef struct dis_instr_t
 /* ======================================================================== */
 /*  INSTRUCTION PRINTER TABLE (forward references)                          */
 /* ======================================================================== */
-typedef char *(*ins_prt_t)(uint_32);
+typedef char *ins_prt_t(uint32_t);
 
-extern char *prt_err(uint_32);
-extern char *prt_imp(uint_32);
-extern char *prt_jsr(uint_32);
-extern char *prt_cbr(uint_32);
-extern char *prt_bxt(uint_32);
-extern char *prt_dir(uint_32);
-extern char *prt_imm(uint_32);
-extern char *prt_dro(uint_32);
-extern char *prt_imo(uint_32);
-extern char *prt_2rg(uint_32);
-extern char *prt_1rg(uint_32);
-extern char *prt_plr(uint_32);
-extern char *prt_dcl(uint_32);
-extern char *prt_bid(uint_32);
-extern char *prt_rot(uint_32);
-extern char *prt_str(uint_32);
+extern char *prt_err(uint32_t);
+extern char *prt_imp(uint32_t);
+extern char *prt_jsr(uint32_t);
+extern char *prt_cbr(uint32_t);
+extern char *prt_bxt(uint32_t);
+extern char *prt_dir(uint32_t);
+extern char *prt_imm(uint32_t);
+extern char *prt_dro(uint32_t);
+extern char *prt_imo(uint32_t);
+extern char *prt_2rg(uint32_t);
+extern char *prt_1rg(uint32_t);
+extern char *prt_plr(uint32_t);
+extern char *prt_dcl(uint32_t);
+extern char *prt_bid(uint32_t);
+extern char *prt_rot(uint32_t);
+extern char *prt_str(uint32_t);
 
-extern ins_prt_t instr_printer[];
+extern ins_prt_t *const instr_printer[];
 
 /* ======================================================================== */
 /*  Declare storage for the ROM image.                                      */
@@ -193,7 +179,7 @@ extern dis_instr_t instr[65539];
                         ((instr[(a)].flags & FLAG_CODE) == 0)))
 
 #define GET_BIT(bv,i) (((bv)[(i) >> 5] >> ((i) & 31)) & 1)
-#define SET_BIT(bv,i) ((bv)[(i) >> 5] |= 1 << ((i) & 31))
+#define SET_BIT(bv,i) ((bv)[(i) >> 5] |= 1u << ((i) & 31))
 
 #define VB_PRINTF(v,x)  do {                                    \
                             if (verbose > (v))                  \
@@ -211,14 +197,14 @@ extern dis_instr_t instr[65539];
 struct defsym_t
 {
     const char *name;
-    uint_16 addr, len, width;
+    uint16_t addr, len, width;
 };
 
 
 /* ======================================================================== */
 /*  MAYBE_DEFSYM     -- Helper:  Define a symbol if it's not def'd yet      */
 /* ======================================================================== */
-void maybe_defsym(const char *sym, uint_32 addr);
+void maybe_defsym(const char *sym, uint32_t addr);
 
 /* ======================================================================== */
 /*  SETUP_DEFSYM     -- Set up the default symbol table.                    */
@@ -258,27 +244,27 @@ extern int forced_entry_points          ;
 
 #define MAX_ENTRY (1024)
 
-extern uint_32 entry_point[MAX_ENTRY];
+extern uint32_t entry_point[MAX_ENTRY];
 
 /* ======================================================================== */
 /*  MARK_INVALID -- Mark an address as invalid.                             */
 /* ======================================================================== */
-int mark_invalid(uint_32 addr);
+int mark_invalid(uint32_t addr);
 
 /* ======================================================================== */
 /*  MARK_VALID -- Mark an address as valid, w/ optional add'l flags.        */
 /* ======================================================================== */
-int mark_valid(uint_32 addr, uint_32 flags);
+int mark_valid(uint32_t addr, uint32_t flags);
 
 /* ======================================================================== */
 /*  MARK_INTERP -- Mark address range as interpreted, w/ opt flags & cmts.  */
 /* ======================================================================== */
-int mark_interp(uint_32 addr, uint_32 flags, int len, const char *cmt);
+int mark_interp(uint32_t addr, uint32_t flags, int len, const char *cmt);
 
 /* ======================================================================== */
 /*  ADD_ENTRY_POINT -- List a location as a ROM entry point.                */
 /* ======================================================================== */
-int add_entry_point(uint_32 addr);
+int add_entry_point(uint32_t addr);
 
 /* ======================================================================== */
 /*  MARK_EMPTY -- Mark an address range as not holding "local code."        */
@@ -298,7 +284,7 @@ int mark_branch_target(int target, int target_of);
 /* ======================================================================== */
 /*  ADD_COMMENT  -- Add / replace comment on an instruction                 */
 /* ======================================================================== */
-int add_comment(uint_32 addr, const char *cmt);
+int add_comment(uint32_t addr, const char *cmt);
 
 
 #include "dasm/exec_interp.h"
@@ -316,9 +302,9 @@ int add_comment(uint_32 addr, const char *cmt);
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ------------------------------------------------------------------------ */
 /*                   Copyright (c) 2006, Joseph Zbiciak                     */
 /* ======================================================================== */

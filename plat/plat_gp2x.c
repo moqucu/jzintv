@@ -6,8 +6,8 @@
 
 /* Most of the code in this file is based on code from wiki.gp2x.org */
 
-static volatile uint_32 *memregs32;
-static volatile uint_16 *memregs16;
+static volatile uint32_t *memregs32;
+static volatile uint16_t *memregs16;
 static int memfd;
 
 int gp2x_speed(int speed)
@@ -51,7 +51,7 @@ int gp2x_speed(int speed)
     return m == 0 ? -1 : 0;
 }
 
-static uint_16 saved_clock = 0;
+static uint16_t saved_clock = 0;
 
 void gp2x_save_clock(void)
 {

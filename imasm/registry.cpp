@@ -12,8 +12,8 @@ as published by the Free Software Foundation; either version 2
 of the License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of 
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the 
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
@@ -59,7 +59,7 @@ RegHelp::CloseKey()
     {
         RegCloseKey(m_hKey);
     }
-    
+
     return 1;
 }
 
@@ -75,7 +75,7 @@ int RegHelp::AddString(char *szSection, char *szBuff)
                         0,
                         REG_SZ,
                         (const BYTE *)szBuff,
-                        lstrlen(szBuff) + 1)                        
+                        lstrlen(szBuff) + 1)
         != ERROR_SUCCESS)
     {
         return 0;
@@ -96,12 +96,12 @@ int RegHelp::AddDword(char *szSection, DWORD dwVal)
                         0,
                         REG_DWORD,
                         (const BYTE *)&dwVal,
-                        sizeof (DWORD))                     
+                        sizeof (DWORD))
         != ERROR_SUCCESS)
     {
         return 0;
     }
-    
+
     return 1;
 }
 
@@ -111,7 +111,7 @@ int RegHelp::GetString(char *szSection, char *szBuff, unsigned long ulSize)
     {
         return 0;
     }
-    
+
     unsigned long len = ulSize;
 
     if (RegQueryValueEx(m_hKey,
@@ -124,7 +124,7 @@ int RegHelp::GetString(char *szSection, char *szBuff, unsigned long ulSize)
     {
         return 0;
     }
-        
+
     return 1;
 }
 
@@ -134,7 +134,7 @@ int RegHelp::GetDword(char *szSection, DWORD *dwVal)
     {
         return 0;
     }
-    
+
     unsigned long len = sizeof (DWORD);
 
     if (RegQueryValueEx(m_hKey,
@@ -147,6 +147,6 @@ int RegHelp::GetDword(char *szSection, DWORD *dwVal)
     {
         return 0;
     }
-        
+
     return 1;
 }

@@ -12,8 +12,8 @@ as published by the Free Software Foundation; either version 2
 of the License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of 
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the 
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
@@ -24,7 +24,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "includes.h"
 
-const char *const license_string = 
+const char *const license_string =
     "IMASM Macro Precompiler\n"
     "imasm -help for help\n"
     "\n"
@@ -80,11 +80,11 @@ int main(int argc, char *argv[])
     } catch(StringFIFO::BufferOverflow &bo)
     {
         cerr << "ERROR:  Line too large. " << endl
-             << "    Maximum line length: " << bo.buffer_size << endl 
+             << "    Maximum line length: " << bo.buffer_size << endl
              << "  Attempted line length: " << bo.string_length << endl;
 
         // todo: output StringFIFO_fromFile location.
-        
+
         exit(1);
     } catch(Parser::ParseError &p)
     {
@@ -92,7 +92,7 @@ int main(int argc, char *argv[])
         exit(1);
     } catch(...) // catch all
     {
-        cerr << "INTERNAL ERROR: UNHANDLED EXCEPTION! " 
+        cerr << "INTERNAL ERROR: UNHANDLED EXCEPTION! "
              << __FILE__ ":" << __LINE__ << endl;
     }
 
@@ -108,11 +108,11 @@ void OutputLicense()
 
 void OutputHelp()
 {
-    cout << "IMASM Macro Precompiler"                        << endl 
+    cout << "IMASM Macro Precompiler"                        << endl
          << "Copyright (C) 2003  Joe Fisher, Joseph Zbiciak" << endl << endl
          << "IMASM usage:"                                   << endl << endl
          << "  Preprocess file:  imasm inputfile outputfile" << endl
-         << "  This help:        imasm -help"                << endl 
+         << "  This help:        imasm -help"                << endl
          << "  Show license:     imasm"                      << endl;
 }
 

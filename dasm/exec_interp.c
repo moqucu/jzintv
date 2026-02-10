@@ -2,20 +2,6 @@
 /*  DIS-1600  Advanced(?) CP-1600 Disassembler.                             */
 /*  By Joseph Zbiciak                                                       */
 /* ------------------------------------------------------------------------ */
-/*  This program is free software; you can redistribute it and/or modify    */
-/*  it under the terms of the GNU General Public License as published by    */
-/*  the Free Software Foundation; either version 2 of the License, or       */
-/*  (at your option) any later version.                                     */
-/*                                                                          */
-/*  This program is distributed in the hope that it will be useful,         */
-/*  but WITHOUT ANY WARRANTY; without even the implied warranty of          */
-/*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
-/*  General Public License for more details.                                */
-/*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
-/* ------------------------------------------------------------------------ */
 /*                   Copyright (c) 2006, Joseph Zbiciak                     */
 /* ======================================================================== */
 
@@ -27,7 +13,7 @@
 /*                      These names aren't necessarily the names Mattel     */
 /*                      used.  These are just names meaningful to me.       */
 /* ======================================================================== */
-struct defsym_t exec_routine_sym[] = 
+struct defsym_t exec_routine_sym[] =
 {
     { "X_RESET",                0x1000,     1,          1   },
     { "X_RET_R5",               0x1003,     1,          1   },
@@ -60,7 +46,7 @@ struct defsym_t exec_routine_sym[] =
     { "X_PRPAD_R1",             0x186C,     1,          1   },
     { "X_PRINT_R5",             0x187B,     1,          1   },
     { "X_PRPAD_R5",             0x1871,     1,          1   },
-    
+
     { "X_EXT_SIGN_LO",          0x1668,     1,          1   },
     { "X_EXT_SIGN_HI",          0x1669,     1,          1   },
     { "X_CLAMP",                0x1670,     1,          1   },
@@ -146,16 +132,16 @@ static const exec_hdr_dsc_t exec_hdr_dsc[] =
     {   "Border color init\n",              1   }
 };
 
-uint_32 used_mob_pics[ 8];
-uint_32 used_gfx_pics[16];
+uint32_t used_mob_pics[ 8];
+uint32_t used_gfx_pics[16];
 
 /* ======================================================================== */
 /*  DECODE_GRAM_INIT                                                        */
 /* ======================================================================== */
-int decode_gram_init(uint_32 addr)
+int decode_gram_init(uint32_t addr)
 {
     int i, num_pic, changed = 0;
-    char buf[30];
+    char buf[64];
     int pic_num = 0;
     int rpt, xmr, ymr, inv, rot, crd;
     const char *src;
@@ -204,7 +190,7 @@ int decode_gram_init(uint_32 addr)
         {
             crd = 0x3F & (w0 >> 1);
 
-            snprintf(buf, sizeof(buf), "#%.2X   :  CART #%.2X    %c%c%c-", 
+            snprintf(buf, sizeof(buf), "#%.2X   :  CART #%.2X    %c%c%c-",
                     pic_num, crd,
                     xmr ? 'X' : '-',
                     ymr ? 'Y' : '-',
@@ -234,7 +220,7 @@ int decode_gram_init(uint_32 addr)
             if ((w1 & 7) == 0)
             {
                 rpt = (w1 >> 7) & 7;                /* rpt - 1 in bits 9:7  */
-                rot = w1 & 0x008;                
+                rot = w1 & 0x008;
                 src = w1 & 0x010 ? "GROM" :
                       w1 & 0x040 ? "GRAM" : "CART";
 
@@ -249,7 +235,7 @@ int decode_gram_init(uint_32 addr)
                         xmr ? 'X' : '-',
                         ymr ? 'Y' : '-',
                         inv ? 'I' : '-',
-                        inv ? 'R' : '-');
+                        rot ? 'R' : '-');
 
                 if ((w1 & 0x50) == 0)
                 {
@@ -258,7 +244,7 @@ int decode_gram_init(uint_32 addr)
                 }
 
                 pic_num += rpt;
-            } else 
+            } else
             /* ------------------------------------------------------------ */
             /*  If the 3 LSBs are 100, then it's a 4x4 tile that gets       */
             /*  expanded to 8x8 through replication.                        */
@@ -266,7 +252,7 @@ int decode_gram_init(uint_32 addr)
             if ((w1 & 7) == 4)
             {
                 snprintf(buf, sizeof(buf), "#%.2X   :  4x4 tile", pic_num);
-            } else 
+            } else
             /* ------------------------------------------------------------ */
             /*  If the 2 LSBs are 10, then the remaining bits drive a       */
             /*  generator algorithm.                                        */
@@ -305,7 +291,7 @@ int decode_gram_init(uint_32 addr)
 /* ======================================================================== */
 /*  DECODE_TIMER_TABLE   -- Decode list of periodically-executed functions  */
 /* ======================================================================== */
-int decode_timer_table(uint_32 addr)
+int decode_timer_table(uint32_t addr)
 {
     int changed = 0, i;
 
@@ -444,7 +430,7 @@ int mark_cart_header_pre(void)
 /* ======================================================================== */
 /*  DECODE_GFX_LIST                                                         */
 /* ======================================================================== */
-int decode_gfx_list(uint_32 addr)
+int decode_gfx_list(uint32_t addr)
 {
     int changed = 0;
     int i;
@@ -456,7 +442,7 @@ int decode_gfx_list(uint_32 addr)
 
     for (i = 0; i < 256; i++, addr += 8)
     {
-        if (GET_BIT(used_gfx_pics, i) && 
+        if (GET_BIT(used_gfx_pics, i) &&
             (instr[addr].flags & (FLAG_CODE | FLAG_INTERP)) == 0)
         {
             snprintf(buf, sizeof(buf), "CART PIC #%.2X", i);
@@ -475,7 +461,7 @@ int decode_gfx_list(uint_32 addr)
 int mark_cart_header_post(void)
 {
     int changed = 0;
-    
+
     changed += decode_gfx_list(GET_DWORD(0x5006));
 
     return changed;
@@ -486,19 +472,19 @@ int mark_cart_header_post(void)
 /* ======================================================================== */
 int decode_exec_music(void)
 {
-    uint_32 addr;
+    uint32_t addr;
     int changed = 0;
 
     for (addr = 0; addr < 0xFFFD; addr++)
     {
-        uint_32 targ;
+        uint32_t targ;
 
         if (!IS_JSR(addr) || IS_INTERP(addr + 3))
             continue;
 
         targ = instr[addr].br_target;
 
-        if (targ != 0x1B27 && targ != 0x1B5D && 
+        if (targ != 0x1B27 && targ != 0x1B5D &&
             targ != 0x1B95 && targ != 0x1A94)
             continue;
 
@@ -512,8 +498,8 @@ int decode_exec_music(void)
             } else if (GET_WORD(addr) == 0)
             {
                 changed += mark_interp(addr, FLAG_DATA, 1, "End of music");
-                break;                                     
-            } else                                         
+                break;
+            } else
                 changed += mark_interp(addr, FLAG_DATA, 1, "Note (short)");
 
             addr++;
@@ -544,7 +530,7 @@ xxxx xx00 T  xxxxxxxx00   Two words  (FREQ/EFREQ)
 
 */
 
-struct sfx_ops_t { uint_8 mask, sigbits, len; };
+struct sfx_ops_t { uint8_t mask, sigbits, len; };
 
 static const struct sfx_ops_t sfx_ops[] =
 {
@@ -552,16 +538,16 @@ static const struct sfx_ops_t sfx_ops[] =
     { 0xFF, 0x4F, 2 },
     { 0xFF, 0x77, 3 },
     { 0xFF, 0xCF, 1 },
-    { 0x7F, 0x0F, 2 }, 
+    { 0x7F, 0x0F, 2 },
     { 0x7F, 0x37, 1 },
     { 0x3F, 0x17, 2 },
     { 0x1F, 0x07, 1 },
-    { 0x0F, 0x01, 2 }, 
-    { 0x0F, 0x03, 2 }, 
+    { 0x0F, 0x01, 2 },
+    { 0x0F, 0x03, 2 },
     { 0x0F, 0x05, 1 },
-    { 0x0F, 0x09, 1 }, 
+    { 0x0F, 0x09, 1 },
     { 0x0F, 0x0B, 1 },
-    { 0x0F, 0x0D, 1 }, 
+    { 0x0F, 0x0D, 1 },
     { 0x03, 0x02, 1 },
     { 0x03, 0x00, 2 },
 
@@ -573,14 +559,14 @@ static const struct sfx_ops_t sfx_ops[] =
 /* ======================================================================== */
 int decode_exec_sfx(void)
 {
-    uint_32 addr;
+    uint32_t addr;
     int changed = 0;
     int i;
-    uint_32 ucall = 0xFFFFFFFF;
+    uint32_t ucall = 0xFFFFFFFF;
 
     for (addr = 0; addr < 0xFFFD; addr++)
     {
-        uint_32 targ;
+        uint32_t targ;
 
         if (!IS_JSR(addr) || IS_INTERP(addr + 3))
             continue;
@@ -597,7 +583,7 @@ int decode_exec_sfx(void)
 
         while (addr < 0xFFFF && !IS_EMPTY(addr))
         {
-            uint_32 word = GET_WORD(addr);
+            uint32_t word = GET_WORD(addr);
 
             if (addr >= ucall)  /* Some SCODE UCALLs into itself.  Skiing. */
                 break;
@@ -608,7 +594,7 @@ int decode_exec_sfx(void)
 
             if (word == 0x77)  /* UCALL */
             {
-                uint_32 temp = GET_DWORD(addr + 1);
+                uint32_t temp = GET_DWORD(addr + 1);
                 char buf[64];
 
                 changed += add_entry_point(temp);
@@ -622,13 +608,13 @@ int decode_exec_sfx(void)
 
             if (!sfx_ops[i].mask)
                 changed += mark_interp(addr, FLAG_DATA, 1, "Unknown");
-            else if ((word & 0xFF) == 0xCF)                
-            {                                              
+            else if ((word & 0xFF) == 0xCF)
+            {
                 changed += mark_interp(addr, FLAG_DATA, 1, "SFX end\n");
                 break;
             }
             else
-                changed += mark_interp(addr, FLAG_DATA, sfx_ops[i].len, 
+                changed += mark_interp(addr, FLAG_DATA, sfx_ops[i].len,
                                         "SFX data");
 
             addr += sfx_ops[i].len;
@@ -643,12 +629,12 @@ int decode_exec_sfx(void)
 /* ======================================================================== */
 int decode_print_calls(void)
 {
-    uint_32 addr;
+    uint32_t addr;
     int changed = 0;
 
     for (addr = 0; addr < 0xFFFD; addr++)
     {
-        uint_32 targ;
+        uint32_t targ;
 
         if (!IS_JSR(addr) || IS_INTERP(addr + 3))
             continue;
@@ -692,9 +678,9 @@ int decode_print_calls(void)
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ------------------------------------------------------------------------ */
 /*                   Copyright (c) 2006, Joseph Zbiciak                     */
 /* ======================================================================== */

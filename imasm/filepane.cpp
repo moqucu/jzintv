@@ -12,8 +12,8 @@ as published by the Free Software Foundation; either version 2
 of the License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of 
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the 
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
@@ -28,7 +28,7 @@ extern HINSTANCE g_hInst;
 
 //-----------------------------------------------------------------------------
 // Name: FilePane()
-// Desc: 
+// Desc:
 //-----------------------------------------------------------------------------
 FilePane::FilePane(HWND hWnd)
 {
@@ -40,7 +40,7 @@ FilePane::FilePane(HWND hWnd)
 
 //-----------------------------------------------------------------------------
 // Name: ~FilePane()
-// Desc: 
+// Desc:
 //-----------------------------------------------------------------------------
 FilePane::~FilePane()
 {
@@ -58,19 +58,19 @@ void FilePane::DeleteNodes(HTREEITEM hRoot)
     hItem = TreeView_GetChild(m_hTree, hRoot);
 
     while (hItem != NULL)
-    {       
+    {
         DeleteNodes(hItem);
-        
+
         hItem = TreeView_GetChild(m_hTree, hRoot);
     }
 
     TVITEM tv;
-    
+
     ZeroMemory(&tv, sizeof (TVITEM));
     tv.mask = TVIF_PARAM;
     tv.hItem = hRoot;
     TreeView_GetItem(m_hTree, &tv);
-    
+
     ItemParam *pItem = (ItemParam *)tv.lParam;
 
     if (pItem != NULL)
@@ -83,14 +83,14 @@ void FilePane::DeleteNodes(HTREEITEM hRoot)
 
 //-----------------------------------------------------------------------------
 // Name: LoadDefaultPane()
-// Desc: 
+// Desc:
 //-----------------------------------------------------------------------------
 int FilePane::LoadDefaultPane()
 {
     m_bHaveProject = false;
 
     DeleteNodes(m_hTreeRoot);
-    
+
     m_hTreeRoot = AddItem(TVI_ROOT, "no project", FP_PROJECT, NULL, false);
     m_hTreeSource = AddItem(m_hTreeRoot, "Source Files", FP_FOLDER, NULL, false);
     m_hTreeInclude = AddItem(m_hTreeRoot, "Include Files", FP_FOLDER, NULL, false);
@@ -100,7 +100,7 @@ int FilePane::LoadDefaultPane()
 
 //-----------------------------------------------------------------------------
 // Name: LoadProject()
-// Desc: 
+// Desc:
 //-----------------------------------------------------------------------------
 int FilePane::LoadProject(const char *szPath)
 {
@@ -161,7 +161,7 @@ int FilePane::LoadProject(const char *szPath)
 
 //-----------------------------------------------------------------------------
 // Name: LoadProject()
-// Desc: 
+// Desc:
 //-----------------------------------------------------------------------------
 int FilePane::LoadProject(string &sPath)
 {
@@ -170,12 +170,12 @@ int FilePane::LoadProject(string &sPath)
 
 //-----------------------------------------------------------------------------
 // Name: AddSourceFile()
-// Desc: 
+// Desc:
 //-----------------------------------------------------------------------------
 int FilePane::AddSourceFile(string &sName, string &sPath)
 {
     ItemParam ip;
-    
+
     ip.sName = sName;
     ip.sPath = sPath;
     AddItem(m_hTreeSource, sName, FP_SOURCE, &ip);
@@ -187,12 +187,12 @@ int FilePane::AddSourceFile(string &sName, string &sPath)
 
 //-----------------------------------------------------------------------------
 // Name: AddSourceFile()
-// Desc: 
+// Desc:
 //-----------------------------------------------------------------------------
 int FilePane::AddSourceFile(const char *szName, const char *szPath)
 {
     ItemParam ip;
-    
+
     ip.sName = szName;
     ip.sPath = szPath;
     AddItem(m_hTreeSource, szName, FP_SOURCE, &ip);
@@ -204,12 +204,12 @@ int FilePane::AddSourceFile(const char *szName, const char *szPath)
 
 //-----------------------------------------------------------------------------
 // Name: AddIncludeFile()
-// Desc: 
+// Desc:
 //-----------------------------------------------------------------------------
 int FilePane::AddIncludeFile(string &sName, string &sPath)
 {
     ItemParam ip;
-    
+
     ip.sName = sName;
     ip.sPath = sPath;
     AddItem(m_hTreeInclude, sName, FP_INCLUDE, &ip);
@@ -221,12 +221,12 @@ int FilePane::AddIncludeFile(string &sName, string &sPath)
 
 //-----------------------------------------------------------------------------
 // Name: AddIncludeFile()
-// Desc: 
+// Desc:
 //-----------------------------------------------------------------------------
 int FilePane::AddIncludeFile(const char *szName, const char *szPath)
 {
     ItemParam ip;
-    
+
     ip.sName = szName;
     ip.sPath = szPath;
     AddItem(m_hTreeInclude, szName, FP_INCLUDE, &ip);
@@ -238,12 +238,12 @@ int FilePane::AddIncludeFile(const char *szName, const char *szPath)
 
 //-----------------------------------------------------------------------------
 // Name: AddOtherFile()
-// Desc: 
+// Desc:
 //-----------------------------------------------------------------------------
 int FilePane::AddOtherFile(string &sName, string &sPath)
 {
     ItemParam ip;
-    
+
     ip.sName = sName;
     ip.sPath = sPath;
     AddItem(m_hTreeOther, sName, FP_OTHER, &ip);
@@ -255,12 +255,12 @@ int FilePane::AddOtherFile(string &sName, string &sPath)
 
 //-----------------------------------------------------------------------------
 // Name: AddOtherFile()
-// Desc: 
+// Desc:
 //-----------------------------------------------------------------------------
 int FilePane::AddOtherFile(const char *szName, const char *szPath)
 {
     ItemParam ip;
-    
+
     ip.sName = szName;
     ip.sPath = szPath;
     AddItem(m_hTreeOther, szName, FP_OTHER, &ip);
@@ -272,7 +272,7 @@ int FilePane::AddOtherFile(const char *szName, const char *szPath)
 
 //-----------------------------------------------------------------------------
 // Name: AddItem()
-// Desc: 
+// Desc:
 //-----------------------------------------------------------------------------
 HTREEITEM FilePane::AddItem(HTREEITEM hParent, const char *szItem, int iType, ItemParam *pIP, bool bSort)
 {
@@ -283,7 +283,7 @@ HTREEITEM FilePane::AddItem(HTREEITEM hParent, const char *szItem, int iType, It
     lstrcpy(szBuff, szItem);
 
     ZeroMemory(&tvi, sizeof (TVINSERTSTRUCT));
-    tvi.hParent = hParent;  
+    tvi.hParent = hParent;
     if (bSort)
     {
         tvi.hInsertAfter = TVI_SORT;
@@ -295,7 +295,7 @@ HTREEITEM FilePane::AddItem(HTREEITEM hParent, const char *szItem, int iType, It
     tvi.item.mask = TVIF_TEXT | TVIF_PARAM;
     tvi.item.pszText = szBuff;
     tvi.item.cchTextMax = MAX_PATH;
-    
+
     if (pIP)
     {
         tvi.item.lParam = (LPARAM)(new ItemParam);
@@ -319,7 +319,7 @@ HTREEITEM FilePane::AddItem(HTREEITEM hParent, const char *szItem, int iType, It
 
 //-----------------------------------------------------------------------------
 // Name: AddItem()
-// Desc: 
+// Desc:
 //-----------------------------------------------------------------------------
 HTREEITEM FilePane::AddItem(HTREEITEM hParent, string &sItem, int iType, ItemParam *pIP, bool bSort)
 {
@@ -328,7 +328,7 @@ HTREEITEM FilePane::AddItem(HTREEITEM hParent, string &sItem, int iType, ItemPar
 
 //-----------------------------------------------------------------------------
 // Name: UpdateItem()
-// Desc: 
+// Desc:
 //-----------------------------------------------------------------------------
 int FilePane::UpdateItem(HTREEITEM hItem, const char *szItem, ItemParam *pIP)
 {
@@ -359,7 +359,7 @@ int FilePane::UpdateItem(HTREEITEM hItem, const char *szItem, ItemParam *pIP)
         // If not, allocate it
         if (!pTemp)
         {
-            tvi.lParam = (LPARAM)(new ItemParam);           
+            tvi.lParam = (LPARAM)(new ItemParam);
         }
 
         tvi.mask |= TVIF_PARAM;
@@ -372,7 +372,7 @@ int FilePane::UpdateItem(HTREEITEM hItem, const char *szItem, ItemParam *pIP)
 
 //-----------------------------------------------------------------------------
 // Name: CreateImageList()
-// Desc: 
+// Desc:
 //-----------------------------------------------------------------------------
 void FilePane::CreateImageList()
 {
@@ -416,7 +416,7 @@ void FilePane::CreateImageList()
 
 //-----------------------------------------------------------------------------
 // Name: CreateTreeView()
-// Desc: 
+// Desc:
 //-----------------------------------------------------------------------------
 int FilePane::CreateTreeView()
 {
@@ -433,7 +433,7 @@ int FilePane::CreateTreeView()
                                 (HMENU)NULL,
                                 GetModuleHandle(NULL),
                                 0);
-    
+
     if (m_hTree)
     {
         ShowWindow(m_hTree, SW_SHOWNORMAL);
@@ -444,7 +444,7 @@ int FilePane::CreateTreeView()
 
 //-----------------------------------------------------------------------------
 // Name: Resize()
-// Desc: 
+// Desc:
 //-----------------------------------------------------------------------------
 int FilePane::Resize(RECT &rc)
 {
@@ -453,7 +453,7 @@ int FilePane::Resize(RECT &rc)
 
 //-----------------------------------------------------------------------------
 // Name: Resize()
-// Desc: 
+// Desc:
 //-----------------------------------------------------------------------------
 int FilePane::Resize(int x, int y, int cx, int cy)
 {
@@ -462,7 +462,7 @@ int FilePane::Resize(int x, int y, int cx, int cy)
 
 //-----------------------------------------------------------------------------
 // Name: GetCurSelPath()
-// Desc: 
+// Desc:
 //-----------------------------------------------------------------------------
 int FilePane::GetCurSelPath(char *szBuff, int iMax)
 {
@@ -477,12 +477,12 @@ int FilePane::GetCurSelPath(char *szBuff, int iMax)
     {
         // Get the info structure
         TVITEM tv;
-    
+
         ZeroMemory(&tv, sizeof (TVITEM));
         tv.mask = TVIF_PARAM;
         tv.hItem = hCur;
         TreeView_GetItem(m_hTree, &tv);
-        
+
         ItemParam *pItem = (ItemParam *)tv.lParam;
 
         if (pItem != NULL)
@@ -500,7 +500,7 @@ int FilePane::GetCurSelPath(char *szBuff, int iMax)
 
 //-----------------------------------------------------------------------------
 // Name: NewProject()
-// Desc: 
+// Desc:
 //-----------------------------------------------------------------------------
 int FilePane::NewProject(string &sName, string &sPath)
 {
@@ -535,7 +535,7 @@ int FilePane::NewProject(string &sName, string &sPath)
 
 //-----------------------------------------------------------------------------
 // Name: NewProject()
-// Desc: 
+// Desc:
 //-----------------------------------------------------------------------------
 int FilePane::NewProject(const char *szName, const char *szPath)
 {
@@ -546,7 +546,7 @@ int FilePane::NewProject(const char *szName, const char *szPath)
 
 //-----------------------------------------------------------------------------
 // Name: RemoveSelected()
-// Desc: 
+// Desc:
 //-----------------------------------------------------------------------------
 int FilePane::RemoveSelected()
 {
@@ -561,12 +561,12 @@ int FilePane::RemoveSelected()
     {
         // Get the info structure
         TVITEM tv;
-    
+
         ZeroMemory(&tv, sizeof (TVITEM));
         tv.mask = TVIF_PARAM;
         tv.hItem = hCur;
         TreeView_GetItem(m_hTree, &tv);
-        
+
         ItemParam *pItem = (ItemParam *)tv.lParam;
 
         if (pItem)
@@ -585,18 +585,18 @@ int FilePane::RemoveSelected()
 
 //-----------------------------------------------------------------------------
 // Name: WriteProject()
-// Desc: 
+// Desc:
 //-----------------------------------------------------------------------------
 int FilePane::WriteProject()
 {
-    ItemParam *pIP; 
+    ItemParam *pIP;
     TVITEM tv;
     HTREEITEM hItem;
-    
+
     ZeroMemory(&tv, sizeof (TVITEM));
     tv.mask = TVIF_PARAM;
 
-    // First get the root item  
+    // First get the root item
     tv.hItem = m_hTreeRoot;
     TreeView_GetItem(m_hTree, &tv);
     pIP = (ItemParam *)tv.lParam;
@@ -671,5 +671,5 @@ int FilePane::WriteProject()
 
 //-----------------------------------------------------------------------------
 // Name: ()
-// Desc: 
+// Desc:
 //-----------------------------------------------------------------------------

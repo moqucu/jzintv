@@ -52,19 +52,29 @@ AUTHORS:    Mark Zenier;
 
         case IFC_SHL:
             if (etop < 0) FRAERR("shift left by negative amount attempted");
-            else          etop = etop < 32 ? estkm1p->v << etop : 0;
+            else          etop = safe_shls32(estkm1p->v, etop);
             estkm1p--;
             break;
 
         case IFC_SHRU:
             if (etop < 0) FRAERR("shift right by negative amount attempted");
-            else          etop = etop < 32 ? (unsigned)estkm1p->v >> etop : 0;
+            else          etop = safe_shru32((unsigned)estkm1p->v, etop);
             estkm1p--;
             break;
 
         case IFC_SHR:
             if (etop < 0) FRAERR("shift right by negative amount attempted");
-            else          etop = (signed)estkm1p->v >> (etop < 32 ? etop : 31);
+            else          etop = safe_shrs32(estkm1p->v, etop);
+            estkm1p--;
+            break;
+
+        case IFC_ROTL16:
+            etop = rotl16(estkm1p->v, etop);
+            estkm1p--;
+            break;
+
+        case IFC_ROTL32:
+            etop = rotl32(estkm1p->v, etop);
             estkm1p--;
             break;
 

@@ -15,8 +15,8 @@ enum
 
 typedef struct _TAG_ITEMPARAM
 {
-    string sName;
-    string sPath;
+    std::string sName;
+    std::string sPath;
 } ItemParam;
 
 class FilePane
@@ -26,26 +26,26 @@ public:
     ~FilePane();
     int LoadDefaultPane();
     int LoadProject(const char *szPath);
-    int LoadProject(string &sPath);
-    int AddSourceFile(string &sName, string &sPath);
+    int LoadProject(std::string &sPath);
+    int AddSourceFile(std::string &sName, std::string &sPath);
     int AddSourceFile(const char *szName, const char *szPath);
-    int AddIncludeFile(string &sName, string &sPath);
+    int AddIncludeFile(std::string &sName, std::string &sPath);
     int AddIncludeFile(const char *szName, const char *szPath);
-    int AddOtherFile(string &sName, string &sPath);
+    int AddOtherFile(std::string &sName, std::string &sPath);
     int AddOtherFile(const char *szName, const char *szPath);
     int Resize(RECT &rc);
     int Resize(int x, int y, int cx, int cy);
     int GetCurSelPath(char *szBuff, int iMax);
     bool IsOpen() {return m_bHaveProject;}
     int NewProject(const char *szName, const char *szPath);
-    int NewProject(string &sName, string &sPath);
+    int NewProject(std::string &sName, std::string &sPath);
     int RemoveSelected();
 
 private:
     int CreateTreeView();
     void CreateImageList();
     void DeleteNodes(HTREEITEM hRoot);
-    HTREEITEM AddItem(HTREEITEM hParent, string &sItem, int iType, ItemParam *pIP = NULL, bool bSort = true);
+    HTREEITEM AddItem(HTREEITEM hParent, std::string &sItem, int iType, ItemParam *pIP = NULL, bool bSort = true);
     HTREEITEM AddItem(HTREEITEM hParent, const char *szItem, int iType, ItemParam *pIP = NULL, bool bSort = true);
     int UpdateItem(HTREEITEM hItem, const char *szItem, ItemParam *pIP = NULL);
     int WriteProject();
@@ -59,8 +59,8 @@ private:
     HWND m_hParent;
     HWND m_hTree;
 
-    //string m_sProj;
-    //LList<string> m_fileList;
+    //std::string m_sProj;
+    //LList<std::string> m_fileList;
     int m_anImages[FP_SIZE];
     bool m_bHaveProject;
 };

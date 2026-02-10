@@ -2,7 +2,6 @@
  * ============================================================================
  *  Title:    Controller pads via Joe Fisher's Classic Gaming Controller
  *  Author:   J. Zbiciak
- *  $Id$
  * ============================================================================
  *  Some code in this module comes from Joe Fisher's reference code.
  * ============================================================================
@@ -12,22 +11,21 @@
  */
 
 #ifndef PAD_CGC_LINUX_H_
-#define PAD_CGC_LINUX_H_
-#if defined(linux) || defined(macosx)
+# define PAD_CGC_LINUX_H_
+# if defined(PLAT_LINUX) || defined(PLAT_MACOS)
 
 /* ======================================================================== */
 /*  PAD_CGC_INIT -- Initializes a Classic Gaming Controller interface.      */
 /* ======================================================================== */
 int pad_cgc_linux_init
 (
-    pad_cgc_t       *pad,           /*  pad_cgc_t structure to initialize   */
-    uint_32         addr,           /*  Base address of pad.                */
+    pad_cgc_t      *pad,            /*  pad_cgc_t structure to initialize   */
+    uint32_t        addr,           /*  Base address of pad.                */
     const char      *cgc_dev        /*  path to CGC device.                 */
 );
 
-#endif
-#endif 
-
+# endif /* PLAT_LINUX || PLAT_MACOS */
+#endif /* PAD_CGC_LINUX_H_ */
 
 /* ======================================================================== */
 /*  This program is free software; you can redistribute it and/or modify    */
@@ -40,10 +38,9 @@ int pad_cgc_linux_init
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                 Copyright (c) 2004-+Inf, Joseph Zbiciak                  */
 /* ======================================================================== */
-

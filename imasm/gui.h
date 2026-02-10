@@ -19,7 +19,7 @@ typedef struct _TAG_WNDINFO
 typedef struct _TAG_SYNTAXINFO
 {
     COLORREF crCol;
-    string sName;
+    std::string sName;
 } SyntaxInfo;
 
 INT APIENTRY WinMain(HINSTANCE, HINSTANCE, LPSTR, INT);

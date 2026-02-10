@@ -11,7 +11,7 @@
 #include <gccore.h>
 #include <wiiuse/wpad.h>
 
-void  wii_init() 
+void  wii_init()
 {
 #ifndef USE_AS_BACKEND
     fatInitDefault();
@@ -19,7 +19,7 @@ void  wii_init()
 }
 
 /* http://lists.ozlabs.org/pipermail/linuxppc-dev/1999-October/003889.html */
-LOCAL uint_64 wii_get_timebase()
+LOCAL uint64_t wii_get_timebase()
 {
     unsigned long long retval;
     unsigned long junk;

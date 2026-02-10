@@ -1,4 +1,5 @@
 #include "config.h"
+#include "lzoe/lzoe.h"
 #include "bincfg/bincfg.h"
 
 //extern int bc_debug, bc__flex_debug;
@@ -6,7 +7,7 @@
 int main(int argc, char *argv[])
 {
     bc_cfgfile_t *cfg;
-    FILE *f;
+    LZFILE *f;
 
 #if 0
     if (argc > 2 && argv[1][0] == '-')
@@ -27,7 +28,7 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
-    f = fopen(argv[1], "r");
+    f = lzoe_fopen(argv[1], "r");
 
     if (!f)
     {

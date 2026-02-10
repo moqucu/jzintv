@@ -11,8 +11,8 @@ as published by the Free Software Foundation; either version 2
 of the License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of 
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the 
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
@@ -27,8 +27,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <string>
 #include <vector>
 
-using namespace std;
-
 class Token
 {
 public:
@@ -37,7 +35,7 @@ public:
 
     Token &operator =(Token &tok);
     Token &operator =(const char *szBuff);
-    Token &operator =(string &sBuff);
+    Token &operator =(std::string &sBuff);
 
     const char *operator[](size_t i);
 
@@ -49,10 +47,8 @@ public:
 private:
     void Tokenize();
 
-    string m_str;
-    string *m_pTok;
-    char m_szTok[255];
-    vector<string> m_tokVector;
+    std::string m_str;
+    std::vector<std::string> m_tokVector;
     char m_szSeps[255];
 };
 

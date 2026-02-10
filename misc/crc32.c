@@ -20,7 +20,7 @@
 /* ======================================================================== */
 /*  CRC32_TBL    -- Lookup table used for the CRC-32 code.                  */
 /* ======================================================================== */
-uint_32 crc32_tbl[256] = 
+uint32_t crc32_tbl[256] =
 {
     0x00000000L, 0x77073096L, 0xEE0E612CL, 0x990951BAL, 0x076DC419L,
     0x706AF48FL, 0xE963A535L, 0x9E6495A3L, 0x0EDB8832L, 0x79DCB8A4L,
@@ -81,7 +81,7 @@ uint_32 crc32_tbl[256] =
 /*                  Note:  The 32-bit CRC is set up as a right-shifting     */
 /*                  CRC with no inversions.                                 */
 /* ======================================================================== */
-uint_32 crc32_update(uint_32 crc, uint_8 data)
+uint32_t crc32_update(uint32_t crc, uint8_t data)
 {
     return (crc >> 8) ^ crc32_tbl[(crc ^ data) & 0xFF];
 }
@@ -91,7 +91,7 @@ uint_32 crc32_update(uint_32 crc, uint_8 data)
 /*                  This function updates the CRC with a 16-bit value,      */
 /*                  little-endian.                                          */
 /* ======================================================================== */
-uint_32 crc32_upd16(uint_32 crc, uint_16 data)
+uint32_t crc32_upd16(uint32_t crc, uint16_t data)
 {
     crc ^= data;
     crc  = (crc >> 8) ^ crc32_tbl[crc & 0xFF];
@@ -104,7 +104,7 @@ uint_32 crc32_upd16(uint_32 crc, uint_16 data)
 /*                  This function updates the CRC with a 32-bit value,      */
 /*                  little-endian.                                          */
 /* ======================================================================== */
-uint_32 crc32_upd32(uint_32 crc, uint_32 data)
+uint32_t crc32_upd32(uint32_t crc, uint32_t data)
 {
     crc ^= data;
     crc  = (crc >> 8) ^ crc32_tbl[crc & 0xFF];
@@ -119,7 +119,7 @@ uint_32 crc32_upd32(uint_32 crc, uint_32 data)
 /*                  Note:  The 32-bit CRC is set up as a right-shifting     */
 /*                  CRC with no inversions.                                 */
 /* ======================================================================== */
-uint_32 crc32_block(uint_32 crc, uint_8 *data, int len)
+uint32_t crc32_block(uint32_t crc, const uint8_t *data, int len)
 {
     int i;
 

@@ -4,7 +4,7 @@
 #include "gif/lzw_enc.h"
 
 
-uint_8 gif_header[] =
+uint8_t gif_header[] =
 {
     /* signature */
     'G','I','F','8','7','a',
@@ -21,7 +21,7 @@ uint_8 gif_header[] =
 
 
 /* local descriptor */
-uint_8 gif_local[] =
+uint8_t gif_local[] =
 {
     0x2C,       /* signature */
     0, 0, 0, 0, /* Anchor at upper left */
@@ -31,15 +31,15 @@ uint_8 gif_local[] =
 };
 
 
-uint_8 gif_file[65536];
+uint8_t gif_file[65536];
 
-uint_8 image[200*160];
+uint8_t image[200*160];
 
 int main(void)
 {
     FILE *f;
     int x, y, i;
-    uint_8 *gif_ptr = gif_file;
+    uint8_t *gif_ptr = gif_file;
 
     for (y = 0; y < 200; y++)
         for (x = 0; x < 160; x++)

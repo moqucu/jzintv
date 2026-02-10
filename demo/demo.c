@@ -9,9 +9,9 @@
  *  The output file can be fed through a post-processor, which then reformats
  *  and compresses the data, for use in a demo-player on a real Intellivision.
  *
- *  Rather than snoop the bus for everything or implement a "tickable" 
+ *  Rather than snoop the bus for everything or implement a "tickable"
  *  interface, the demo recorder gets ticked by the STIC directly, and the
- *  STIC hands the demo recorder its current vision of the STIC control 
+ *  STIC hands the demo recorder its current vision of the STIC control
  *  registers, BACKTAB and GRAM.  The demo recorder then only has to snoop
  *  the PSG registers.
  *
@@ -32,7 +32,7 @@
 /*  SIGBIT_STIC  -- Significant bits in STIC registers.                     */
 /*  STIC_REGS    -- List of STIC register numbers to examine.               */
 /* ======================================================================== */
-LOCAL const uint_16 sigbit_psg [14]   =
+LOCAL const uint16_t sigbit_psg [14]   =
 {
     0x00FF, 0x00FF, 0x00FF, 0x00FF, /* Lower 8 bits of channel periods.     */
     0x000F, 0x000F, 0x000F,         /* Upper 4 bits of channel periods.     */
@@ -43,7 +43,7 @@ LOCAL const uint_16 sigbit_psg [14]   =
     0x003F, 0x003F, 0x003F          /* Volume controls.                     */
 };
 
-LOCAL const uint_16 sigbit_stic[0x40] =
+LOCAL const uint16_t sigbit_stic[0x40] =
 {
     /* MOB X Registers                                  0x00 - 0x07 */
     0x07FF, 0x07FF, 0x07FF, 0x07FF, 0x07FF, 0x07FF, 0x07FF, 0x07FF,
@@ -104,7 +104,7 @@ LOCAL const int stic_regs[32] =
 /*      N bytes     PSG1 registers (1 byte each)                            */
 /*                                                                          */
 /* ======================================================================== */
-LOCAL uint_8 demo_buf[54 + 32*2 + 64*8 + 240*2 + 16 + 16];
+LOCAL uint8_t demo_buf[54 + 32*2 + 64*8 + 240*2 + 16 + 16];
 
 #define EMIT_32(buf, word)  do {\
                                 buf[0]   = ((word) >>  0) & 0xFF;           \
@@ -133,13 +133,13 @@ void demo_tick
 )
 {
     int i, j, c;
-    uint_32 stic_chg    = { 0 };
-    uint_32 gram_chg[2] = { 0, 0 };
-    uint_32 btab_chg[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
-    uint_32 psg0_chg    = { 0 };
-    uint_32 psg1_chg    = { 0 };
-    uint_32 mask;
-    uint_8  *buf;
+    uint32_t stic_chg    = { 0 };
+    uint32_t gram_chg[2] = { 0, 0 };
+    uint32_t btab_chg[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+    uint32_t psg0_chg    = { 0 };
+    uint32_t psg1_chg    = { 0 };
+    uint32_t mask;
+    uint8_t  *buf;
 
 
     /* -------------------------------------------------------------------- */
@@ -150,7 +150,7 @@ void demo_tick
     for (i = 0; i < 32; i++)
     {
         int reg = stic_regs[i];
-        uint_32 stic_reg = stic->raw[reg] & sigbit_stic[reg];
+        uint32_t stic_reg = stic->raw[reg] & sigbit_stic[reg];
 
         if (i == 31)    /* last reg is 0x32 */
         {
@@ -185,8 +185,8 @@ void demo_tick
 
     for (i = 0; i < 240; i++)
     {
-        uint_32 demo_btab = demo->btab[i];
-        uint_32 stic_btab = stic->btab[i];
+        uint32_t demo_btab = demo->btab[i];
+        uint32_t stic_btab = stic->btab[i];
 
         stic_btab &= (stic_btab & 0x800) ? mask : 0x3FFF;
 
@@ -202,8 +202,8 @@ void demo_tick
     /* -------------------------------------------------------------------- */
     for (i = 0; i < 14; i++)
     {
-        uint_32 psg0_reg = demo->psg0 ? demo->psg0->reg[i] & sigbit_psg[i] : 0;
-        uint_32 psg1_reg = demo->psg1 ? demo->psg1->reg[i] & sigbit_psg[i] : 0;
+        uint32_t psg0_reg = demo->psg0 ? demo->psg0->reg[i] & sigbit_psg[i] : 0;
+        uint32_t psg1_reg = demo->psg1 ? demo->psg1->reg[i] & sigbit_psg[i] : 0;
 
         if (demo->psg0_reg[i] != psg0_reg)
         {
@@ -259,8 +259,8 @@ void demo_tick
     EMIT_16(buf, psg0_chg);
     EMIT_16(buf, psg1_chg);
 
-    for (i = 0; i < 32; i++) 
-        if ((stic_chg >> i) & 1) 
+    for (i = 0; i < 32; i++)
+        if ((stic_chg >> i) & 1)
             EMIT_16(buf, demo->stic[i]);
 
     for (i = 0; i < 64; i++)
@@ -299,7 +299,7 @@ int demo_init
     ay8910_t    *psg1
 )
 {
-    memset(demo, 0, sizeof(demo));
+    memset(demo, 0, sizeof(*demo));
 
     if (!(demo->f = fopen(demo_file, "wb")))
     {
@@ -336,9 +336,9 @@ void demo_dtor(demo_t *demo)
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                 Copyright (c) 2005-+Inf, Joseph Zbiciak                  */
 /* ======================================================================== */

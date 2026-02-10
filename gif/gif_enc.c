@@ -16,38 +16,38 @@
 #include "gif/gif_enc.h"
 #include "gif/lzw_enc.h"
 
-LOCAL uint_8 *gif_enc_buf = NULL;
-LOCAL int     gif_enc_buf_sz = 0;
+LOCAL uint8_t *gif_enc_buf = NULL;
+LOCAL int      gif_enc_buf_sz = 0;
 
-LOCAL uint_8 *gif_img_tr  = NULL;
-LOCAL uint_8 *gif_img_a   = NULL;
-LOCAL uint_8 *gif_img_b   = NULL;
-LOCAL uint_8 *gif_img_d   = NULL, *gif_pal_d = NULL;
-LOCAL uint_8 *gif_img_e   = NULL, *gif_pal_e = NULL;
-LOCAL uint_8 *gif_img_f   = NULL, *gif_pal_f = NULL;
-LOCAL int     gif_img_sz  = 0;
+LOCAL uint8_t *gif_img_tr  = NULL;
+LOCAL uint8_t *gif_img_a   = NULL;
+LOCAL uint8_t *gif_img_b   = NULL;
+LOCAL uint8_t *gif_img_d   = NULL, *gif_pal_d = NULL;
+LOCAL uint8_t *gif_img_e   = NULL, *gif_pal_e = NULL;
+LOCAL uint8_t *gif_img_f   = NULL, *gif_pal_f = NULL;
+LOCAL int      gif_img_sz  = 0;
 
-LOCAL int gen_mpi(uint_8 *src, uint_8 *xtra, uint_8 *dst, 
-                  int cnt, uint_8 *pal);
+LOCAL int gen_mpi(uint8_t *src, uint8_t *xtra, uint8_t *dst,
+                  int cnt, uint8_t *pal);
 
-int gif_best_stats[6];
+int gif_best_stat[6];
 
 /* ======================================================================== */
 /*  GIF_START -- Starts a single or multi-frame GIF.                        */
 /* ======================================================================== */
 int gif_start
 (
-    gif_t   *gif, 
-    FILE    *f,             /* file to attach to GIF.                       */
-    int     x_dim,          /* source image X dimension                     */
-    int     y_dim,          /* source image Y dimension                     */
-    uint_8  pal[][3],       /* palette to use for GIF.                      */
-    int     n_cols,         /* number of colors in GIF.                     */
-    int     multi           /* 0: Single image, 1: Multiple image           */
+    gif_t         *gif,
+    FILE          *f,           /* file to attach to GIF.                   */
+    int            x_dim,       /* source image X dimension                 */
+    int            y_dim,       /* source image Y dimension                 */
+    const uint8_t  pal[][3],    /* palette to use for GIF.                  */
+    int            n_cols,      /* number of colors in GIF.                 */
+    int            multi        /* 0: Single image, 1: Multiple image       */
 )
 {
     int i, gt_size;
-    uint_8 *enc_ptr;
+    uint8_t *enc_ptr;
     size_t wrote;
 
     /* -------------------------------------------------------------------- */
@@ -59,8 +59,8 @@ int gif_start
     gif->y_dim = y_dim;
     if (multi)
     {
-        gif->vid = CALLOC(uint_8, x_dim * y_dim);
-        gif->pal = CALLOC(uint_8, n_cols * 3);
+        gif->vid = CALLOC(uint8_t, x_dim * y_dim);
+        gif->pal = CALLOC(uint8_t, n_cols * 3);
     } else
     {
         gif->vid = gif->pal = NULL;
@@ -70,7 +70,7 @@ int gif_start
     {
         if (gif_enc_buf) free(gif_enc_buf);
         gif_enc_buf_sz = x_dim * y_dim * 2;
-        gif_enc_buf    = CALLOC(uint_8, gif_enc_buf_sz);
+        gif_enc_buf    = CALLOC(uint8_t, gif_enc_buf_sz);
     }
 
     if (!gif_enc_buf || (multi && (!gif->pal || !gif->vid)))
@@ -207,11 +207,11 @@ int gif_finish(gif_t *gif)
 /* ======================================================================== */
 int gif_wr_frame_s
 (
-    gif_t  *gif,
-    uint_8 *vid
+    gif_t         *gif,
+    const uint8_t *vid
 )
 {
-    uint_8 *enc_ptr = gif_enc_buf;
+    uint8_t *enc_ptr = gif_enc_buf;
     int lzw_len;
     size_t wrote;
 
@@ -235,7 +235,7 @@ int gif_wr_frame_s
     /* -------------------------------------------------------------------- */
     /*  Now compress the image.                                             */
     /* -------------------------------------------------------------------- */
-    lzw_len = lzw_encode(vid, enc_ptr, gif->x_dim*gif->y_dim, 
+    lzw_len = lzw_encode(vid, enc_ptr, gif->x_dim*gif->y_dim,
                          gif_enc_buf_sz - (enc_ptr - gif_enc_buf));
 
     if (lzw_len < 0)
@@ -259,12 +259,12 @@ int gif_wr_frame_s
 /* ======================================================================== */
 int gif_write
 (
-    FILE   *f,
-    uint_8 *vid,
-    int     x_dim,
-    int     y_dim,
-    uint_8  pal[][3],
-    int     n_cols
+    FILE          *f,
+    const uint8_t *vid,
+    int            x_dim,
+    int            y_dim,
+    const uint8_t  pal[][3],
+    int            n_cols
 )
 {
     gif_t   gif;
@@ -308,21 +308,22 @@ int gif_write
 /* ======================================================================== */
 int gif_wr_frame_m
 (
-    gif_t  *gif,
-    uint_8 *vid,
-    int     delay,
-    int     mode
+    gif_t         *gif,
+    const uint8_t *vid,
+    int            delay,
+    int            mode
 )
 {
     int trans = gif->trans >= 0;
-    uint_8 *enc_ptr = gif_enc_buf;
-    uint_8 *vid_ptr, *prv_ptr, *trn_ptr;
-    uint_8 *best_img1, *best_img2, *best_lct;
+    uint8_t *enc_ptr = gif_enc_buf;
+    const uint8_t *vid_ptr, *prv_ptr;
+    uint8_t *trn_ptr;
+    uint8_t *best_img1, *best_img2, *best_lct;
     int x, y, xx, yy, min_x, min_y, max_x, max_y, width, height;
     int n_col_d, n_col_e = 0, n_col_f = 0, lct_sz_d, lct_sz_e, lct_sz_f;
     int enc_sz_a, enc_sz_b, enc_sz_c, enc_sz_d, enc_sz_e, enc_sz_f;
     int best_sz, best_lct_sz, trans_idx, do_trans = 0;
-    int lzw_len; 
+    int lzw_len;
     int cnt, num_trans = 0;
     char best = '*';
     size_t wrote;
@@ -336,7 +337,7 @@ int gif_wr_frame_m
     {
         if (gif_img_tr) free(gif_img_tr);
         gif_img_sz = gif->x_dim * gif->y_dim;
-        gif_img_tr = CALLOC(uint_8, 7 * gif->x_dim * gif->y_dim + 3*256);
+        gif_img_tr = CALLOC(uint8_t, 7 * gif->x_dim * gif->y_dim + 3*256);
 
         if (!gif_img_tr)
         {
@@ -401,9 +402,9 @@ int gif_wr_frame_m
     for (y = 0; y < gif->y_dim; y++)
         for (x = 0; x < gif->x_dim; x++)
         {
-            uint_8 curr = *vid_ptr++;
-            uint_8 prev = *prv_ptr++;
-            uint_8 tran = gif->trans;
+            uint8_t curr = *vid_ptr++;
+            uint8_t prev = *prv_ptr++;
+            uint8_t tran = gif->trans;
 
             if (curr != prev)
             {
@@ -507,9 +508,9 @@ int gif_wr_frame_m
         enc_sz_b = lzw_encode(gif_img_b, gif_img_tr, cnt, gif_img_sz*2);
         enc_sz_e = lzw_encode(gif_img_e, gif_img_tr, cnt, gif_img_sz*2);
 #if 1
-        enc_sz_c = lzw_encode2(gif_img_b,  gif_img_a, 
+        enc_sz_c = lzw_encode2(gif_img_b,  gif_img_a,
                                gif_img_tr, cnt, gif_img_sz);
-        enc_sz_f = lzw_encode2(gif_img_f,  gif_img_d, 
+        enc_sz_f = lzw_encode2(gif_img_f,  gif_img_d,
                                gif_img_tr, cnt, gif_img_sz);
 #endif
     }
@@ -531,14 +532,14 @@ int gif_wr_frame_m
     best_lct    = NULL;
     best_lct_sz = 0;
     best_sz     = enc_sz_a;
-    trans_idx   = 0;
+    trans_idx   = 0xFF;
     do_trans    = 0;
     best        = 'a';
 
 #if 1
-    if (enc_sz_b < best_sz) 
-    { 
-        best_img1   = gif_img_b; 
+    if (enc_sz_b < best_sz)
+    {
+        best_img1   = gif_img_b;
         best_img2   = NULL;
         best_lct    = NULL;
         best_lct_sz = 0;
@@ -546,23 +547,23 @@ int gif_wr_frame_m
         trans_idx   = gif->trans;
         do_trans    = 1;
         best        = 'b';
-    }              
-                   
-    if (enc_sz_d < best_sz) 
-    {              
-        best_img1   = gif_img_d; 
+    }
+
+    if (enc_sz_d < best_sz)
+    {
+        best_img1   = gif_img_d;
         best_img2   = NULL;
         best_lct    = gif_pal_d;
         best_lct_sz = lct_sz_d;
         best_sz     = enc_sz_d;
-        trans_idx   = 0;
+        trans_idx   = 0xFF;
         do_trans    = 0;
         best        = 'd';
-    }              
-                   
-    if (enc_sz_e < best_sz) 
-    {              
-        best_img1   = gif_img_e; 
+    }
+
+    if (enc_sz_e < best_sz)
+    {
+        best_img1   = gif_img_e;
         best_img2   = NULL;
         best_lct    = gif_pal_e;
         best_lct_sz = lct_sz_e;
@@ -570,31 +571,31 @@ int gif_wr_frame_m
         trans_idx   = n_col_e - 1;
         do_trans    = 1;
         best        = 'e';
-    }              
+    }
 
-    if (enc_sz_c < best_sz) 
-    {              
-        best_img1   = gif_img_b; 
-        best_img2   = gif_img_a; 
+    if (enc_sz_c < best_sz)
+    {
+        best_img1   = gif_img_b;
+        best_img2   = gif_img_a;
         best_lct    = NULL;
         best_lct_sz = 0;
         best_sz     = enc_sz_c;
         trans_idx   = gif->trans;
         do_trans    = 1;
         best        = 'c';
-    }              
-                   
-    if (enc_sz_f < best_sz) 
-    {              
-        best_img1   = gif_img_f; 
-        best_img2   = gif_img_d; 
+    }
+
+    if (enc_sz_f < best_sz)
+    {
+        best_img1   = gif_img_f;
+        best_img2   = gif_img_d;
         best_lct    = gif_pal_f;
         best_lct_sz = lct_sz_f;
         best_sz     = enc_sz_f;
         trans_idx   = n_col_f - 1;
         do_trans    = 1;
         best        = 'f';
-    }              
+    }
 
     if (best_sz < 0 || best_sz == INT_MAX)
     {
@@ -662,7 +663,7 @@ int gif_wr_frame_m
     /* -------------------------------------------------------------------- */
     if (best_img2)
     {
-        lzw_len = lzw_encode2(best_img1, best_img2, enc_ptr, cnt, 
+        lzw_len = lzw_encode2(best_img1, best_img2, enc_ptr, cnt,
                               gif_enc_buf_sz - (enc_ptr - gif_enc_buf) - 1);
 
     } else
@@ -685,7 +686,7 @@ int gif_wr_frame_m
     wrote = fwrite(gif_enc_buf, 1, enc_ptr - gif_enc_buf, gif->f);
     if (wrote < (unsigned)(enc_ptr - gif_enc_buf))
     {
-        fprintf(stderr, "gif_wr_frame_m: Short write? %ld vs %ld\n", 
+        fprintf(stderr, "gif_wr_frame_m: Short write? %ld vs %ld\n",
                 (long)wrote, (long)(enc_ptr - gif_enc_buf));
         return -1;
     }
@@ -703,11 +704,11 @@ int gif_wr_frame_m
 /* ======================================================================== */
 LOCAL int gen_mpi
 (
-    uint_8 *src, 
-    uint_8 *xtra, 
-    uint_8 *dst, 
-    int     cnt, 
-    uint_8 *pal_map
+    uint8_t *src,
+    uint8_t *xtra,
+    uint8_t *dst,
+    int      cnt,
+    uint8_t *pal_map
 )
 {
     int hist1[256];
@@ -776,9 +777,9 @@ LOCAL int gen_mpi
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                   Copyright (c) 2005, Joseph Zbiciak                     */
 /* ======================================================================== */

@@ -1,7 +1,10 @@
-#ifndef _BINCFG_H
-#define _BINCFG_H
+#ifndef BINCFG_H_
+#define BINCFG_H_
 
 #include "misc/ll.h"
+#include "misc/types.h"
+#include "misc/printer.h"
+
 /* ======================================================================== */
 /*  BC_CFGFILE_T -- Struct that stores a parsed INTVPC .CFG file in a form  */
 /*                  we can process.                                         */
@@ -44,6 +47,7 @@
 #define BC_SPAN_EP  (0x0040)    /* ECS-style Pageable.                      */
 #define BC_SPAN_PL  (0x0010)    /* Load data into this segment              */
 #define BC_SPAN_PK  (0x0020)    /* Poke a datum at s_addr. Datum in 'width' */
+#define BC_SPAN_DEL (0x0080)    /* Internal: span can be deleted            */
 #define BC_SPAN_ROM (BC_SPAN_R)
 #define BC_SPAN_RAM (BC_SPAN_R | BC_SPAN_W)
 #define BC_SPAN_WOM (BC_SPAN_W)
@@ -52,16 +56,28 @@
 
 typedef struct bc_memspan_t
 {
-    ll_t    l;                  /* Linked list of memory spans.             */
-    uint_16 s_addr, e_addr;     /* Address range of the span.               */
-    uint_32 s_fofs, e_fofs;     /* Starting and ending file offset.         */
-    uint_32 flags;              /* Intellicart flags for span.              */
-    int     width;              /* Width of span in bits (8...16)           */
-    int     epage;              /* ECS Page Number (-1 for not-pageable).   */
-    char    *f_name;            /* File to get span from (NULL if primary)  */
-    uint_16 *data;              /* Actual data to put in memory.            */
+    ll_t      l;                /* Linked list of memory spans.             */
+    uint32_t  s_addr, e_addr;   /* Address range of the span.               */
+    uint32_t  s_fofs, e_fofs;   /* Starting and ending file offset.         */
+    uint32_t  flags;            /* Intellicart flags for span.              */
+    int       width;            /* Width of span in bits (8...16)           */
+    int       epage;            /* ECS Page Number (-1 for not-pageable).   */
+    char     *f_name;           /* File to get span from (NULL if primary)  */
+    uint16_t *data;             /* Actual data to put in memory.            */
 } bc_memspan_t;
 
+
+/* ------------------------------------------------------------------------ */
+/*  BC_MEMATTR_PAGE_T -- Subset of bc_memspan_t used by grammar to capture  */
+/*  memory attributes and ECS page number.  Used in both [mapping] and      */
+/*  [memattr] sections.                                                     */
+/* ------------------------------------------------------------------------ */
+typedef struct bc_memattr_page_t
+{
+    uint32_t flags;             /* Intellicart flags for span.              */
+    int      epage;             /* Width of span in bits (8...16)           */
+    int      width;             /* ECS Page Number (-1 for not-pageable).   */
+} bc_memattr_page_t;
 
 
 /* ------------------------------------------------------------------------ */
@@ -76,33 +92,34 @@ typedef struct bc_memspan_t
 /* ------------------------------------------------------------------------ */
 typedef struct bc_mac_addr_t
 {
-    uint_16 addr;
+    uint16_t addr;
 } bc_mac_addr_t;
 
 typedef struct bc_mac_load_t
 {
     char    *name;
     int     width;
-    uint_16 addr;
+    uint16_t addr;
 } bc_mac_load_t;
 
 typedef struct bc_mac_poke_t
 {
-    uint_16 addr;
-    uint_16 value;
+    uint16_t addr;
+    uint16_t value;
+    int      epage;
 } bc_mac_poke_t;
 
 typedef struct bc_mac_reg_t
 {
-    uint_16 reg;
-    uint_16 value;
+    uint16_t reg;
+    uint16_t value;
 } bc_mac_reg_t;
 
 typedef struct bc_mac_watch_t
 {
     char    *name;
     int     spans;
-    uint_16 *addr;
+    uint16_t *addr;
 } bc_mac_watch_t;
 
 typedef enum bc_macro_cmd_t
@@ -139,28 +156,6 @@ typedef struct bc_macro_t
 } bc_macro_t;
 
 
-/* ------------------------------------------------------------------------ */
-/*  BC_VAR_T     -- <name,value> tuple.  Also stores 'type' for value.      */
-/* ------------------------------------------------------------------------ */
-#define BC_VAR_DECNUM  (1)
-#define BC_VAR_HEXNUM  (2)
-#define BC_VAR_STRING  (4)
-
-typedef struct bc_strnum_t
-{
-    uint_32         flag;
-    sint_32         dec_val;
-    uint_32         hex_val;
-    char *          str_val;
-} bc_strnum_t;
-
-typedef struct bc_var_t
-{
-    ll_t            l;              /* linked list of variable defs.        */
-    char            *name;          /* name of the variable.                */
-    bc_strnum_t     val;            /* Numeric, string or either.           */
-} bc_var_t;
-
 
 /* ------------------------------------------------------------------------ */
 /*  BC_VARLIKE_T -- Structure for encapsulating a [var]-like section.       */
@@ -178,19 +173,19 @@ typedef enum   bc_varlike_types_t
 typedef struct bc_varlike_t
 {
     bc_varlike_types_t type;
-    bc_var_t           *vars;
+    cfg_var_t          *vars;
 } bc_varlike_t;
-        
+
 /* ------------------------------------------------------------------------ */
 /*  BC_DIAG_T     -- List of errors/warnings encountered within the CFG.    */
 /* ------------------------------------------------------------------------ */
-typedef enum bc_diagtype_t 
+typedef enum bc_diagtype_t
 {
     BC_DIAG_ERROR,
     BC_DIAG_WARNING
 } bc_diagtype_t;
 
-typedef struct bc_diag_t   
+typedef struct bc_diag_t
 {
     ll_t            l;              /* We can have more than one error.     */
     bc_diagtype_t   type;           /* Warning or error?                    */
@@ -203,18 +198,22 @@ typedef struct bc_diag_t
 /* ------------------------------------------------------------------------ */
 /*  BC_CFGFILE_T  -- Top level structure that ties the others together.     */
 /* ------------------------------------------------------------------------ */
+struct metadata_t;                  /* Forward declaration.             */
 typedef struct bc_cfgfile_t
 {
     char            *cfgfile;       /* name of configuration file.          */
     char            *binfile;       /* name of primary binary file.         */
-                                  
+
     bc_memspan_t    *span;          /* linked list of memory spans to load  */
     bc_macro_t      *macro;         /* linked list of macros to execute.    */
-    bc_var_t        *vars;          /* linked list of variable defs.        */
-    bc_var_t        *keys[4];       /* linked list of key mappings.         */
-    bc_var_t        *joystick;      /* linked list of joystick mappings.    */
+    cfg_var_t       *vars;          /* linked list of variable defs.        */
+    cfg_var_t       *keys[4];       /* linked list of key mappings.         */
+    cfg_var_t       *joystick;      /* linked list of joystick mappings.    */
 
     bc_diag_t       *diags;         /* linked list of errors/warnings       */
+
+    /*  Optional decoded metadata from CFG variables. (May be NULL.)        */
+    struct game_metadata_t *metadata; 
 } bc_cfgfile_t;
 
 /* ======================================================================== */
@@ -222,15 +221,17 @@ typedef struct bc_cfgfile_t
 /* ======================================================================== */
 extern bc_cfgfile_t *bc_parsed_cfg;
 
+#ifdef LZOE_H_
 /* ======================================================================== */
 /*  BC_PARSE_CFG  -- Invokes the lexer and grammar to parse the config.     */
 /* ======================================================================== */
 bc_cfgfile_t *bc_parse_cfg
 (
-    FILE *f, 
+    LZFILE *f,
     const char *const binfile,
-    const char *const cfgfile  
+    const char *const cfgfile
 );
+#endif
 
 /* ======================================================================== */
 /*  BC_READ_DATA  -- Reads ROM segments and attaches them to bc_cfgfile_t.  */
@@ -292,7 +293,6 @@ int  bc_do_macros(bc_cfgfile_t *cfg, int partial_ok);
 /*                                                                          */
 /*  BC_FREE_MEMSPAN_T    -- Releases storage associated with bc_memspan_t.  */
 /*  BC_FREE_MACRO_T      -- Releases storage associated with bc_macro_t.    */
-/*  BC_FREE_VAR_T        -- Releases storage associated with bc_var_t.      */
 /*  BC_FREE_DIAG_T       -- Releases storage associated with bc_diag_t      */
 /* ======================================================================== */
 
@@ -305,11 +305,6 @@ void bc_free_memspan_t(ll_t *l_mem, void *unused);
 /*  BC_FREE_MACRO_T      -- Releases storage associated with bc_macro_t.    */
 /* ======================================================================== */
 void bc_free_macro_t(ll_t *l_mac, void *unused);
-
-/* ======================================================================== */
-/*  BC_FREE_VAR_T        -- Releases storage associated with bc_var_t.      */
-/* ======================================================================== */
-void bc_free_var_t(ll_t *l_var, void *unused);
 
 /* ======================================================================== */
 /*  BC_FREE_DIAG_T       -- Releases storage associated with bc_diag_t      */
@@ -335,41 +330,31 @@ void bc_free_cfg(bc_cfgfile_t *cfg);
 /*  BC_PRINT_MEMSPAN -- Print out all the memory span information.          */
 /* ======================================================================== */
 
-
 /* ======================================================================== */
 /*  BC_PRINT_DIAG    -- Print all the collected diagnostics attached to cfg */
 /* ======================================================================== */
 void bc_print_diag
 (
-    FILE                *RESTRICT const f, 
-    const char          *RESTRICT const fname,
-    const bc_diag_t     *RESTRICT const diag,
-    int                                 cmt 
+    printer_t       *RESTRICT const printer,
+    const char      *RESTRICT const fname,
+    const bc_diag_t *RESTRICT const diag,
+    const int                       cmt
 );
-
-/* ======================================================================== */
-/*  BC_PRINT_MACRO_T -- Print a single macro_t structure.                   */
-/* ======================================================================== */
-void bc_print_macro_t(ll_t *l_mac, void *v_f);
 
 /* ======================================================================== */
 /*  BC_PRINT_MACRO   -- Print the [macro] section                           */
 /* ======================================================================== */
-void bc_print_macro  (FILE *RESTRICT f, bc_macro_t *RESTRICT mac);
-
-/* ======================================================================== */
-/*  BC_PRINT_VAR_T   -- Print <name> = <value> tuple.                       */
-/* ======================================================================== */
-void bc_print_var_t  (ll_t *RESTRICT var, void *RESTRICT f);
+void bc_print_macro  (printer_t  *RESTRICT const printer, 
+                      bc_macro_t *RESTRICT const mac);
 
 /* ======================================================================== */
 /*  BC_PRINT_VARLIKE -- Print [var],[keys],[joystick] sections              */
 /* ======================================================================== */
 void bc_print_varlike
 (
-    FILE       *RESTRICT f, 
-    bc_var_t   *RESTRICT varlike, 
-    const char *RESTRICT sectname
+    printer_t  *RESTRICT const printer,
+    cfg_var_t  *RESTRICT const varlike,
+    const char *RESTRICT const sectname
 );
 
 /* ======================================================================== */
@@ -377,7 +362,7 @@ void bc_print_varlike
 /* ======================================================================== */
 void bc_print_memspan
 (
-    FILE                *RESTRICT const f, 
+    printer_t           *RESTRICT const printer,
     const bc_memspan_t  *RESTRICT const mem
 );
 
@@ -387,7 +372,7 @@ void bc_print_memspan
 /* ======================================================================== */
 void bc_print_cfg
 (
-    FILE                *RESTRICT const f, 
+    printer_t           *RESTRICT const printer,
     const bc_cfgfile_t  *RESTRICT const bc
 );
 
@@ -406,9 +391,9 @@ void bc_print_cfg
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ------------------------------------------------------------------------ */
 /*                 Copyright (c) 2003-+Inf, Joseph Zbiciak                  */
 /* ======================================================================== */

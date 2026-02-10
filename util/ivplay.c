@@ -24,7 +24,7 @@ int spc_do_ald(int addr, int no_block)
     int ready;
 
     ready = cr_do_read(crp, 0x80) & 0x8000;
-    if (!no_block) 
+    if (!no_block)
         while (!ready)
         {
             usleep(SLEEP_TIME);
@@ -47,7 +47,7 @@ int spc_do_fifo(int data, int no_block)
     int ready;
 
     ready = (cr_do_read(crp, 0x81) & 0x8000) == 0;
-    if (!no_block) 
+    if (!no_block)
         while (!ready)
         {
             usleep(SLEEP_TIME);
@@ -87,8 +87,8 @@ main()
     /* -------------------------------------------------------------------- */
     /*  Reset the FIFO, ready it for data.                                  */
     /* -------------------------------------------------------------------- */
-    cr_do_write(crp, 0x81, 0x400); 
-    cr_do_write(crp, 0x81, 0x400); 
+    cr_do_write(crp, 0x81, 0x400);
+    cr_do_write(crp, 0x81, 0x400);
     while (cr_do_read(crp, 0x81) & 0x8000)
         ;
     while ((cr_do_read(crp, 0x80) & 0x8000) == 0)
@@ -100,7 +100,7 @@ main()
     /*spc_do_ald(0x06, 0);  /* Mattel Electronics Presents  */
     spc_do_ald(0x02, 0);    /* (pause)                      */
 
-    
+
     /* -------------------------------------------------------------------- */
     /*  Read byte stream from stdin, and convert into decle stream.         */
     /* -------------------------------------------------------------------- */
@@ -134,7 +134,7 @@ main()
                 spc_do_ald(0x00, 0);
                 started = 1;
                 printf("\nALD\n");
-            } 
+            }
             spc_do_fifo(unpacked[i], 0);
         }
         d = 0;
@@ -166,7 +166,7 @@ main()
     while ((cr_do_read(crp, 0x80) & 0x8000) == 0)
         usleep(SLEEP_TIME);
     cr_do_reset(crp);
-    
+
     return 0;
 }
 
@@ -181,9 +181,9 @@ main()
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                 Copyright (c) 1998-2001, Joseph Zbiciak                  */
 /* ======================================================================== */

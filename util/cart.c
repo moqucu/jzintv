@@ -8,7 +8,7 @@
 #include "config.h"
 #include "cart.h"
 
-#if (!defined(linux) && !defined(WIN32)) || !defined(i386)
+#if (!defined(PLAT_LINUX) && !defined(WIN32)) || !defined(i386)
 void cr_set_disp(cart_rd_t *cr, unsigned display) { UNUSED(cr); UNUSED(display); }
 void cr_set_ctrl(cart_rd_t *cr, unsigned control) { UNUSED(cr); UNUSED(control); }
 void cr_set_data(cart_rd_t *cr, unsigned value) { UNUSED(cr); UNUSED(value); }
@@ -30,9 +30,9 @@ int cr_selftest(cart_rd_t *cr, unsigned *w, unsigned *r)
 }
 void cr_sleep(long len) { UNUSED(len); }
 void cr_do_reset(cart_rd_t *cr) { UNUSED(cr); }
-unsigned cr_do_read(cart_rd_t *cr, unsigned addr) 
-{ 
-    UNUSED(cr); UNUSED(addr); 
+unsigned cr_do_read(cart_rd_t *cr, unsigned addr)
+{
+    UNUSED(cr); UNUSED(addr);
     return 0;
 }
 void cr_do_write(cart_rd_t *cr, unsigned addr, unsigned data)
@@ -40,7 +40,7 @@ void cr_do_write(cart_rd_t *cr, unsigned addr, unsigned data)
     UNUSED(cr); UNUSED(addr); UNUSED(data);
 }
 void cr_init_ports(unsigned long base) { UNUSED(base); }
-  
+
 
 #else
 
@@ -191,7 +191,7 @@ unsigned cr_detect(unsigned port)
     cart_rd_t try;
 
     memset(&try, 0, sizeof(try));
-    
+
     if (port) i = 4;
     do
     {
@@ -251,13 +251,13 @@ int cr_selftest(cart_rd_t *cr, unsigned *w, unsigned *r)
             *w = value;
             *r = rd;
             return -1;
-        } 
+        }
         if (cr_loopback(cr, xvalue, &rd))
         {
             *w = xvalue;
             *r = rd;
             return -1;
-        } 
+        }
     }
 
     return 0;
@@ -305,7 +305,7 @@ void cr_do_reset(cart_rd_t *cr)
     cr_set_ctrl(cr, CTRL(RESET, cr->ctrl));     /* Go into RESET.           */
     cr_set_disp(cr, 0);
 
-    if (cr->reset_delay) 
+    if (cr->reset_delay)
         cr_sleep(cr->reset_delay);
 
     cr_set_ctrl(cr, CTRL(NACT,  cr->ctrl));     /* Go into NACT.            */
@@ -399,10 +399,10 @@ void cr_init_ports(unsigned long base)
                 perror("cr_init_ports: ioperm()");
                 exit(1);
             }
-            printf("> Granted access to $%.4X (%d)\n", 
+            printf("> Granted access to $%.4X (%d)\n",
                    (int)ports[i], (int)ports[i]);
         }
-    } 
+    }
 
     /* -------------------------------------------------------------------- */
     /*  Drop elevated privs if we have them.                                */
@@ -427,9 +427,9 @@ void cr_init_ports(unsigned long base)
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                 Copyright (c) 1998-2001, Joseph Zbiciak                  */
 /* ======================================================================== */

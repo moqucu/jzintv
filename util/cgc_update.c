@@ -49,8 +49,8 @@
 
 
 #define MAX_FIRMWARE (64 * 255)         /* Maximum possible image size      */
-uint_8 firmware[MAX_FIRMWARE];
-uint_8 num_blocks = 0;
+uint8_t firmware[MAX_FIRMWARE];
+uint8_t num_blocks = 0;
 
 /* ======================================================================== */
 /*  DIE             Ok, so I write too much perl                            */
@@ -68,20 +68,20 @@ LOCAL void die(const char *error)
 /* ======================================================================== */
 LOCAL void write_firmware(int fd)
 {
-    uint_8 cmd  = CMD_REWRITE;
-    uint_8 resp = -1;
+    uint8_t cmd  = CMD_REWRITE;
+    uint8_t resp = -1;
     int i, j, errsv;
     const char *error;
 
     errno = 0;
 
-    tcflush(fd, TCIOFLUSH); 
+    tcflush(fd, TCIOFLUSH);
     if (write(fd, &cmd,        1) != 1) die("Error writing command byte");
-    tcflush(fd, TCIOFLUSH); 
+    tcflush(fd, TCIOFLUSH);
     if (write(fd, &num_blocks, 1) != 1) die("Error writing number of blocks");
-    tcflush(fd, TCIOFLUSH); 
+    tcflush(fd, TCIOFLUSH);
     if (read (fd, &resp,       1) != 1) die("Error reading number of blocks");
-    
+
     if (resp != num_blocks)
     {
         errsv = errno;
@@ -89,22 +89,22 @@ LOCAL void write_firmware(int fd)
         errno = errsv;
         die("Error during number-of-blocks handshake");
     }
-    
+
     for (i = 0; i < num_blocks; i++)
     {
-        printf("\rSending block %d of %d...", i+1, num_blocks); 
+        printf("\rSending block %d of %d...", i+1, num_blocks);
         fflush(stdout);
 
         /* Send a byte at a time for paranoia's sake. */
         for (j = 0; j < 64; j++)
         {
-            tcflush(fd, TCIOFLUSH); 
+            tcflush(fd, TCIOFLUSH);
             if (write(fd, firmware + 64*i+j, 1) != 1 || tcflush(fd, TCOFLUSH))
                 die("Error sending block");
         }
 
-        tcflush(fd, TCIOFLUSH); 
-        if (read(fd, &resp, 1) != 1 || tcflush(fd, TCIFLUSH)) 
+        tcflush(fd, TCIOFLUSH);
+        if (read(fd, &resp, 1) != 1 || tcflush(fd, TCIFLUSH))
             die("Error reading block handshake byte");
 
         switch (resp)
@@ -167,7 +167,7 @@ LOCAL int open_cgc(const char *cgc_dev)
 {
     int fd, i;
     struct termios tio;
-    char o_byte, i_byte;
+    char o_byte, i_byte = 0;
 
     /* -------------------------------------------------------------------- */
     /*  Establish descriptor to the device node.                            */
@@ -218,8 +218,8 @@ LOCAL int open_cgc(const char *cgc_dev)
     for (i = 0; i < 10; i++)
     {
         tcflush(fd, TCIOFLUSH);
-        write(fd, &o_byte, 1);
-        if (read(fd, &i_byte, 1) != 1)
+        if (write(fd, &o_byte, 1) != 1 ||
+            read (fd, &i_byte, 1) != 1)
         {
             fprintf(stderr, "Could not synchronize with CGC %s\n", cgc_dev);
             return -1;
@@ -227,7 +227,7 @@ LOCAL int open_cgc(const char *cgc_dev)
     }
     if (i_byte != 0x52)
     {
-        fprintf(stderr, "Unexpected sync byte %.2X synchronizing with %s\n", 
+        fprintf(stderr, "Unexpected sync byte %.2X synchronizing with %s\n",
                 0xFF & i_byte, cgc_dev);
         return -1;
     }
@@ -274,9 +274,9 @@ int main(void)
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                 Copyright (c) 2004-+Inf, Joseph Zbiciak                  */
 /* ======================================================================== */

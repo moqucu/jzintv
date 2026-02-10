@@ -2,20 +2,6 @@
 /*  DIS-1600  Advanced(?) CP-1600 Disassembler.                             */
 /*  By Joseph Zbiciak                                                       */
 /* ------------------------------------------------------------------------ */
-/*  This program is free software; you can redistribute it and/or modify    */
-/*  it under the terms of the GNU General Public License as published by    */
-/*  the Free Software Foundation; either version 2 of the License, or       */
-/*  (at your option) any later version.                                     */
-/*                                                                          */
-/*  This program is distributed in the hope that it will be useful,         */
-/*  but WITHOUT ANY WARRANTY; without even the implied warranty of          */
-/*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
-/*  General Public License for more details.                                */
-/*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
-/* ------------------------------------------------------------------------ */
 /*                   Copyright (c) 2006, Joseph Zbiciak                     */
 /* ======================================================================== */
 
@@ -40,7 +26,7 @@ const char *mnemonic[] =
             "MVOI", "MVII", "ADDI", "SUBI", "CMPI", "ANDI", "XORI",
             "MVO@", "MVI@", "ADD@", "SUB@", "CMP@", "AND@", "XOR@",
                     "MOVR", "ADDR", "SUBR", "CMPR", "ANDR", "XORR",
-            "INCR", "DECR", "COMR", "NEGR", "ADCR",         "RSWD", 
+            "INCR", "DECR", "COMR", "NEGR", "ADCR",         "RSWD",
     "NOP",  "SIN",  "GSWD",
 
     "PSHR", "PULR", "CLRR", "TSTR",
@@ -69,7 +55,7 @@ mnm_t mnm_reg_2op[8] =
     M_err,  M_err,  M_MOVR, M_ADDR, M_SUBR, M_CMPR, M_ANDR, M_XORR
 };
 
-mnm_t mnm_rot_1op[8] = 
+mnm_t mnm_rot_1op[8] =
 {
     M_SWAP, M_SLL,  M_RLC,  M_SLLC, M_SLR,  M_SAR,  M_RRC,  M_SARC
 };
@@ -81,23 +67,23 @@ mnm_t mnm_reg_1op[8] =
 
 mnm_t mnm_cond_br[16] =
 {
-    M_B,    M_BC,   M_BOV,  M_BPL,  M_BEQ,  M_BLT,  M_BLE,  M_BUSC, 
+    M_B,    M_BC,   M_BOV,  M_BPL,  M_BEQ,  M_BLT,  M_BLE,  M_BUSC,
     M_NOPP, M_BNC,  M_BNOV, M_BMI,  M_BNEQ, M_BGE,  M_BGT,  M_BESC
 };
 
 mnm_t mnm_impl_1op_a[4] = { M_HLT,  M_SDBD, M_EIS,  M_DIS  };
 mnm_t mnm_impl_1op_b[4] = { M_err,  M_TCI,  M_CLRC, M_SETC };
 
-mnm_t mnm_jsr[8] = 
+mnm_t mnm_jsr[8] =
 {
-    M_JSR,  M_JSRE, M_JSRD, M_err,  M_J,    M_JE,   M_JD,   M_err 
+    M_JSR,  M_JSRE, M_JSRD, M_err,  M_J,    M_JE,   M_JD,   M_err
 };
 
 
 /* ======================================================================== */
 /*  INSTRUCTION PRINTER TABLE (forward references)                          */
 /* ======================================================================== */
-ins_prt_t instr_printer[] =
+ins_prt_t *const instr_printer[] =
 {
 /*  "err!"  */
     prt_err,
@@ -138,7 +124,7 @@ ins_prt_t instr_printer[] =
     prt_dcl, prt_bid,    prt_str,
 
 /*  "SKIP"                                                          */
-    prt_imp 
+    prt_imp
 };
 
 
@@ -173,7 +159,7 @@ struct defsym_t defsym[] =
     { ".PSG0.rgt_hand",         0x01FE,     1,          1   },
     { ".PSG0.lft_hand",         0x01FF,     1,          1   },
 
-                                                   
+
     { ".PSG1.chn_a_lo",         0x00F0,     1,          1   },
     { ".PSG1.chn_b_lo",         0x00F1,     1,          1   },
     { ".PSG1.chn_c_lo",         0x00F2,     1,          1   },
@@ -190,7 +176,7 @@ struct defsym_t defsym[] =
     { ".PSG1.chn_c_vol",        0x00FD,     1,          1   },
     { ".PSG1.rgt_hand",         0x00FE,     1,          1   },
     { ".PSG1.lft_hand",         0x00FF,     1,          1   },
-                                                   
+
     { ".ISRVEC",                0x0100,     2,          1   },
   /*{ ".RAM",                   0x0100,     0x00F0,     2   },*/ /* annoying */
     { ".BTAB",                  0x0200,     0x00F0,     2   },
@@ -209,9 +195,9 @@ struct defsym_t defsym[] =
     { ".STIC.HDLY",             0x0030,     1,          1   },
     { ".STIC.VDLY",             0x0031,     1,          1   },
     { ".STIC.EDGE",             0x0032,     1,          1   },
-                                                            
+
     { ".HEADER",                0x5000,     1,          1   },
-                                                           
+
     { ".ISRRET",                0x1014,     1,          1   },
     { ".EXEC",                  0x1000,     0x1000,     3   },
 
@@ -223,17 +209,17 @@ struct defsym_t defsym[] =
 
     { ".ECSCBL.POLL",           0xCF01,     1,          1   },
     { ".ECSCBL",                0xCF00,     0x100,      2   },
-                                                   
+
     { NULL,                     0,          0,          0   }
-};                                                         
+};
 
 
 /* ======================================================================== */
 /*  MAYBE_DEFSYM     -- Helper:  Define a symbol if it's not def'd yet      */
 /* ======================================================================== */
-void maybe_defsym(const char *sym, uint_32 addr)
+void maybe_defsym(const char *sym, uint32_t addr)
 {
-    uint_32 unused;
+    uint32_t unused;
 
     addr <<= 3;
 
@@ -253,7 +239,8 @@ void setup_defsym(void)
 {
     int i, j;
     int addr;
-    char symbuf[256];
+    char *symbuf = NULL;
+    size_t symbuf_sz = 0;
     const char *sym;
 
     for (i = 0; defsym[i].name; i++)
@@ -265,13 +252,29 @@ void setup_defsym(void)
             sym = defsym[i].name;
             if (defsym[i].len > 1)
             {
-                snprintf(symbuf, sizeof(symbuf),
-                        "%s.%.*X", defsym[i].name, defsym[i].width, j);
+                size_t symlen = strlen(defsym[i].name) + defsym[i].width + 2;
+                if (symlen > symbuf_sz)
+                {
+                    symbuf_sz = symlen * 2;
+                    symbuf = (char *)realloc(symbuf, symlen * 2);
+                    if (!symbuf)
+                    {
+                        fprintf(stderr, "Out of memory in setup_defsym()\n");
+                        exit(1);
+                    }
+                }
+                snprintf(symbuf, symbuf_sz, 
+                         "%s.%.*X", defsym[i].name, defsym[i].width, j);
                 sym = symbuf;
             }
 
             maybe_defsym(sym, addr);
         }
+    }
+
+    if (symbuf)
+    {
+        free(symbuf);
     }
 }
 
@@ -307,13 +310,37 @@ int debug_show_instr_flags        = 0;
 int no_default_symbols            = 0;
 int no_exec_routine_symbols       = 0;
 int forced_entry_points           = 0;
+int forced_data_ranges            = 0;
+int generic_labels                = 0;
 
-uint_32 entry_point[MAX_ENTRY];
+uint32_t entry_point  [MAX_ENTRY];
+uint32_t data_range_lo[MAX_ENTRY];
+uint32_t data_range_hi[MAX_ENTRY];
+uint32_t generic_label[MAX_ENTRY];
+
+/* ======================================================================== */
+/*  REMOVE_SDBD           -- Remove the SDBD from an instruction.           */
+/* ======================================================================== */
+LOCAL int remove_sdbd(uint32_t addr)
+{
+    if (!(instr[addr].flags & FLAG_SDBD))
+        return 0;
+
+    if ((instr[addr].flags & FLAG_SDBD) && instr[addr].len == 3)
+    {
+        instr[addr].len = 2;
+        instr[addr].op1.op &= 0xFF;
+        instr[addr].flags &= ~FLAG_SDBD;
+        return 1;
+    }
+
+    return 0;
+}
 
 /* ======================================================================== */
 /*  ADD_COMMENT  -- Add / replace comment on an instruction                 */
 /* ======================================================================== */
-int add_comment(uint_32 addr, const char *cmt)
+int add_comment(uint32_t addr, const char *cmt)
 {
     instr[addr].cmt = cmt;
     return 0;
@@ -322,25 +349,28 @@ int add_comment(uint_32 addr, const char *cmt)
 /* ======================================================================== */
 /*  MARK_INVALID -- Mark an address as invalid.                             */
 /* ======================================================================== */
-int mark_invalid(uint_32 addr)
+int mark_invalid(uint32_t addr)
 {
-    int changed;
+    int changed = 0;
 
     if (instr[addr].flags & FLAG_FORCED)
         return 0;
-    
+
     changed = (instr[addr].flags & FLAG_INVOP) == 0;
     instr[addr].flags |= FLAG_INVOP;
     instr[addr].flags &= ~MASK_CODE;
+
+    changed += remove_sdbd((addr + 1) & 0xFFFF);
+
     return changed;
 }
 
 /* ======================================================================== */
 /*  MARK_VALID -- Mark an address as valid, w/ optional add'l flags.        */
 /* ======================================================================== */
-int mark_valid(uint_32 addr, uint_32 flags)
+int mark_valid(uint32_t addr, uint32_t flags)
 {
-    uint_32 old_flags = instr[addr].flags;
+    uint32_t old_flags = instr[addr].flags;
     instr[addr].flags &= MASK_CODE;
     instr[addr].flags |= flags;
     return old_flags != instr[addr].flags;
@@ -349,14 +379,14 @@ int mark_valid(uint_32 addr, uint_32 flags)
 /* ======================================================================== */
 /*  MARK_INTERP -- Mark address range as interpreted, w/ opt flags & cmts.  */
 /* ======================================================================== */
-int mark_interp(uint_32 addr, uint_32 flags, int len, const char *cmt)
+int mark_interp(uint32_t addr, uint32_t flags, int len, const char *cmt)
 {
     int i;
     int changed = 0;
 
     for (i = 0; i < len; i++)
     {
-        uint_32 old_flags = instr[addr + i].flags;
+        uint32_t old_flags = instr[addr + i].flags;
 
         if (flags & MASK_DATA)
             instr[addr + 1].flags &= ~MASK_DATA;
@@ -393,12 +423,12 @@ int mark_string(int addr)
 
     while (!IS_EMPTY(addr) && (instr[addr].flags & FLAG_CODE) == 0)
     {
-        uint_32 old_flags = instr[addr].flags;
+        uint32_t old_flags = instr[addr].flags;
 
         if (GET_WORD(addr) == 0)
             break;
 
-        instr[addr].flags = (old_flags & ~(MASK_CODE|MASK_DATA|FLAG_INTERP)) 
+        instr[addr].flags = (old_flags & ~(MASK_CODE|MASK_DATA|FLAG_INTERP))
                             | FLAG_INVOP | FLAG_STRING;
 
         changes += old_flags != instr[addr].flags;
@@ -421,7 +451,7 @@ int mark_branch_target(int target, int target_of)
 
     if (!instr[target].target_of)
     {
-        instr[target].target_of = calloc(4, sizeof(int));
+        instr[target].target_of = (int *)calloc(4, sizeof(int));
         instr[target].tg_of_max = 4;
         instr[target].tg_of_cnt = 0;
     }
@@ -433,7 +463,7 @@ int mark_branch_target(int target, int target_of)
     if (i >= instr[target].tg_of_max)
     {
         instr[target].tg_of_max <<= 1;
-        instr[target].target_of = realloc(instr[target].target_of, 
+        instr[target].target_of = (int *)realloc(instr[target].target_of,
                                           instr[target].tg_of_max*sizeof(int));
     }
 
@@ -443,18 +473,17 @@ int mark_branch_target(int target, int target_of)
     return 1;
 }
 
-
 /* ======================================================================== */
 /*  ADD_ENTRY_POINT -- List a location as a ROM entry point.                */
 /* ======================================================================== */
-int add_entry_point(uint_32 addr)
+int add_entry_point(uint32_t addr)
 {
     int i;
 
     for (i = 0; i < forced_entry_points; i++)
         if (entry_point[i] == addr)
             return 0;
-    
+
     if (forced_entry_points == MAX_ENTRY)
     {
         fprintf(stderr, "Too many entry points (max %d)\n", MAX_ENTRY);
@@ -468,14 +497,60 @@ int add_entry_point(uint_32 addr)
 }
 
 /* ======================================================================== */
+/*  ADD_DATA_RANGE  -- List range of locations as data.                     */
+/* ======================================================================== */
+LOCAL int add_data_range(uint32_t addr_lo, uint32_t addr_hi)
+{
+    if (addr_lo > 0xFFFF)
+        return 0;
+
+    if (addr_hi > 0xFFFF)
+        addr_hi = addr_lo;
+
+    if (forced_data_ranges == MAX_ENTRY)
+    {
+        fprintf(stderr, "Too many data ranges (max %d)\n", MAX_ENTRY);
+        exit(1);
+    }
+
+    if ( addr_lo > addr_hi )
+    {
+        uint32_t t = addr_lo; addr_lo = addr_hi; addr_hi = t;
+    }
+
+    data_range_lo[forced_data_ranges  ] = addr_lo;
+    data_range_hi[forced_data_ranges++] = addr_hi;
+
+    VB_PRINTF(0, ("Added $%.4X - $%.4X as a data_range\n", addr_lo, addr_hi));
+    return 1;
+}
+
+/* ======================================================================== */
+/*  ADD_GENERIC_LABEL                                                       */
+/* ======================================================================== */
+LOCAL int add_generic_label(uint32_t addr)
+{
+    if (generic_labels == MAX_ENTRY)
+    {
+        fprintf(stderr, "Too many generic labels (max %d)\n", MAX_ENTRY);
+        exit(1);
+    }
+
+    generic_label[generic_labels++] = addr;
+
+    VB_PRINTF(0, ("Added generic label at $%.4X\n", addr));
+    return 1;
+}
+
+/* ======================================================================== */
 /*  DIS_JUMP -- decode J/JE/JD/JSR/JSRE/JSRD                                */
 /* ======================================================================== */
-LOCAL void dis_jump      (uint_32 addr)
+LOCAL void dis_jump      (uint32_t addr)
 {
-    uint_16 w0, w1, w2;
-    uint_16 btarg;
-    int     ret_reg;
-    int     int_mode;
+    uint16_t w0, w1, w2;
+    uint16_t btarg;
+    int      ret_reg;
+    int      int_mode;
 
     /* -------------------------------------------------------------------- */
     /*  Make sure all three words are in implemented memory and are 10-bit. */
@@ -485,13 +560,15 @@ LOCAL void dis_jump      (uint_32 addr)
         mark_invalid(addr);
         return;
     }
-        
+
     /* -------------------------------------------------------------------- */
     /*  Get all three words of the jump instruction.                        */
     /* -------------------------------------------------------------------- */
     w0 = GET_WORD(addr);
     w1 = GET_WORD(addr + 1);
     w2 = GET_WORD(addr + 2);
+
+    assert(w0 == 0x0004);
 
     /* -------------------------------------------------------------------- */
     /*  Decode "interrupt mode".  This is in bits 0 and 1 of word 2.        */
@@ -553,9 +630,9 @@ LOCAL void dis_jump      (uint_32 addr)
 /* ======================================================================== */
 /*  DIS_IMPL_1OP_A -- decode HLT/SDBD/EIS/DIS                               */
 /* ======================================================================== */
-LOCAL void dis_impl_1op_a(uint_32 addr)
+LOCAL void dis_impl_1op_a(uint32_t addr)
 {
-    uint_32 w0, w1;
+    uint32_t w0, w1;
 
     /* -------------------------------------------------------------------- */
     /*  Make sure it's a valid opcode.                                      */
@@ -610,9 +687,9 @@ LOCAL void dis_impl_1op_a(uint_32 addr)
 /* ======================================================================== */
 /*  DIS_IMPL_1OP_B -- decode TCI/CLRC/SETC                                  */
 /* ======================================================================== */
-LOCAL void dis_impl_1op_b(uint_32 addr)
+LOCAL void dis_impl_1op_b(uint32_t addr)
 {
-    uint_32 w0;
+    uint32_t w0;
 
     /* -------------------------------------------------------------------- */
     /*  Nuke invalid ops, and TCI if we're treating rare ops as invalid.    */
@@ -634,9 +711,9 @@ LOCAL void dis_impl_1op_b(uint_32 addr)
 /* ======================================================================== */
 /*  DIS_NOP_SIN -- Decode NOP and SIN instructions.                         */
 /* ======================================================================== */
-LOCAL void dis_nop_sin   (uint_32 addr)
+LOCAL void dis_nop_sin   (uint32_t addr)
 {
-    uint_32 w0;
+    uint32_t w0;
 
     /* -------------------------------------------------------------------- */
     /*  If LSB != 0, treat it as invalid opcode no matter what.  Also, if   */
@@ -661,7 +738,7 @@ LOCAL void dis_nop_sin   (uint_32 addr)
 /* ======================================================================== */
 /*  DIS_GSWD    -- Decode Get Status WorD instructions.                     */
 /* ======================================================================== */
-LOCAL void dis_gwsd      (uint_32 addr)
+LOCAL void dis_gwsd      (uint32_t addr)
 {
     /* -------------------------------------------------------------------- */
     /*  Dirt simple.  One mnemonic.  Bits 0..1 are the destination.         */
@@ -676,9 +753,9 @@ LOCAL void dis_gwsd      (uint_32 addr)
 /* ======================================================================== */
 /*  DIS_REG_1OP -- Decode single-operand register instructions.             */
 /* ======================================================================== */
-LOCAL void dis_reg_1op   (uint_32 addr)
+LOCAL void dis_reg_1op   (uint32_t addr)
 {
-    uint_32 w0, op, dst;
+    uint32_t w0, op, dst;
 
     /* -------------------------------------------------------------------- */
     /*  Bits 0..2 are the destination (R0..R7).  Bits 3..5 are the opcode.  */
@@ -710,9 +787,9 @@ LOCAL void dis_reg_1op   (uint_32 addr)
 /* ======================================================================== */
 /*  DIS_ROT_1OP -- Decode rotates and shifts.                               */
 /* ======================================================================== */
-LOCAL void dis_rot_1op   (uint_32 addr)
+LOCAL void dis_rot_1op   (uint32_t addr)
 {
-    uint_32 w0, op, reg, amt; 
+    uint32_t w0, op, reg, amt;
 
     /* -------------------------------------------------------------------- */
     /*  Bits 0..1 are the destination (R0 thru R3).  Bit 2 determines       */
@@ -743,11 +820,11 @@ LOCAL void dis_rot_1op   (uint_32 addr)
 /* ======================================================================== */
 /*  DIS_REG_2OP -- Decode MOVR/ADDR/SUBR/CMPR/ANDR/XORR.                    */
 /* ======================================================================== */
-LOCAL void dis_reg_2op   (uint_32 addr)
+LOCAL void dis_reg_2op   (uint32_t addr)
 {
-    uint_32 w0, src, dst, op;
+    uint32_t w0, src, dst, op;
     mnm_t m;
-    
+
     /* -------------------------------------------------------------------- */
     /*  Bits 0..2 are the source, bits 3..5 are the dest, and bits 6..8     */
     /*  are the opcode.                                                     */
@@ -770,7 +847,7 @@ LOCAL void dis_reg_2op   (uint_32 addr)
     /*  Build the instruction.                                              */
     /* -------------------------------------------------------------------- */
     instr[addr].mnemonic  = m = mnm_reg_2op[op];
-    
+
     instr[addr].op1.type  = OP_REG;
     instr[addr].op1.op    = src;
     instr[addr].op1.flags = OPF_SRC;
@@ -792,9 +869,9 @@ LOCAL void dis_reg_2op   (uint_32 addr)
 /* ======================================================================== */
 /*  DIS_COND_BR -- Decode all "internal" conditional branches, and NOPP.    */
 /* ======================================================================== */
-LOCAL void dis_cond_br   (uint_32 addr)
+LOCAL void dis_cond_br   (uint32_t addr)
 {
-    uint_32 w0, cnd, ofs, dir, trg;
+    uint32_t w0, cnd, ofs, dir, trg;
 
     /* -------------------------------------------------------------------- */
     /*  Make sure target word is in implemented memory.                     */
@@ -854,7 +931,7 @@ LOCAL void dis_cond_br   (uint_32 addr)
     /*  Build the instruction.                                              */
     /* -------------------------------------------------------------------- */
     instr[addr].mnemonic      = mnm_cond_br[cnd];
-    
+
     if (cnd != 0x8)
     {
         instr[addr].op1.type  = OP_BRTRG;
@@ -877,9 +954,9 @@ LOCAL void dis_cond_br   (uint_32 addr)
 /* ======================================================================== */
 /*  DIS_BEXT    -- Decode external-condition branches.                      */
 /* ======================================================================== */
-LOCAL void dis_bext      (uint_32 addr)
+LOCAL void dis_bext      (uint32_t addr)
 {
-    uint_32 w0, cnd, ofs, dir, trg;
+    uint32_t w0, cnd, ofs, dir, trg;
 
     /* -------------------------------------------------------------------- */
     /*  Treat BEXT as 'rare' opcode, since it shouldn't appear in any       */
@@ -925,7 +1002,7 @@ LOCAL void dis_bext      (uint_32 addr)
     /*  Build the instruction.                                              */
     /* -------------------------------------------------------------------- */
     instr[addr].mnemonic  = M_BEXT;
-    
+
     instr[addr].op1.type  = OP_IMMED;
     instr[addr].op1.op    = cnd;
     instr[addr].op1.flags = OPF_SRC;
@@ -943,11 +1020,11 @@ LOCAL void dis_bext      (uint_32 addr)
 /* ======================================================================== */
 /*  DIS_IMM_2OP -- Decode immediate mode instructions                       */
 /* ======================================================================== */
-LOCAL void dis_imm_2op   (uint_32 addr)
+LOCAL void dis_imm_2op   (uint32_t addr)
 {
-    uint_32 w0, w1, w2, op, dst, imm;
-    mnm_t   m;
-    int     is_sdbd = 0;
+    uint32_t w0, w1, w2, op, dst, imm;
+    mnm_t    m;
+    int      is_sdbd = 0;
 
     /* -------------------------------------------------------------------- */
     /*  Destination is in bits 0..2.  Opcode is in bits 6..8.               */
@@ -1011,13 +1088,13 @@ LOCAL void dis_imm_2op   (uint_32 addr)
     /* -------------------------------------------------------------------- */
     instr[addr].mnemonic = m = mnm_imm_2op[op];
     instr[addr].len = 2 + is_sdbd;
-    
+
     if (m == M_MVOI)
     {
         instr[addr].op1.type  = OP_REG;
         instr[addr].op1.op    = dst;
         instr[addr].op1.flags = OPF_SRC;
-    
+
         instr[addr].op2.type  = OP_IMMED;
         instr[addr].op2.op    = imm;
         instr[addr].op2.flags = OPF_DST;
@@ -1026,7 +1103,7 @@ LOCAL void dis_imm_2op   (uint_32 addr)
         instr[addr].op1.type  = OP_IMMED;
         instr[addr].op1.op    = imm;
         instr[addr].op1.flags = OPF_SRC;
-    
+
         instr[addr].op2.type  = OP_REG;
         instr[addr].op2.op    = dst;
         instr[addr].op2.flags = m == M_MVII ? OPF_DST :
@@ -1037,10 +1114,10 @@ LOCAL void dis_imm_2op   (uint_32 addr)
 /* ======================================================================== */
 /*  DIS_DIR_2OP -- Decode direct mode instructions                          */
 /* ======================================================================== */
-LOCAL void dis_dir_2op   (uint_32 addr)
+LOCAL void dis_dir_2op   (uint32_t addr)
 {
-    uint_32 w0, w1, op, dst;
-    mnm_t   m;
+    uint32_t w0, w1, op, dst;
+    mnm_t    m;
 
     /* -------------------------------------------------------------------- */
     /*  Destination is in bits 0..2.  Opcode is in bits 6..8.               */
@@ -1071,13 +1148,13 @@ LOCAL void dis_dir_2op   (uint_32 addr)
     /* -------------------------------------------------------------------- */
     instr[addr].mnemonic = m = mnm_dir_2op[op];
     instr[addr].len = 2;
-    
+
     if (m == M_MVO)  /* MVO */
     {
         instr[addr].op1.type  = OP_REG;
         instr[addr].op1.op    = dst;
         instr[addr].op1.flags = OPF_SRC;
-    
+
         instr[addr].op2.type  = OP_DIRADDR;
         instr[addr].op2.op    = w1;
         instr[addr].op2.flags = OPF_DST | OPF_ADDR;
@@ -1086,7 +1163,7 @@ LOCAL void dis_dir_2op   (uint_32 addr)
         instr[addr].op1.type  = OP_DIRADDR;
         instr[addr].op1.op    = w1;
         instr[addr].op1.flags = OPF_SRC | OPF_ADDR;
-    
+
         instr[addr].op2.type  = OP_REG;
         instr[addr].op2.op    = dst;
         instr[addr].op2.flags = m == M_MVI ? OPF_DST :
@@ -1097,10 +1174,10 @@ LOCAL void dis_dir_2op   (uint_32 addr)
 /* ======================================================================== */
 /*  DIS_IND_2OP -- Decode indirect mode instructions                        */
 /* ======================================================================== */
-LOCAL void dis_ind_2op   (uint_32 addr)
+LOCAL void dis_ind_2op   (uint32_t addr)
 {
-    uint_32 w0, op, op1, op2;
-    mnm_t   m;
+    uint32_t w0, op, op1, op2;
+    mnm_t    m;
 
     /* -------------------------------------------------------------------- */
     /*  Destination is in bits 0..2.  Source is in bits 3..5.  Opcode is    */
@@ -1137,7 +1214,7 @@ LOCAL void dis_ind_2op   (uint_32 addr)
     /* -------------------------------------------------------------------- */
     instr[addr].mnemonic = m = mnm_ind_2op[op];
     instr[addr].len = 1;
-    
+
     if (m == M_MVO_)
     {
         instr[addr].op1.type  = OP_REG;
@@ -1155,13 +1232,13 @@ LOCAL void dis_ind_2op   (uint_32 addr)
         instr[addr].op1.type  = OP_REG;
         instr[addr].op1.op    = op1;
         instr[addr].op1.flags = OPF_SRC | OPF_IND;
-    
+
         instr[addr].op2.type  = OP_REG;
         instr[addr].op2.op    = op2;
         instr[addr].op2.flags = m == M_MVI_ ? OPF_DST :
                                 m == M_CMP_ ? OPF_SRC : OPF_SRCDST;
 
-        if (op1 == 6)
+        if (op1 == 6 && m == M_MVI_)
             instr[addr].mnemonic = m = M_PULR;
     }
 }
@@ -1171,10 +1248,10 @@ LOCAL void dis_ind_2op   (uint_32 addr)
 /*                     invalid instructions as such.  If enabled, mark      */
 /*                     "rare" instructions illegal too.                     */
 /* ======================================================================== */
-LOCAL void decode_instrs(uint_32 addr_lo, uint_32 addr_hi)
+LOCAL void decode_instrs(uint32_t addr_lo, uint32_t addr_hi)
 {
-    uint_32 addr, w0;
-    
+    uint32_t addr, w0;
+
     /* -------------------------------------------------------------------- */
     /*  Step by single addresses within range.  Although some instructions  */
     /*  are multi-word, we don't know where instruction boundaries are yet. */
@@ -1245,8 +1322,6 @@ LOCAL void decode_instrs(uint_32 addr_lo, uint_32 addr_hi)
     }
 }
 
-
-
 /* ======================================================================== */
 /*  FIND_FUNKY_BRANCHES() -- Look for arithmetic on R7 and convert these    */
 /*                           instructions to branches, *or* treat them as   */
@@ -1254,7 +1329,7 @@ LOCAL void decode_instrs(uint_32 addr_lo, uint_32 addr_hi)
 /* ======================================================================== */
 LOCAL int find_funky_branches(void)
 {
-    uint_32 addr;
+    uint32_t addr;
     int changed = 0;
 
     /* -------------------------------------------------------------------- */
@@ -1286,13 +1361,13 @@ LOCAL int find_funky_branches(void)
                 /* -------------------------------------------------------- */
                 /*  ADCR looks like a short forward conditional branch.     */
                 /* -------------------------------------------------------- */
-                case M_ADCR: 
+                case M_ADCR:
                 {
                     instr[addr].br_target = addr + 2;
                     instr[addr].flags    |= FLAG_BRANCH | FLAG_CONDBR;
                     break;
                 }
-                    
+
                 /* -------------------------------------------------------- */
                 /*  INCR/DECR are unconditional branches.                   */
                 /* -------------------------------------------------------- */
@@ -1343,7 +1418,7 @@ LOCAL int find_funky_branches(void)
                 }
                 default:        /* Uhoh?! */
                 {
-                    fprintf(stderr, 
+                    fprintf(stderr,
                             "Instruction '%s' at $%.4X sets op1 as dst R7\n",
                             mnemonic[instr[addr].mnemonic], addr);
                     break;
@@ -1352,7 +1427,7 @@ LOCAL int find_funky_branches(void)
 
             continue;
         }
-                    
+
         /* ---------------------------------------------------------------- */
         /*  Check the second operand.                                       */
         /* ---------------------------------------------------------------- */
@@ -1388,8 +1463,8 @@ LOCAL int find_funky_branches(void)
                 case M_ADDI:
                 case M_SUBI:
                 {
-                    uint_32 targ;
-                    
+                    uint32_t targ;
+
                     if (instr[addr].mnemonic == M_ADDI)
                     {
                         targ = addr + instr[addr].len + instr[addr].op1.op;
@@ -1415,14 +1490,14 @@ LOCAL int find_funky_branches(void)
                 case M_ANDI:
                 case M_XORI:
                 {
-                    uint_32 targ;
+                    uint32_t targ;
 
                     if (suspicious_pc_math_is_invalid)
                     {
                         changed += mark_invalid(addr);
                         break;
                     }
-                    
+
                     if (instr[addr].mnemonic == M_ANDI)
                     {
                         targ = (addr + instr[addr].len) & instr[addr].op1.op;
@@ -1440,7 +1515,7 @@ LOCAL int find_funky_branches(void)
                 /* -------------------------------------------------------- */
                 /*  These are fairly common.                                */
                 /* -------------------------------------------------------- */
-                case M_PULR: case M_MVI:  case M_MVI_: 
+                case M_PULR: case M_MVI:  case M_MVI_:
                 {
                     instr[addr].br_target = BTARG_UNK;
                     instr[addr].flags    |= FLAG_BRANCH;
@@ -1492,7 +1567,7 @@ LOCAL int find_funky_branches(void)
                 case M_MVO_: case M_CMP_:
                 case M_MVOI: case M_CMPI:
                 {
-                    fprintf(stderr, 
+                    fprintf(stderr,
                             "WARNING: '%s' at $%.4x appears to write R7?\n",
                             mnemonic[instr[addr].mnemonic], addr);
                     break;
@@ -1524,8 +1599,8 @@ LOCAL int find_funky_branches(void)
 
 /* ======================================================================== */
 /*  MARK_ARGS_INVALID -- Mark arguments to instructions as invalid.  This   */
-/*                      allows us to catch branches into the middle of      */
-/*                      instructions, and so on.                            */
+/*                       allows us to catch branches into the middle of     */
+/*                       instructions, and so on.                           */
 /* ======================================================================== */
 LOCAL int mark_args_invalid(void)
 {
@@ -1563,6 +1638,32 @@ LOCAL int mark_forced_entry(void)
 
         changed += mark_valid(addr, FLAG_BRTRG | FLAG_CODE | FLAG_FORCED);
         changed += mark_branch_target(addr, 0x10000);
+    }
+
+    return changed;
+}
+
+/* ======================================================================== */
+/*  MARK_FORCED_DATA  -- Mark forced data ranges as data, not code          */
+/* ======================================================================== */
+LOCAL int mark_forced_data(void)
+{
+    int i;
+    int changed = 0;
+    uint32_t addr;
+
+    for (i = 0; i < forced_data_ranges; i++)
+    {
+        uint32_t addr_lo = data_range_lo[i];
+        uint32_t addr_hi = data_range_hi[i] + 1;
+
+        for ( addr = addr_lo ; addr != addr_hi ; addr++ )
+        {
+            if (IS_EMPTY(addr) || IS_BRTRG(addr))
+                continue;
+
+            changed += mark_invalid(addr);
+        }
     }
 
     return changed;
@@ -1677,7 +1778,7 @@ LOCAL int propagate_invop_old(void)
         {
 
             /* len 1 branches are "INCR PC", "DECR PC", etc. */
-            if (MAYBE_CODE(addr) && 
+            if (MAYBE_CODE(addr) &&
                 IS_BRANCH (addr) &&
                 instr[addr].len == 1)
             {
@@ -1686,8 +1787,8 @@ LOCAL int propagate_invop_old(void)
             }
 
             /* len 2 branches are "B", "Bcond", and some PC arith. */
-            if (MAYBE_CODE(addr - 1) && 
-                IS_BRANCH (addr - 1) && 
+            if (MAYBE_CODE(addr - 1) &&
+                IS_BRANCH (addr - 1) &&
                 !IS_CONDBR(addr - 1) &&
                 instr[addr - 1].len == 2)
             {
@@ -1696,7 +1797,7 @@ LOCAL int propagate_invop_old(void)
             }
 
             /* len 3 branches are J/JSR, and some PC arith.  */
-            if (MAYBE_CODE(addr - 2) && 
+            if (MAYBE_CODE(addr - 2) &&
                 IS_BRANCH (addr - 2) &&
                 instr[addr - 2].len == 3)
             {
@@ -1723,9 +1824,9 @@ LOCAL int propagate_invop_old(void)
 /* ======================================================================== */
 LOCAL int kill_bad_branches(void)
 {
-    uint_32 addr, targ;
+    uint32_t addr, targ;
     int changed = 0;
-    
+
     /* -------------------------------------------------------------------- */
     /*  Scan the target-of arrays, removing bad targeting.                  */
     /* -------------------------------------------------------------------- */
@@ -1738,7 +1839,7 @@ LOCAL int kill_bad_branches(void)
 
         if (!instr[addr].target_of)
         {
-            fprintf(stderr, 
+            fprintf(stderr,
                     "WARNING: $%.4X marked as BRTRG, but has no target_of\n",
                     addr);
             continue;
@@ -1817,9 +1918,9 @@ LOCAL int kill_bad_branches(void)
         if (NOT_CODE(addr))
             continue;
 
-        if (IS_BRANCH(addr) 
+        if (IS_BRANCH(addr)
             && (targ = instr[addr].br_target) <= 0xFFFF
-            && IS_EMPTY(targ) 
+            && IS_EMPTY(targ)
             && (targ != 0xCF01)) /* hack for ECScable */
         {
             if ((!allow_global_branches && (targ < 0x1000||targ >= 0x2000)) ||
@@ -1843,7 +1944,7 @@ LOCAL int kill_bad_branches(void)
 /* ======================================================================== */
 LOCAL int brtrg_vs_sdbd(void)
 {
-    uint_32 addr, targ;
+    uint32_t addr, targ;
     int changed = 0;
 
     /* -------------------------------------------------------------------- */
@@ -1927,8 +2028,8 @@ LOCAL int brtrg_vs_sdbd(void)
             }
         }
     }
-                
-    return changed;        
+
+    return changed;
 }
 
 /* ======================================================================== */
@@ -1974,8 +2075,8 @@ LOCAL int find_jsr_data(void)
 
         while (MAYBE_CODE(targ))
         {
-            if (debug_find_jsr_data > 1) 
-                printf("fjd: target %.4X, flags %.4X\n", 
+            if (debug_find_jsr_data > 1)
+                printf("fjd: target %.4X, flags %.4X\n",
                        targ, instr[targ].flags);
             /* ------------------------------------------------------------ */
             /*  If we see SDBD, just move to the next instruction.          */
@@ -1995,7 +2096,7 @@ LOCAL int find_jsr_data(void)
             if (IS_JSR(targ) || IS_CONDBR(targ))
             {
                 if (debug_find_jsr_data)
-                    printf("fjd: saw %s at %.4X\n", 
+                    printf("fjd: saw %s at %.4X\n",
                             IS_JSR(targ)?"JSR":"CONDBR", targ);
                 break;
             }
@@ -2010,7 +2111,7 @@ LOCAL int find_jsr_data(void)
                     instr[targ].br_target >  targ)
                 {
                     if (debug_find_jsr_data)
-                        printf("fjd: taking BR %.4X at %.4X\n", 
+                        printf("fjd: taking BR %.4X at %.4X\n",
                                 instr[targ].br_target, targ);
                     targ = instr[targ].br_target;
                     continue;
@@ -2033,8 +2134,8 @@ LOCAL int find_jsr_data(void)
                 instr[targ].op1.op == reg      &&
                 (instr[targ].op1.flags&(OPF_SRC|OPF_IND)) ==(OPF_SRC|OPF_IND))
             {
-                uint_32 flag = FLAG_INVOP;
-                int     i;
+                uint32_t flag = FLAG_INVOP;
+                int      i;
                 i = 1;
                 if (instr[targ].flags & FLAG_SDBD)
                 {
@@ -2077,7 +2178,7 @@ LOCAL int find_jsr_data(void)
                 targ += instr[targ].len;
                 continue;
             }
-            
+
             if (debug_find_jsr_data)
                 printf("fjd: instr at %.4X broke it\n", targ);
 
@@ -2094,7 +2195,7 @@ LOCAL int find_jsr_data(void)
 /* ======================================================================== */
 LOCAL void mark_data(void)
 {
-    uint_32 addr, addr2, span, dtype;
+    uint32_t addr, addr2, span, dtype;
 
     /* -------------------------------------------------------------------- */
     /*  Convert all INVOP to DATA if they're not already marked as some     */
@@ -2224,7 +2325,7 @@ LOCAL void mark_data(void)
 /* ======================================================================== */
 LOCAL void generate_labels(void)
 {
-    int addr; 
+    int addr;
     int targ;
     const char *lbl;
 
@@ -2245,7 +2346,7 @@ LOCAL void generate_labels(void)
         /* ---------------------------------------------------------------- */
         if      (instr[addr].op1.flags & OPF_ADDR) targ=instr[addr].op1.op;
         else if (instr[addr].op2.flags & OPF_ADDR) targ=instr[addr].op2.op;
-        else if (IS_BRANCH(addr) && 
+        else if (IS_BRANCH(addr) &&
                  instr[addr].br_target <= 0xFFFF)  targ=instr[addr].br_target;
         else                                       continue;
 
@@ -2300,7 +2401,7 @@ LOCAL void generate_labels(void)
 /* ======================================================================== */
 LOCAL void generate_text(void)
 {
-    int addr; 
+    int addr;
 
     /* -------------------------------------------------------------------- */
     /*  Go decode all the instructions.                                     */
@@ -2322,7 +2423,7 @@ LOCAL void do_disasm(void)
 {
     int addr, p, sa = -1, ea = -1;
     int tot_changes = 0, changes, c;
-    
+
     /* -------------------------------------------------------------------- */
     /*  Scan for preload pages that are also marked readable and not        */
     /*  bankswitched.                                                       */
@@ -2337,7 +2438,7 @@ LOCAL void do_disasm(void)
             (GET_BIT(icart.readable, p) != 0) &&
             (GET_BIT(icart.dobanksw, p) == 0))
         {
-            if (sa == -1) 
+            if (sa == -1)
                 sa = addr;
 
             ea = addr + 255;
@@ -2358,6 +2459,19 @@ LOCAL void do_disasm(void)
     sa = ea = -1;
 
     /* -------------------------------------------------------------------- */
+    /*  If we have any generic labels, generate them.                       */
+    /* -------------------------------------------------------------------- */
+    if ( generic_labels )
+    {
+        int i;
+        for (i = 0; i < generic_labels; i++)
+        {
+            const uint32_t targ = generic_label[i];
+            symtab_getsym(symtab, targ << 3, IS_EMPTY(targ) ? 'G' : 'L', 0);
+        }
+    }
+
+    /* -------------------------------------------------------------------- */
     /*  Now, if enabled, do various "analysis passes".                      */
     /* -------------------------------------------------------------------- */
     if (!skip_advanced_analysis)
@@ -2376,34 +2490,41 @@ LOCAL void do_disasm(void)
             VB_PRINTF(1, ("> Identifying arithmetic branches...\n"));
             tot_changes += find_funky_branches();
         }
-   
+
 again:
         do
         {
             changes = 0;
-#if 1
+
+            if (forced_data_ranges)
+            {
+                VB_PRINTF(1, ("> Marking forced data ranges...\n"));
+                changes += c = mark_forced_data();
+                VB_PRINTF(2, (">>  %d words marked invalid\n", c));
+            }
+
             if (forced_entry_points)
             {
                 VB_PRINTF(1, ("> Marking forced entry points as branch targets...\n"));
                 changes += c = mark_forced_entry();
                 VB_PRINTF(2, (">>  %d words marked valid\n", c));
             }
-#endif
-   
+
+
             if (!skip_kill_bad_branches)
             {
                 VB_PRINTF(1, ("> Marking invalid branches...\n"));
                 changes += c = kill_bad_branches();
                 VB_PRINTF(2, (">>  %d words marked invalid\n", c));
             }
-        
+
             if (!skip_brtrg_vs_sdbd)
             {
                 VB_PRINTF(1, ("> Analysing SDBD/branch interaction...\n"));
                 changes += c = brtrg_vs_sdbd();
                 VB_PRINTF(2, (">>  %d words marked invalid\n", c));
             }
-   
+
             if (!skip_find_jsr_data)
             {
                 VB_PRINTF(1, ("> Finding data after JSR instructions...\n"));
@@ -2424,7 +2545,7 @@ again:
                 changes += c = mark_args_invalid();
                 VB_PRINTF(2, (">>  %d words marked invalid\n", c));
             }
-   
+
             if (!skip_exec_sound_interp)
             {
                 VB_PRINTF(1, ("> Looking for EXEC music...\n"));
@@ -2436,7 +2557,7 @@ again:
                 VB_PRINTF(2, (">>  %d words marked as data\n", c));
             }
 
-   
+
             if (!skip_propagate_invalid)
             {
                 VB_PRINTF(1, ("> Propagating invalid opcodes...\n"));
@@ -2444,18 +2565,18 @@ again:
                 VB_PRINTF(2, (">>  %d words marked invalid\n", c));
             }
 
-   
+
             tot_changes += changes;
-   
+
             if (dont_loop_analysis)
                 break;
 
             if (changes > 0)
-                VB_PRINTF(0, ("%6d changes:  Repeating analysis passes.\n", 
+                VB_PRINTF(0, ("%6d changes:  Repeating analysis passes.\n",
                              changes));
-   
+
         } while (changes > 0);
-        
+
 
         changes = 0;
         if (!skip_mark_cart_header)
@@ -2466,7 +2587,7 @@ again:
         if (changes && !dont_loop_analysis)
             goto again;
 
-        VB_PRINTF(0, ("%6d words marked invalid during analysis\n", 
+        VB_PRINTF(0, ("%6d words marked invalid during analysis\n",
                   tot_changes));
     }
 
@@ -2494,7 +2615,7 @@ again:
 /* ======================================================================== */
 LOCAL void write_disasm(FILE *f)
 {
-    uint_32 next_addr, addr = 0, skip = 0, last_was_invop = 0;
+    uint32_t next_addr, addr = 0, skip = 0, last_was_invop = 0;
     int i;
 
     addr = 0;
@@ -2541,7 +2662,7 @@ LOCAL void write_disasm(FILE *f)
         next_addr = addr + instr[addr].len;
 
         /*
-        if (IS_BRANCH(addr) && !IS_JSR(addr) && 
+        if (IS_BRANCH(addr) && !IS_JSR(addr) &&
             !IS_BRANCH(addr + instr[addr].len))
             fprintf(f, "\n");
         */
@@ -2569,7 +2690,7 @@ LOCAL void write_crossref(FILE *f)
 
     fprintf
     (
-        f, 
+        f,
         ";; ===================================="
         "==================================== ;;\n"
         ";;  Branch cross-reference\n"
@@ -2585,7 +2706,7 @@ LOCAL void write_crossref(FILE *f)
 
         if (!instr[addr].target_of)
         {
-            fprintf(stderr, 
+            fprintf(stderr,
                     "Warning: $%.4X is a branch target w/out target_of\n",
                     addr);
             continue;
@@ -2606,7 +2727,7 @@ LOCAL void write_crossref(FILE *f)
 
     fprintf
     (
-        f, 
+        f,
         "\n;; ===================================="
         "==================================== ;;\n"
     );
@@ -2618,12 +2739,12 @@ LOCAL void write_crossref(FILE *f)
 /*  INSTRUCTION PRINTER FUNCTIONS                                           */
 /* ======================================================================== */
 /* ======================================================================== */
-static char prt_buf[256], prt_buf2[256];
+static char prt_buf[512], prt_buf2[256];
 
 /* ------------------------------------------------------------------------ */
 /*  PRT_ERR -- print out an internal error.                                 */
 /* ------------------------------------------------------------------------ */
-char *prt_err(uint_32 addr)     /* Internal error printer */
+char *prt_err(uint32_t addr)     /* Internal error printer */
 {
     snprintf(prt_buf, sizeof(prt_buf),"error! flags=%.8X ", instr[addr].flags);
     return strdup(prt_buf);
@@ -2632,7 +2753,7 @@ char *prt_err(uint_32 addr)     /* Internal error printer */
 /* ------------------------------------------------------------------------ */
 /*  PRT_IMP -- instruction with implied operands                            */
 /* ------------------------------------------------------------------------ */
-char *prt_imp(uint_32 addr)     /* Implied operands     */
+char *prt_imp(uint32_t addr)     /* Implied operands     */
 {
     return strdup(mnemonic[instr[addr].mnemonic]);
 }
@@ -2640,10 +2761,10 @@ char *prt_imp(uint_32 addr)     /* Implied operands     */
 /* ------------------------------------------------------------------------ */
 /*  PRT_JSR -- JSR-type instructions:  OPC REG, LABEL                       */
 /* ------------------------------------------------------------------------ */
-char *prt_jsr(uint_32 addr)     /* JSR reg, label       */
+char *prt_jsr(uint32_t addr)     /* JSR reg, label       */
 {
     snprintf(prt_buf, sizeof(prt_buf), "%-7s R%d,     %s",
-            mnemonic[instr[addr].mnemonic], 
+            mnemonic[instr[addr].mnemonic],
             instr[addr].op1.op,
             symtab_getsym(symtab, instr[addr].op2.op<<3, 'X', 0));
 
@@ -2653,10 +2774,10 @@ char *prt_jsr(uint_32 addr)     /* JSR reg, label       */
 /* ------------------------------------------------------------------------ */
 /*  PRT_ROT -- Shift/Rotate instructions:  OPC  REG, [1|2]                  */
 /* ------------------------------------------------------------------------ */
-char *prt_rot(uint_32 addr)     /* ROT reg, [1|2]       */
+char *prt_rot(uint32_t addr)     /* ROT reg, [1|2]       */
 {
     snprintf(prt_buf, sizeof(prt_buf), "%-7s R%d,     %d",
-            mnemonic[instr[addr].mnemonic], 
+            mnemonic[instr[addr].mnemonic],
             instr[addr].op1.op, instr[addr].op2.op);
 
     return strdup(prt_buf);
@@ -2665,10 +2786,10 @@ char *prt_rot(uint_32 addr)     /* ROT reg, [1|2]       */
 /* ------------------------------------------------------------------------ */
 /*  PRT_CBR -- Conditional Branch instructions.                             */
 /* ------------------------------------------------------------------------ */
-char *prt_cbr(uint_32 addr)     /* BRANCH label         */
+char *prt_cbr(uint32_t addr)     /* BRANCH label         */
 {
     snprintf(prt_buf, sizeof(prt_buf), "%-7s %s",
-            mnemonic[instr[addr].mnemonic], 
+            mnemonic[instr[addr].mnemonic],
             symtab_getsym(symtab, instr[addr].op1.op<<3, 'X', 0));
 
     return strdup(prt_buf);
@@ -2677,10 +2798,10 @@ char *prt_cbr(uint_32 addr)     /* BRANCH label         */
 /* ------------------------------------------------------------------------ */
 /*  PRT_BXT -- Branch External instructions                                 */
 /* ------------------------------------------------------------------------ */
-char *prt_bxt(uint_32 addr)     /* BEXT cond, label     */
+char *prt_bxt(uint32_t addr)     /* BEXT cond, label     */
 {
     snprintf(prt_buf, sizeof(prt_buf), "%-7s $%.1X,     %s",
-            mnemonic[instr[addr].mnemonic], 
+            mnemonic[instr[addr].mnemonic],
             instr[addr].op1.op,
             symtab_getsym(symtab, instr[addr].op2.op<<3, 'X', 0));
 
@@ -2690,13 +2811,13 @@ char *prt_bxt(uint_32 addr)     /* BEXT cond, label     */
 /* ------------------------------------------------------------------------ */
 /*  PRT_DIR -- Direct-mode instructions                                     */
 /* ------------------------------------------------------------------------ */
-char *prt_dir(uint_32 addr)     /* OP label, reg        */
+char *prt_dir(uint32_t addr)     /* OP label, reg        */
 {
-    snprintf(prt_buf2, sizeof(prt_buf2), "%s,", 
+    snprintf(prt_buf2, sizeof(prt_buf2), "%s,",
             symtab_getsym(symtab, instr[addr].op1.op<<3, 'X', 0));
 
     snprintf(prt_buf, sizeof(prt_buf), "%-7s %-8sR%d",
-            mnemonic[instr[addr].mnemonic], 
+            mnemonic[instr[addr].mnemonic],
             prt_buf2, instr[addr].op2.op);
 
     return strdup(prt_buf);
@@ -2706,19 +2827,19 @@ char *prt_dir(uint_32 addr)     /* OP label, reg        */
 /* ------------------------------------------------------------------------ */
 /*  PRT_IMM -- Immediate-mode instructions                                  */
 /* ------------------------------------------------------------------------ */
-char *prt_imm(uint_32 addr)     /* OP #imm, reg         */
+char *prt_imm(uint32_t addr)     /* OP #imm, reg         */
 {
     if (instr[addr].op1.flags & OPF_ADDR)
     {
-        snprintf(prt_buf2, sizeof(prt_buf2), "#%s,", 
+        snprintf(prt_buf2, sizeof(prt_buf2), "#%s,",
                 symtab_getsym(symtab, instr[addr].op1.op<<3, 'X', 0));
     } else
     {
         snprintf(prt_buf2, sizeof(prt_buf2), "#$%.4X,", instr[addr].op1.op);
     }
 
-    snprintf(prt_buf, sizeof(prt_buf), "%-7s %-8sR%d", 
-            mnemonic[instr[addr].mnemonic], 
+    snprintf(prt_buf, sizeof(prt_buf), "%-7s %-8sR%d",
+            mnemonic[instr[addr].mnemonic],
             prt_buf2, instr[addr].op2.op);
 
     return strdup(prt_buf);
@@ -2728,10 +2849,10 @@ char *prt_imm(uint_32 addr)     /* OP #imm, reg         */
 /* ------------------------------------------------------------------------ */
 /*  PRT_IMO -- MVOI instructions.                                           */
 /* ------------------------------------------------------------------------ */
-char *prt_imo(uint_32 addr)     /* OP reg, #imm         */
+char *prt_imo(uint32_t addr)     /* OP reg, #imm         */
 {
-    snprintf(prt_buf, sizeof(prt_buf), "%-7s R%d,     #$%.4X", 
-            mnemonic[instr[addr].mnemonic], 
+    snprintf(prt_buf, sizeof(prt_buf), "%-7s R%d,     #$%.4X",
+            mnemonic[instr[addr].mnemonic],
             instr[addr].op1.op, instr[addr].op2.op);
 
     return strdup(prt_buf);
@@ -2740,10 +2861,10 @@ char *prt_imo(uint_32 addr)     /* OP reg, #imm         */
 /* ------------------------------------------------------------------------ */
 /*  PRT_2RG -- Register-to-register instructions                            */
 /* ------------------------------------------------------------------------ */
-char *prt_2rg(uint_32 addr)     /* OP reg, reg          */
+char *prt_2rg(uint32_t addr)     /* OP reg, reg          */
 {
-    snprintf(prt_buf, sizeof(prt_buf), "%-7s R%d,     R%d", 
-            mnemonic[instr[addr].mnemonic], 
+    snprintf(prt_buf, sizeof(prt_buf), "%-7s R%d,     R%d",
+            mnemonic[instr[addr].mnemonic],
             instr[addr].op1.op, instr[addr].op2.op);
 
     return strdup(prt_buf);
@@ -2752,9 +2873,9 @@ char *prt_2rg(uint_32 addr)     /* OP reg, reg          */
 /* ------------------------------------------------------------------------ */
 /*  PRT_1RG -- Single-register instructions                                 */
 /* ------------------------------------------------------------------------ */
-char *prt_1rg(uint_32 addr)     /* OP reg               */
+char *prt_1rg(uint32_t addr)     /* OP reg               */
 {
-    snprintf(prt_buf, sizeof(prt_buf), "%-7s R%d", 
+    snprintf(prt_buf, sizeof(prt_buf), "%-7s R%d",
             mnemonic[instr[addr].mnemonic], instr[addr].op1.op);
 
     return strdup(prt_buf);
@@ -2763,9 +2884,9 @@ char *prt_1rg(uint_32 addr)     /* OP reg               */
 /* ------------------------------------------------------------------------ */
 /*  PRT_PLR -- PULR Rx.                                                     */
 /* ------------------------------------------------------------------------ */
-char *prt_plr(uint_32 addr)     /* OP reg               */
+char *prt_plr(uint32_t addr)     /* OP reg               */
 {
-    snprintf(prt_buf, sizeof(prt_buf), "%-7s R%d", 
+    snprintf(prt_buf, sizeof(prt_buf), "%-7s R%d",
             mnemonic[instr[addr].mnemonic], instr[addr].op2.op);
 
     return strdup(prt_buf);
@@ -2774,7 +2895,7 @@ char *prt_plr(uint_32 addr)     /* OP reg               */
 /* ------------------------------------------------------------------------ */
 /*  PRT_DCL -- DECLE directives.                                            */
 /* ------------------------------------------------------------------------ */
-char *prt_dcl(uint_32 addr)     /* DECLE [up to four words] */
+char *prt_dcl(uint32_t addr)     /* DECLE [up to four words] */
 {
     if (instr[addr].len > 4)
     {
@@ -2789,21 +2910,21 @@ char *prt_dcl(uint_32 addr)     /* DECLE [up to four words] */
 
     switch (instr[addr].len)
     {
-        case 1: 
+        case 1:
             snprintf(prt_buf, sizeof(prt_buf), "DECLE   $%.4X", GET_WORD(addr));
             break;
-        case 2: 
+        case 2:
             snprintf(prt_buf, sizeof(prt_buf), "DECLE   $%.4X,  $%.4X",
                     GET_WORD(addr    ), GET_WORD(addr + 1));
             break;
-        case 3: 
+        case 3:
             snprintf(prt_buf, sizeof(prt_buf), "DECLE   $%.4X,  $%.4X,  $%.4X",
-                    GET_WORD(addr    ), GET_WORD(addr + 1), 
+                    GET_WORD(addr    ), GET_WORD(addr + 1),
                     GET_WORD(addr + 2));
             break;
-        case 4: 
+        case 4:
             snprintf(prt_buf, sizeof(prt_buf), "DECLE   $%.4X,  $%.4X,  $%.4X,  $%.4X",
-                    GET_WORD(addr    ), GET_WORD(addr + 1), 
+                    GET_WORD(addr    ), GET_WORD(addr + 1),
                     GET_WORD(addr + 2), GET_WORD(addr + 3));
             break;
     }
@@ -2814,14 +2935,14 @@ char *prt_dcl(uint_32 addr)     /* DECLE [up to four words] */
 /* ------------------------------------------------------------------------ */
 /*  PRT_BID -- BIDECLE directives.                                          */
 /* ------------------------------------------------------------------------ */
-char *prt_bid(uint_32 addr)     /* BIDECLE [up to two bidecles] */
+char *prt_bid(uint32_t addr)     /* BIDECLE [up to two bidecles] */
 {
     /* implementation note:  BIDECLE relies on op1, op2 having been set up  */
     /* rather than reading from the memory image.                           */
     switch (instr[addr].len)
     {
         case 2:
-            snprintf(prt_buf, sizeof(prt_buf), "BIDECLE $%.4X", 
+            snprintf(prt_buf, sizeof(prt_buf), "BIDECLE $%.4X",
                     ( GET_WORD(addr    )       & 0x00FF) |
                     ((GET_WORD(addr + 1) << 8) & 0xFF00));
             break;
@@ -2835,7 +2956,7 @@ char *prt_bid(uint_32 addr)     /* BIDECLE [up to two bidecles] */
             break;
 
         default:
-            fprintf(stderr, "ERROR: BIDECLE w/ len != 2 or 4 at addr %.4X\n", 
+            fprintf(stderr, "ERROR: BIDECLE w/ len != 2 or 4 at addr %.4X\n",
                     addr);
             exit(1);
     }
@@ -2846,7 +2967,7 @@ char *prt_bid(uint_32 addr)     /* BIDECLE [up to two bidecles] */
 /* ------------------------------------------------------------------------ */
 /*  PRT_STR -- STRING directives.                                           */
 /* ------------------------------------------------------------------------ */
-char *prt_str(uint_32 addr)     /* STRING [up to 20 characters] */
+char *prt_str(uint32_t addr)     /* STRING [up to 20 characters] */
 {
     char strbuf[21];
     int i;
@@ -2862,7 +2983,7 @@ char *prt_str(uint_32 addr)     /* STRING [up to 20 characters] */
 
 
 
-    
+
 /* ======================================================================== */
 /* ======================================================================== */
 /*  MAIN PROGRAM, GENERIC CRAPOLA(TM)                                       */
@@ -2878,7 +2999,7 @@ char *prt_str(uint_32 addr)     /* STRING [up to 20 characters] */
 /* ======================================================================== */
 LOCAL void merge_icarts(icartrom_t *dst, icartrom_t *src, int replace)
 {
-    uint_32 a, p, attr_src, attr_dst;
+    uint32_t a, p, attr_src, attr_dst;
 
     /* -------------------------------------------------------------------- */
     /*  Look through 256-word pages of 'src' for preload hunks to copy to   */
@@ -2925,7 +3046,7 @@ LOCAL void merge_icarts(icartrom_t *dst, icartrom_t *src, int replace)
         if (GET_BIT(src->writable, p)) attr_src |= ICARTROM_WRITE;
         if (GET_BIT(src->narrow,   p)) attr_src |= ICARTROM_NARROW;
         if (GET_BIT(src->dobanksw, p)) attr_src |= ICARTROM_BANKSW;
-                                     
+
         attr_dst = 0;
         if (GET_BIT(dst->readable, p)) attr_dst |= ICARTROM_READ;
         if (GET_BIT(dst->writable, p)) attr_dst |= ICARTROM_WRITE;
@@ -2940,7 +3061,7 @@ LOCAL void merge_icarts(icartrom_t *dst, icartrom_t *src, int replace)
             icartrom_addseg(dst, NULL, a, 256, attr_src, 0);
         } else
         {
-            fprintf(stderr, 
+            fprintf(stderr,
                     "INTERNAL ERROR:  Cannot merge incompatible attributes on "
                     "$%.4X - $%.4X\n", a, a + 255);
             exit(1);
@@ -2954,6 +3075,8 @@ static struct option long_opts[] =
 {
     {   "entry",                                2,      NULL,       'e'     },
     {   "entry-point",                          2,      NULL,       'e'     },
+    {   "data",                                 2,      NULL,       'd'     },
+    {   "data-range",                           2,      NULL,       'd'     },
     {   "no-default-symbols",                   0,      NULL,       'S'     },
     {   "no-exec-routine-symbols",              0,      NULL,       'X'     },
     {   "allow-branch-target-wrap",             0,      NULL,       'b'     },
@@ -2976,7 +3099,6 @@ static struct option long_opts[] =
     {   "help",                                 0,      NULL,       'h'     },
     {   "?",                                    0,      NULL,       '?'     },
     {   "license",                              0,      NULL,       'l'     },
-                                               
 
     {   "debug-find-jsr-data",                  0,      NULL,       1       },
     {   "debug-show-instr-flags",               0,      NULL,       2       },
@@ -2984,7 +3106,7 @@ static struct option long_opts[] =
     {   NULL,                                   0,      NULL,       0       }
 };
 
-static const char *optchars = "e:?01234567BEGHLSabdfhlprv";
+static const char *optchars = "g:d:e:?01234567BEGHLSXabdfhlprv";
 
 /*extern char *optarg;*/
 /*extern int  optind, opterr, optopt;*/
@@ -2996,7 +3118,7 @@ int force_overwrite = 0;
 /* ======================================================================== */
 LOCAL void usage(void)
 {
-    fprintf(stderr, 
+    fprintf(stderr,
                                                                            "\n"
 "DIS-1600  Advanced(?) CP-1600 Disassembler"                               "\n"
 "Copyright 2003, Joseph Zbiciak"                                           "\n"
@@ -3014,6 +3136,11 @@ LOCAL void usage(void)
 "  -B  --allow-branch-to-bad-addr  Branches into STIC, PSG, etc. are ok"   "\n"
 "  -G  --allow-global-branches     Allow branch outside given ROM and EXEC""\n"
 "  -E  --no-exec-branches          No branches to $1015-$1FFF"             "\n"
+"  -e<ADDR>  --entry-point <ADDR>  Add <ADDR> as an entry point"           "\n"
+"  -d<ADDR>-<ADDR>                 Add <ADDR>-<ADDR> as a data range"      "\n"
+"            --data-range <ADDR>-<ADDR>"                                   "\n"
+"  -g<ADDR>  --data-label <ADDR>   Add generic label at <ADDR>"            "\n"
+"                                  For hex <ADDR>, use 0xABCD or '$ABCD'." "\n"
                                                                            "\n"
 " Opcode analysis flags:"                                                  "\n"
 "  -r  --allow-rare-opcodes        Permit SIN, TCI, MVOI, others."         "\n"
@@ -3055,7 +3182,7 @@ LOCAL void usage(void)
 /* ======================================================================== */
 LOCAL void license(void)
 {
-    fprintf(stderr, 
+    fprintf(stderr,
                                                                           "\n"
 " DIS-1600  Advanced(?) CP-1600 Disassembler"                             "\n"
 " Copyright 2003, Joseph Zbiciak"                                         "\n"
@@ -3072,9 +3199,9 @@ LOCAL void license(void)
 "   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU"    "\n"
 "   General Public License for more details."                             "\n"
                                                                           "\n"
-"   You should have received a copy of the GNU General Public License"    "\n"
-"   along with this program; if not, write to the Free Software"          "\n"
-"   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA."            "\n"
+"   You should have received a copy of the GNU General Public License along\n"
+"   with this program; if not, write to the Free Software Foundation, Inc.,\n"
+"   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA."          "\n"
                                                                           "\n"
 " Run \"dis1600 --help\" for usage information."                          "\n"
                                                                           "\n"
@@ -3091,7 +3218,7 @@ LOCAL void license(void)
 /* ======================================================================== */
 int main(int argc, char *argv[])
 {
-    int c, option_idx = 0, value;
+    int c, option_idx = 0, value, value2;
     char *output_file;
     int i;
     FILE *f;
@@ -3104,16 +3231,29 @@ int main(int argc, char *argv[])
     /* -------------------------------------------------------------------- */
     /*  Parse command-line arguments.                                       */
     /* -------------------------------------------------------------------- */
-    while ((c = getopt_long(argc, argv, optchars, long_opts, &option_idx)) 
+    while ((c = getopt_long(argc, argv, optchars, long_opts, &option_idx))
             != EOF)
     {
         value = 1;
+        value2 = -1;
         if (optarg)
         {
+            char *s;
+
             if (!sscanf(optarg, "0x%x", &value) &&
                 !sscanf(optarg, "0X%x", &value) &&
                 !sscanf(optarg, "$%x",  &value))
                 value = atoi(optarg);
+
+            value2 = value;
+
+            s = strchr(optarg, '-');
+
+            if ( s && s[1] &&
+                !sscanf(s+1, "0x%x", &value2) &&
+                !sscanf(s+1, "0X%x", &value2) &&
+                !sscanf(s+1, "$%x",  &value2))
+                value2 = atoi(s+1);
         }
 
         switch (c)
@@ -3127,8 +3267,11 @@ int main(int argc, char *argv[])
             case 'H': hlt_is_invalid                = 0;    break;
             case 'f': force_overwrite               = 1;    break;
             case 'S': no_default_symbols            = 1;    break;
+            case 'X': no_exec_routine_symbols       = 1;    break;
             case 'v': verbose++;                            break;
             case 'e': add_entry_point(value);               break;
+            case 'd': add_data_range(value,value2);         break;
+            case 'g': add_generic_label(value);             break;
 
             case 'a': skip_advanced_analysis        = 1;    break;
             case '0': skip_mark_cart_header         = 1;    break;
@@ -3141,7 +3284,8 @@ int main(int argc, char *argv[])
             case '7': skip_exec_print               = 1;    break;
             case 'L': dont_loop_analysis            = 1;    break;
 
-                       
+
+
             case 'h': case '?': usage();                    break;
             case 'l': license();                            break;
 
@@ -3217,7 +3361,7 @@ int main(int argc, char *argv[])
         /* ---------------------------------------------------------------- */
         /*  Read in the requested file.                                     */
         /* ---------------------------------------------------------------- */
-        icart_readfile(argv[i], &temp_icart);
+        icart_readfile(argv[i], &temp_icart, 1);
 
         /* ---------------------------------------------------------------- */
         /*  Merge this image into our total image.                          */
@@ -3266,9 +3410,9 @@ int main(int argc, char *argv[])
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ------------------------------------------------------------------------ */
 /*                   Copyright (c) 2006, Joseph Zbiciak                     */
 /* ======================================================================== */

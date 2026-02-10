@@ -4,15 +4,14 @@
  *
  *  Author:         J. Zbiciak
  *
- *  $Id: op_decode.h,v 1.9 1999/10/10 08:44:28 im14u2c Exp $
  * ============================================================================
  *  This header contains bitfield structures
  * ============================================================================
  */
 
 
-#ifndef _OP_DECODE_H
-#define _OP_DECODE_H
+#ifndef OP_DECODE_H
+#define OP_DECODE_H
 
 #include "cp1600.h"
 
@@ -48,8 +47,8 @@
  *
  *  oo    -- Opcode field (dependent on format)
  *  sss   -- Source register,      R0 ... R7 (binary encoding)
- *  ddd   -- Destination register, R0 ... R7 (binary encoding)    
- *  0dd   -- Destination register, R0 ... R3 
+ *  ddd   -- Destination register, R0 ... R7 (binary encoding)
+ *  0dd   -- Destination register, R0 ... R3
  *  cccc  -- Condition codes (branches)
  *  x     -- External branch condition (0 == internal, 1 == examine BEXT)
  *  z     -- Branch displacement direction (1 == negative)
@@ -68,7 +67,7 @@
  *  n101  -- Less than                 Greater than or equal
  *  n110  -- Less than or equal        Greater than
  *  n111  -- Unequal sign and carry    Equal sign and carry
- *  
+ *
  *  Branch Return Registers  (bb)
  *  -----------------------
  *
@@ -98,7 +97,7 @@
  *     order.  If a non-incrementing data counter is used, both accesses are
  *     to the same address.  Otherwise, the counter is post-incremented with
  *     each access.  Indirect through R6 (stack addressing) is not allowed.
- * 
+ *
  *  Interruptibility notes:
  *
  *  -- Interrupts always occur after an instruction completes.  No instruction
@@ -109,7 +108,7 @@
  *     the transition from the current instruction to the next.
  *
  *  -- When the processor takes an interrupt, the current PC value is pushed
- *     on the stack.  The address jumped to for the interrupt is provided 
+ *     on the stack.  The address jumped to for the interrupt is provided
  *     by external hardware (similar to an 8080, if I recall correctly).
  *
  *  Status register/GSWD/RSWD notes:
@@ -139,7 +138,7 @@
  *
  *  SWAP notes:
  *
- *  -- A "double" swap replicates the lower byte into both bytes, and sets 
+ *  -- A "double" swap replicates the lower byte into both bytes, and sets
  *     S and Z status bits based on that byte.  This is based on the comments
  *     in the following code snippet from RUNNING.SRC in the dev kit:
  *
@@ -244,7 +243,7 @@ typedef struct op_reg_1op
  *  OP_GSWD         -- Get status word
  *
  *  Notes:
- *   -- Only one instruction (GSWD) has this encoding.  
+ *   -- Only one instruction (GSWD) has this encoding.
  *   -- Aliases reg_1op encoding's 110 opcode.
  *   -- Very similar to nop_sin encoding (below)
  *
@@ -267,7 +266,7 @@ typedef struct op_gswd
  *  OP_NOP_SIN          -- NOP and SIN encoding
  *
  *  Notes:
- *   -- Only two instructions (NOP, SIN) have this encoding.  
+ *   -- Only two instructions (NOP, SIN) have this encoding.
  *   -- Aliases reg_1op encoding's 110 opcode.
  *   -- Very similar to gswd encoding (above)
  *
@@ -380,7 +379,9 @@ typedef struct op_dir_2op
     BFE(unsigned zero       :  3,           /* Must be 0                */
     BFE(unsigned op         :  3,           /* 000 invalid              */
     BFE(unsigned id         :  1,           /* Must be 1                */
-        unsigned pad1       : 22))));       /* Pad to 32-bit word       */
+    BFE(unsigned xreg       :  3,           /* Extended register        */
+    BFE(unsigned amode      :  2,           /* Extended address mode    */
+        unsigned pad1       : 17))))));     /* Pad to 32-bit word       */
 
     /* Word #2 */
     BFE(unsigned addr       : 16,           /* Address (ls-bits)        */
@@ -410,7 +411,8 @@ typedef struct op_ind_2op
     BFE(unsigned addr       :  3,           /* Indirect address reg.    */
     BFE(unsigned op         :  3,           /* 000 invalid              */
     BFE(unsigned id         :  1,           /* Must be 1                */
-        unsigned pad1       : 22))));       /* Pad to 32-bit word       */
+    BFE(unsigned ext        :  6,           /* Extended opcode          */
+        unsigned pad1       : 16)))));      /* Pad to 32-bit word       */
 } op_ind_2op;
 
 
@@ -436,7 +438,8 @@ typedef struct op_imm_2op
     BFE(unsigned one        :  3,           /* Must be 111              */
     BFE(unsigned op         :  3,           /* 000 invalid              */
     BFE(unsigned id         :  1,           /* Must be 1                */
-        unsigned pad1       : 22))));       /* Pad to 32-bit word       */
+    BFE(unsigned ext        :  6,           /* Extended opcode          */
+        unsigned pad1       : 16)))));      /* Pad to 32-bit word       */
 
     /* Word #2 */
     BFE(unsigned data_lsb   : 16,           /* Data (ls-bits)           */
@@ -457,7 +460,7 @@ typedef struct op_imm_2op
  *  Decoder functions pick apart the data in the other op_XXX types and
  *  store it in an op_decoded structure.
  *
- *  The exact meaning ascribed to the various fields is dependent on the 
+ *  The exact meaning ascribed to the various fields is dependent on the
  *  original opcode format as well as the instruction in question.  This
  *  format exists only because it's more convenient for the CPU to deal with
  *  than the packed bitfields.
@@ -466,15 +469,17 @@ typedef struct op_imm_2op
 
 typedef struct op_decoded
 {
-    uint_16         imm0;               /* immediate value 0        */
-    uint_16         imm1;               /* immediate value 1        */
-    uint_16         reg0;               /* First register           */
-    uint_16         reg1;               /* Second register          */
+    uint16_t        imm0;               /* immediate value 0        */
+    uint16_t        imm1;               /* immediate value 1        */
+    uint8_t         reg0;               /* First register           */
+    uint8_t         reg1;               /* Second register          */
+    uint8_t         xreg0;              /* First xregister          */
+    uint8_t         amode;              /* Extended addressing mode */
 } op_decoded;
 
 /*
  * ============================================================================
- *  OP_BREAKPT          -- Flags for breakpoints                
+ *  OP_BREAKPT          -- Flags for breakpoints
  *
  *  These flags are cleverly stored in the last 16 bits of the union and
  *  so should never be overwritten.
@@ -482,10 +487,10 @@ typedef struct op_decoded
  */
 typedef struct op_breakpt
 {
-    uint_32         unused0;
-    uint_32         unused1;
-    BFE(unsigned    unused3 : 16,
-        unsigned    flags   : 16);      /* breakpoint flags         */
+    uint32_t        unused0;
+    uint32_t        unused1;
+    BFE(unsigned    cycles  : 16,       /* optional cycles to adv by    */
+        unsigned    flags   : 16);      /* breakpoint flags             */
 } op_breakpt;
 
 /*
@@ -552,9 +557,7 @@ typedef struct instr_t
     opcode_t        opcode;
 } instr_t;
 
-
-typedef void        (*op_decode_t)  (instr_t *, cp1600_ins_t *);
-
+typedef void op_decode_t(instr_t *, cp1600_ins_t **);
 
 /*
  * ============================================================================
@@ -563,7 +566,6 @@ typedef void        (*op_decode_t)  (instr_t *, cp1600_ins_t *);
  *  FN_DECODE_BKPT      -- Variant used for making breakpoints persist.
  * ============================================================================
  */
-
 int
 fn_decode
 (
@@ -593,9 +595,8 @@ fn_decode_bkpt
  * ============================================================================
  */
 
-instr_t *   get_instr (void);
-void        put_instr (instr_t * instr);
-
+instr_t *   get_instr(void);
+void        put_instr(instr_t *instr);
 
 #endif
 
@@ -610,9 +611,9 @@ void        put_instr (instr_t * instr);
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                 Copyright (c) 1998-1999, Joseph Zbiciak                  */
 /* ======================================================================== */

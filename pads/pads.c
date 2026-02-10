@@ -2,68 +2,50 @@
  * ============================================================================
  *  Title:    Controller pads
  *  Author:   J. Zbiciak
- *  $Id: pads.c,v 1.18 1999/10/10 08:44:29 im14u2c Exp $
  * ============================================================================
  *  This module implements the controller pads.
  *  Pads are peripherals that extend periph_t.
  * ============================================================================
  */
 
-
 #include "config.h"
 #include "periph/periph.h"
 #include "pads/pads.h"
-#include "event/event.h"
 
-uint_32 pad_tk_keyboard(periph_t *p, uint_32 len);
-
-/*
- * ============================================================================
- *  PAD_TK_EVENT -- Updates that pad's states according to event inputs.
- * ============================================================================
- */
-uint_32 pad_tk_event(periph_t *p, uint_32 len)
+/* ------------------------------------------------------------------------ */
+/*  Fake shift state machine states.                                        */
+/*  These act as flags:  You can set PAD_FS_PENDING while PAD_FS_ENGAGED.   */
+/* ------------------------------------------------------------------------ */
+enum
 {
-    pad_t   *pad = (pad_t*)p;
-    int     i, s;
-    uint_32 value = 0, dflag;
-    uint_32 *ptr;
+    PAD_FS_IDLE,
+    PAD_FS_ENGAGED = 1,     /*  Fake shift currently pressed.               */
+    PAD_FS_PENDING = 2      /*  Engage fake shift on next keyboard scan.    */
+};
 
-    /* -------------------------------------------------------------------- */
-    /*  If this pad interface is set to Keyboard or Piano, get outta here.  */
-    /* -------------------------------------------------------------------- */
-    if (pad->mode != PAD_HAND) return pad_tk_keyboard(p, len);
-
-    /* -------------------------------------------------------------------- */
-    /*  If no input events have occurred, don't reevaluate the pads.        */
-    /* -------------------------------------------------------------------- */
-    if (pad->last_evt == event_count)
-        return len;
-
-    pad->last_evt = event_count;
-
+/* ======================================================================== */
+/*  PAD_EVAL_HAND    -- Interprets pad inputs as hand controllers.          */
+/*                      Both I/Os must be in input mode.                    */
+/* ======================================================================== */
+LOCAL void pad_eval_hand(pad_t *const pad)
+{
     /* -------------------------------------------------------------------- */
     /*  Iterate over both controllers.                                      */
     /* -------------------------------------------------------------------- */
-    for (s = 0; s < 2; s++)
+    for (int side_idx = 0; side_idx < 2; side_idx++)
     {
-        /* ---------------------------------------------------------------- */
-        /*  Skip ports that are marked as 'output.'                         */
-        /* ---------------------------------------------------------------- */
-        if (pad->io[s]) continue;
-
-        /* ---------------------------------------------------------------- */
-        /*  Start out with "nothing pressed."                               */
-        /* ---------------------------------------------------------------- */
-        value = 0;
-
         /* ---------------------------------------------------------------- */
         /*  Merge all of the keypad / action key inputs to the controller.  */
         /* ---------------------------------------------------------------- */
-        ptr = (s) ? pad->l : pad->r;
+        const uint32_t *const event_inputs = side_idx == 0 ? pad->r : pad->l;
+        uint32_t merged_inputs = 0;
+        for (int i = 0; i < 15; i++)
+            merged_inputs |= event_inputs[i];
 
-        for (i = 0; i < 15; i++)
-            value |= ptr[i];
+        /* ---------------------------------------------------------------- */
+        /*  Merge in the "raw bits" inputs.                                 */
+        /* ---------------------------------------------------------------- */
+        merged_inputs |= event_inputs[17];
 
         /* ---------------------------------------------------------------- */
         /*  Now, generate a disc dir # from E/NE/N/NW/W/SW/S/SE flags.      */
@@ -98,57 +80,126 @@ uint_32 pad_tk_event(periph_t *p, uint_32 len)
         /*         ESE          10000001                                    */
         /*                                                                  */
         /* ---------------------------------------------------------------- */
-        dflag = (0xFF & (ptr[15]|ptr[16]));
-        dflag = (dflag << 4) | (dflag >> 4);
+        uint32_t dir_flags = (0xFF & (event_inputs[15] | event_inputs[16]));
+        dir_flags = (dir_flags << 4) | (dir_flags >> 4);
 
         /* ---------------------------------------------------------------- */
         /*  Step through the four major compass dirs and set bits 0..3      */
         /*  according to each range.  Also process bit 4 along the way.     */
         /*  We begin our analysis with 'south' as that is bit 0.            */
         /* ---------------------------------------------------------------- */
-        for (i = 0; i < 4; i++, dflag >>= 2)
+        for (int i = 0; i < 4; i++, dir_flags >>= 2)
         {
             /* ------------------------------------------------------------ */
             /*  Handle major-direction bit.  We set the bit for any dir     */
             /*  that is mostly in the direction of the major-direction, as  */
             /*  well as for one lop-sided case on the side.                 */
             /* ------------------------------------------------------------ */
-            if ((dflag&0x14) != 0x10 && (dflag&0x0F) > 0x01) value |= 1 << i;
+            if ((dir_flags & 0x14) != 0x10 &&
+                (dir_flags & 0x0F) > 0x01)
+                merged_inputs |= 1u << i;
 
             /* ------------------------------------------------------------ */
             /*  Check for diagonal bit (bit 4) also.                        */
             /* ------------------------------------------------------------ */
-            if ((0x64 >> (dflag & 0x07)) & 1)                value |= 0x10;
+            if ((0x64 >> (dir_flags & 0x07)) & 1)
+                merged_inputs |= 0x10;
         }
 
         /* ---------------------------------------------------------------- */
-        /*  Remember our output value.                                      */
+        /*  Record the merged inputs, inverting because active-low.         */
         /* ---------------------------------------------------------------- */
-        pad->side[s] = 0xFF & ~value;
+        pad->side[side_idx] = 0xFF & ~merged_inputs;
     }
-
-    return len;
 }
 
-
-/*
- * ============================================================================
- *  PAD_TK_KEYBOARD  -- Updates that pad's states according to event inputs.
- * ============================================================================
- */
-uint_32 pad_tk_keyboard(periph_t *p, uint_32 len)
+/* ======================================================================== */
+/*  Helper functions for special key inputs: Fake shift and Synth.          */
+/* ======================================================================== */
+LOCAL INLINE uint32_t fake_shift_bits(const uint32_t row)
 {
-    pad_t   *pad = (pad_t*)p;
-    uint_32 value, need_shift = 0, synth_keys = 0;
-    int i, j;
-    uint_32 kk[8], tk[8];
+    return (row >> 8) & 0xFF;
+}
 
+LOCAL INLINE uint32_t synth_key_bits(const uint32_t row)
+{
+    return (row >> 16) & 0xFF;
+}
+
+/* ======================================================================== */
+/*  BIT_TRANSPOSE_8X8    -- Transpose an 8x8 bit matrix.                    */
+/*  This converts the keyboard bitmap from row-major to column-major.       */
+/*                                                                          */
+/*    src[0]  a7 a6 a5 a4 a3 a2 a1 a0     h0 g0 f0 e0 d0 c0 b0 a0  dst[0]   */
+/*    src[1]  b7 b6 b5 b4 b3 b2 b1 b0     h1 g1 f1 e1 d1 c1 b1 a1  dst[1]   */
+/*    src[2]  c7 c6 c5 c4 c3 c2 c1 c0     h2 g2 f2 e2 d2 c2 b2 a2  dst[2]   */
+/*    src[3]  d7 d6 d5 d4 d3 d2 d1 d0 ==> h3 g3 f3 e3 d3 c3 b3 a3  dst[3]   */
+/*    src[4]  e7 e6 e5 e4 e3 e2 e1 e0     h4 g4 f4 e4 d4 c4 b4 a4  dst[4]   */
+/*    src[5]  f7 f6 f5 f4 f3 f2 f1 f0     h5 g5 f5 e5 d5 c5 b5 a5  dst[5]   */
+/*    src[6]  g7 g6 g5 g4 g3 g2 g1 g0     h6 g6 f6 e6 d6 c6 b6 a6  dst[6]   */
+/*    src[7]  h7 h6 h5 h4 h3 h2 h1 h0     h7 g7 f7 e7 d7 c7 b7 a7  dst[7]   */
+/*                                                                          */
+/* ======================================================================== */
+LOCAL INLINE void bit_transpose_8x8(uint8_t *const dst,
+                                    const uint8_t *const src)
+{
+#if CHAR_BIT != 8
+    /* Slow reference version. */
+    for (int col = 0; col < 8; col++)
+    {
+        uint32_t row_bits_for_col = 0;
+
+        for (int row = 0; row < 8; row++)
+            row_bits_for_col |= ((src[row] >> col) & 1) << row;
+
+        dst[col] = row_bits_for_col;
+    }
+#else
+    /* Tricky fast version, adapted from Hacker's Delight, v2, figure 7-6. */
+    uint64_t x;
+    memcpy((void *)&x, src, sizeof(uint64_t));
+
+# ifdef BYTE_LE
+    x = ((x     ) & 0xAA55AA55AA55AA55ull) |
+        ((x << 7) & 0x5500550055005500ull) |
+        ((x >> 7) & 0x00AA00AA00AA00AAull);
+
+    x = ((x      ) & 0xCCCC3333CCCC3333ull) |
+        ((x << 14) & 0x3333000033330000ull) |
+        ((x >> 14) & 0x0000CCCC0000CCCCull);
+
+    x = ((x      ) & 0xF0F0F0F00F0F0F0Full) |
+        ((x << 28) & 0x0F0F0F0F00000000ull) |
+        ((x >> 28) & 0x00000000F0F0F0F0ull);
+# else /*BYTE_BE*/
+    x = ((x     ) & 0x55AA55AA55AA55AAull) |
+        ((x >> 9) & 0x0055005500550055ull) |
+        ((x << 9) & 0xAA00AA00AA00AA00ull);
+
+    x = ((x      ) & 0x3333CCCC3333CCCCull) |
+        ((x >> 18) & 0x0000333300003333ull) |
+        ((x << 18) & 0xCCCC0000CCCC0000ull);
+
+    x = ((x      ) & 0x0F0F0F0FF0F0F0F0ull) |
+        ((x >> 36) & 0x000000000F0F0F0Full) |
+        ((x << 36) & 0xF0F0F0F000000000ull);
+# endif
+
+    memcpy(dst, (const void *)&x, sizeof(uint64_t));
+#endif
+}
+
+/* ======================================================================== */
+/*  PAD_EVAL_KEYBOARD    -- Interprets pad inputs as a keyboard.            */
+/* ======================================================================== */
+LOCAL void pad_eval_keyboard(pad_t *const pad)
+{
     /* -------------------------------------------------------------------- */
     /*  The I/O ports can have one of four settings.  The following truth   */
     /*  table indicates the meaning of these four modes.                    */
     /*                                                                      */
     /*      io[1]   io[0]       Meaning                                     */
-    /*        0       0         Both sides read -- just float inputs        */
+    /*        0       0         Both sides read -- scan hand controllers    */
     /*        0       1         Normal scanning mode.  0 drives, 1 reads    */
     /*        1       0         Transposed scanning.   1 drives, 0 reads    */
     /*        1       1         Illegal:  Both sides driving.               */
@@ -171,74 +222,74 @@ uint_32 pad_tk_keyboard(periph_t *p, uint_32 len)
     /*  we want to, we can use that state as a magic handshake so that      */
     /*  apps can request higher-quality keyboard input from an emulator.    */
     /* -------------------------------------------------------------------- */
-    if (pad->io[0] == pad->io[1])
+    if (pad->io[0] == PAD_DIR_OUTPUT &&
+        pad->io[1] == PAD_DIR_OUTPUT)   /* both sides driving; do nothing. */
     {
-        pad->side[0] = pad->side[1] = 0xFF;
-        return len;
+        return;
     }
+
+    /* Keyboard matrices, in normal (by row) and transposed (by col) order. */
+    uint8_t keys_by_row[8];         /* Each row has 1 bit per column.       */
+    uint8_t keys_by_col[8];         /* Each colum has 1 bit per row.        */
 
     /* -------------------------------------------------------------------- */
     /*  Fold the 'fake-shift' data down into the real data if we need it.   */
     /* -------------------------------------------------------------------- */
-    if (pad->fake_shift & 1)
-        for (i = 0; i < 8; i++)
-            kk[i] = (pad->k[i] | (pad->k[i] >> 8)) & 0xFF;
+    if (pad->fake_shift & PAD_FS_ENGAGED)
+        for (int row = 0; row < 8; row++)
+            keys_by_row[row] =
+                (pad->k[row] | fake_shift_bits(pad->k[row])) & 0xFF;
     else
-        for (i = 0; i < 8; i++)
-            kk[i] = (pad->k[i] & 0xFF);
-
+        for (int row = 0; row < 8; row++)
+            keys_by_row[row] = pad->k[row] & 0xFF;
 
     /* -------------------------------------------------------------------- */
-    /*  Determine if we'll need fake-shift next scan. Some of our           */
-    /*  keybindings press a key AND shift.  We handle that by looking at    */
-    /*  the upper bits of the value table and seeing if we need to push     */
-    /*  shift in addition to the key.                                       */
+    /*  Determine if we'll need fake-shift during an upcoming scan.  Some   */
+    /*  of our keybindings press a key AND shift.  We handle that by        */
+    /*  looking at the upper bits of the value table and seeing if we need  */
+    /*  to push shift in addition to the key.  Pending shifts move to       */
+    /*  Engaged when the keyboard scan reads the shift key state.           */
     /* -------------------------------------------------------------------- */
-    for (i = 0; i < 8; i++)
-        need_shift |= pad->k[i];
+    bool need_fake_shift = false;
 
-    synth_keys = (need_shift & 0xFF0000) != 0;
-    need_shift = (need_shift & 0x00FF00) != 0;
+    for (int row = 0; row < 8; row++)
+        if (fake_shift_bits(pad->k[row]))
+            need_fake_shift = true;
 
-    if (need_shift) { pad->fake_shift |= 2; } 
-    else            { pad->fake_shift  = 0; }
+    if (need_fake_shift) { pad->fake_shift |= PAD_FS_PENDING; }
+    else                 { pad->fake_shift  = PAD_FS_IDLE; }
 
     /* -------------------------------------------------------------------- */
     /*  Compute the transpose of the keyboard.  We need this to identify    */
     /*  "buffer fight paths", so that we correctly mask away keys in the    */
     /*  same way a real ECS keyboard will.                                  */
     /* -------------------------------------------------------------------- */
-    for (i = 0; i < 8; i++)
-    {
-        uint_32 tmp = 0;
-
-        for (j = 0; j < 8; j++)
-            tmp |= ((kk[j] >> i) & 1) << j;
-
-        tk[i] = tmp;
-    }
+    bit_transpose_8x8(/* dst = */ keys_by_col, /* src = */ keys_by_row);
 
     /* -------------------------------------------------------------------- */
-    /*  See if any synth keys are pressed.  If so, merge them into the      */
-    /*  keyboard image, but not the transpose.                              */
+    /*  Merge any synth keys into the "by-row" keyboard image, but not the  */
+    /*  "by-col" keyboard image.  The synth has blocking diodes that cause  */
+    /*  the transpose to read as all zeros.  That is why we do this step    */
+    /*  after computing the transpose, rather than before.                  */
     /* -------------------------------------------------------------------- */
-    if (synth_keys)
-        for (i = 0; i < 8; i++)
-            kk[i] |= (pad->k[i] >> 16) & 0xFF;
+    for (int row = 0; row < 8; row++)
+        keys_by_row[row] |= synth_key_bits(pad->k[row]);
 
     /* -------------------------------------------------------------------- */
     /*  Handle normal scanning:                                             */
     /* -------------------------------------------------------------------- */
-    if (pad->io[0] == 1)
+    if (pad->io[0] == PAD_DIR_OUTPUT)
     {
         /* ---------------------------------------------------------------- */
         /*  Ok, merge together the data from the rows selected by side 0.   */
         /* ---------------------------------------------------------------- */
-        value = 0;
-        for (i = 0; i < 8; i++)
+        const uint32_t row_select_n = pad->side[0];   /* Active Low */
+        uint32_t merged_cols = 0;
+
+        for (int row = 0; row < 8; row++)
         {
-            if ((pad->side[0] & (1 << i)) == 0)
-                value |= kk[i];
+            if ((row_select_n & (1u << row)) == 0)
+                merged_cols |= keys_by_row[row];
         }
 
         /* ---------------------------------------------------------------- */
@@ -246,39 +297,42 @@ uint_32 pad_tk_keyboard(periph_t *p, uint_32 len)
         /*  the scan, and the fake-shift flag being set.  If both are met,  */
         /*  assert the shift in col 7.                                      */
         /* ---------------------------------------------------------------- */
-        if ((pad->side[0] & (1 << 6)) == 0 && (pad->fake_shift & 2) != 0)
+        if ((row_select_n & (1u << 6)) == 0 &&
+            (pad->fake_shift & PAD_FS_PENDING) != 0)
         {
-            value |= 128;
-            pad->fake_shift = 1;
-        } 
+            merged_cols |= 1u << 7;
+            pad->fake_shift = PAD_FS_ENGAGED;
+        }
 
         /* ---------------------------------------------------------------- */
         /*  Go back and clear out bits that would get zapped by ghost       */
         /*  paths in the scanning matrix.  These happen wherever there's a  */
         /*  1 in the transpose that isn't matched up to a 0 in the scan val */
         /* ---------------------------------------------------------------- */
-        for (i = 0; i < 8; i++)
+        for (int col = 0; col < 8; col++)
         {
-            uint_32 tmp = tk[i] & pad->side[0];
-            if (tmp)
-                value &= ~(1 << i);
+            const uint32_t col_ghost_bits = keys_by_col[col] & row_select_n;
+            if (col_ghost_bits)
+                merged_cols &= ~(1u << col);
         }
 
-        pad->side[1] = 0xFF & ~value;
-    } 
+        pad->side[1] = 0xFF & ~merged_cols;
+    }
     /* -------------------------------------------------------------------- */
     /*  Handle transposed scanning:                                         */
     /* -------------------------------------------------------------------- */
-    else if (pad->io[1] == 1)
+    else if (pad->io[1] == PAD_DIR_OUTPUT)
     {
         /* ---------------------------------------------------------------- */
-        /*  Ok, merge together the data from the rows selected by side 0.   */
+        /*  Ok, merge together the data from the cols selected by side 1.   */
         /* ---------------------------------------------------------------- */
-        value = 0;
-        for (i = 0; i < 8; i++)
+        const uint32_t col_select_n = pad->side[1];  /* Active Low */
+
+        uint32_t merged_rows = 0;
+        for (int col = 0; col < 8; col++)
         {
-            if ((pad->side[1] & (1 << i)) == 0)
-                value |= tk[i];
+            if ((col_select_n & (1u << col)) == 0)
+                merged_rows |= keys_by_col[col];
         }
 
         /* ---------------------------------------------------------------- */
@@ -286,156 +340,154 @@ uint_32 pad_tk_keyboard(periph_t *p, uint_32 len)
         /*  the scan, and the fake-shift flag being set.  If both are met,  */
         /*  assert the shift in row 6.                                      */
         /* ---------------------------------------------------------------- */
-        if ((pad->side[1] & (1 << 7)) == 0 && (pad->fake_shift & 2) != 0)
+        if ((col_select_n & (1u << 7)) == 0 &&
+            (pad->fake_shift & PAD_FS_PENDING) != 0)
         {
-            value |= 64;
-            pad->fake_shift = 1;
-        } 
+            merged_rows |= 1u << 6;
+            pad->fake_shift = PAD_FS_ENGAGED;
+        }
 
         /* ---------------------------------------------------------------- */
         /*  Go back and clear out bits that would get zapped by ghost       */
         /*  paths in the scanning matrix.  These happen wherever there's a  */
         /*  1 in the transpose that isn't matched up to a 0 in the scan val */
         /* ---------------------------------------------------------------- */
-        for (i = 0; i < 8; i++)
+        for (int row = 0; row < 8; row++)
         {
-            uint_32 tmp = kk[i] & pad->side[1];
-            if (tmp)
-                value &= ~(1 << i);
+            const uint32_t row_ghost_bits = keys_by_row[row] & col_select_n;
+            if (row_ghost_bits)
+                merged_rows &= ~(1u << row);
         }
 
-        pad->side[0] = 0xFF & ~value;
-    } 
-
-    else
-    {
-        fprintf(stderr, "pad_keyboard_tk: INTERNAL ERROR\n");
-        exit(1);
+        pad->side[0] = 0xFF & ~merged_rows;
     }
+}
 
-/*jzp_printf("\n(a) side[0]=%.2X side[1]=%.2X\n", pad->side[0], pad->side[1]);*/
-
+/* ======================================================================== */
+/*  PAD_TICK     -- Just mark the controller inputs stale.                  */
+/* ======================================================================== */
+LOCAL uint32_t pad_tick(periph_t *per, uint32_t len)
+{
+    pad_t *const pad = PERIPH_AS(pad_t, per);
+    pad->stale = true;
     return len;
 }
 
-/*
- * ============================================================================
- *  PAD_READ     -- Returns the current state of the pads.
- * ============================================================================
- */
-uint_32 pad_read        (periph_t *p, periph_t *r, uint_32 a, uint_32 d)
+/* ======================================================================== */
+/*  PAD_READ     -- Returns the current state of the pads.                  */
+/* ======================================================================== */
+LOCAL uint32_t pad_read(periph_t *per, periph_t *req,
+                        uint32_t addr, uint32_t data)
 {
-    pad_t *pad = (pad_t*)p;
+    pad_t *const pad = PERIPH_AS(pad_t, per);
+    UNUSED(req);
+    UNUSED(data);
 
-    UNUSED(r);    
-    UNUSED(d);    
+    if (addr < 14) return ~0U;
 
-    /* -------------------------------------------------------------------- */
-    /*  Ignore accesses that are outside our address space.                 */
-    /* -------------------------------------------------------------------- */
-    if (a < 14) return ~0U;
+    if (pad->stale)
+    {
+        pad->stale = false;
 
-    if (pad->mode == PAD_KEYBOARD)
-        pad_tk_keyboard(p, 0);
+        if (pad->io_cap == PAD_INPUT_ONLY ||
+            (pad->io[0] == PAD_DIR_INPUT && pad->io[1] == PAD_DIR_INPUT))
+            pad_eval_hand(pad);
+        else
+            pad_eval_keyboard(pad);
+    }
 
-    return (pad->side[a & 1] & 0xFF);
+    const int pad_idx = addr & 1;
+    return pad->side[pad_idx];
 }
 
-/*
- * ============================================================================
- *  PAD_WRITE    -- Looks for changes in I/O mode on PSG I/O ports.
- * ============================================================================
- */
-void pad_write(periph_t *p, periph_t *r, uint_32 a, uint_32 d)
+/* ======================================================================== */
+/*  PAD_WRITE    -- Looks for changes in I/O mode on PSG I/O ports.         */
+/* ======================================================================== */
+LOCAL void pad_write(periph_t *per, periph_t *req, uint32_t addr, uint32_t data)
 {
-    pad_t *pad = (pad_t*)p;
+    pad_t *const pad = PERIPH_AS(pad_t, per);
+    UNUSED(req);
 
-    UNUSED(r);    
+    /* -------------------------------------------------------------------- */
+    /*  Only look at lower 8 bits of the write.                             */
+    /* -------------------------------------------------------------------- */
+    data &= 0xFF;
 
     /* -------------------------------------------------------------------- */
     /*  Capture writes to the 'control' register in the PSG, looking for    */
-    /*  I/O direction setup.                                                */
+    /*  I/O direction setup.  Re-evaluate pad if I/O direction changes.     */
     /* -------------------------------------------------------------------- */
-    if (a == 8)
+    if (addr == 8 && pad->io_cap == PAD_BIDIR)
     {
-        int io_0 = (d >> 6) & 1;
-        int io_1 = (d >> 7) & 1;
-        int need_reeval;
+        const pad_io_dir_t io_0 = (data >> 6) & 1 ? PAD_DIR_OUTPUT
+                                                  : PAD_DIR_INPUT;
+        const pad_io_dir_t io_1 = (data >> 7) & 1 ? PAD_DIR_OUTPUT
+                                                  : PAD_DIR_INPUT;
 
-        need_reeval = ((!io_0) & pad->io[0]) |
-                      ((!io_1) & pad->io[1]);
+        pad->stale |= io_0 != pad->io[0] || io_1 != pad->io[1];
 
         pad->io[0] = io_0;
         pad->io[1] = io_1;
-
-        /* ---------------------------------------------------------------- */
-        /*  Force pad state to be re-evaluated if changing a port from      */
-        /*  output to input.                                                */
-        /* ---------------------------------------------------------------- */
-        if (need_reeval)
-        {
-            pad->last_evt--;
-            pad_tk_event(p, 0);
-        }
-
-/*jzp_printf("pad io: %d %d\n", io_0, io_1);*/
-
-        /* ---------------------------------------------------------------- */
-        /*  If we set a side to output, clear the outputted value. (?)      */
-        /* ---------------------------------------------------------------- */
-        /*if (io_0) pad->side[0] = 0;*/
-        /*if (io_1) pad->side[1] = 0;*/
     }
 
     /* -------------------------------------------------------------------- */
     /*  Look for writes to I/O port 0 and 1.  If they're set to output,     */
-    /*  record the writes.                                                  */
+    /*  record the writes.  Re-evaluate pad if I/O output changes.          */
     /* -------------------------------------------------------------------- */
-    if (a >= 14 && pad->io[a & 1])
+    const int pad_idx = addr & 1;
+    if (addr >= 14 && pad->io[pad_idx] == PAD_DIR_OUTPUT)
     {
-        pad->side[a & 1] = d;
+        pad->stale |= pad->side[pad_idx] != data;
+        pad->side[pad_idx] = data;
     }
-/*jzp_printf("(b) side[0]=%.2X side[1]=%.2X\n", pad->side[0], pad->side[1]);*/
 
-    return ;
+    return;
 }
 
-/*
- * ============================================================================
- *  PAD_INIT     -- Makes a dummy pad
- * ============================================================================
- */
+/* ======================================================================== */
+/*  PAD_RESET_INPUTS -- Reset the input bitvectors.  Used when switching    */
+/*                      keyboard input maps.                                */
+/* ======================================================================== */
+void pad_reset_inputs(pad_t *const pad)
+{
+    memset(pad->l, 0, sizeof(pad->l));
+    memset(pad->r, 0, sizeof(pad->r));
+    memset(pad->k, 0, sizeof(pad->k));
+    pad->fake_shift = PAD_FS_IDLE;
+    pad->stale = true;
+}
+
+/* ======================================================================== */
+/*  PAD_INIT     -- Makes a pair of input controller pads                   */
+/* ======================================================================== */
 int pad_init
 (
-    pad_t           *pad,       /*  pad_t structure to initialize       */
-    uint_32         addr,       /*  Base address of pad.                */
-    pad_mode_t      initial     /*  Initial controller/keyboard mode    */
+    pad_t          *const pad,      /*  pad_t structure to initialize       */
+    const uint32_t        addr,     /*  Base address of pad.                */
+    const pad_io_cap_t    io_cap    /*  Input only, or bidirectional?       */
 )
 {
     pad->periph.read      = pad_read;
     pad->periph.write     = pad_write;
     pad->periph.peek      = pad_read;
     pad->periph.poke      = pad_write;
-    pad->periph.tick      = pad_tk_event;
-    pad->periph.min_tick  = 3579545 / (4*120);  /* 120Hz scanning rate. */
-    pad->periph.max_tick  = 3579545 / (4* 60);  /* 60Hz scanning rate.  */
+    pad->periph.tick      = pad_tick;
+    pad->periph.min_tick  = 3579545 / (4*240);  /* 240Hz scanning rate. */
+    pad->periph.max_tick  = 3579545 / (4*120);  /* 120Hz scanning rate. */
 
     pad->periph.addr_base = addr;
     pad->periph.addr_mask = 0xF;
 
-    pad->mode             = initial;
     pad->side[0]          = 0xFF;
     pad->side[1]          = 0xFF;
-    pad->io  [0]          = 0;
-    pad->io  [1]          = 0;
-                  
-    memset(pad->l, 0, sizeof(pad->l));
-    memset(pad->r, 0, sizeof(pad->r));
-    memset(pad->k, 0, sizeof(pad->k));
+    pad->io  [0]          = PAD_DIR_INPUT;
+    pad->io  [1]          = PAD_DIR_INPUT;
+    pad->io_cap           = io_cap;
+
+    pad_reset_inputs(pad);
 
     return 0;
 }
-
 
 /* ======================================================================== */
 /*  This program is free software; you can redistribute it and/or modify    */
@@ -448,9 +500,9 @@ int pad_init
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
-/*                 Copyright (c) 1998-2004, Joseph Zbiciak                  */
+/*                 Copyright (c) 1998-2020, Joseph Zbiciak                  */
 /* ======================================================================== */

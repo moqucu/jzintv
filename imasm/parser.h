@@ -11,8 +11,8 @@ as published by the Free Software Foundation; either version 2
 of the License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of 
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the 
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
@@ -25,13 +25,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #define PARSER_H_INCLUDED
 
 #include <string>
-#include <fstream>
 #include <list>
 #include <map>
 
 #include "strfifo.h"
-
-using namespace std;
 
 int stricmp_(const char *str1, const char *str2);
 
@@ -44,17 +41,17 @@ enum
 
 typedef struct _tag_symbol
 {
-    string sName;
+    std::string sName;
     int iVal;
     int iSize;
 } symbol;
 
 typedef struct _tag_macro
 {
-    string sName;
+    std::string sName;
     int iType;
-    vector<string> argVector;
-    vector<string> codeVector;
+    std::vector<std::string> argVector;
+    std::vector<std::string> codeVector;
 } macro;
 
 struct Parser_ltstr
@@ -69,8 +66,8 @@ class Parser
 {
     public:
         Parser(StringFIFO *iFIFO, StringFIFO *oFIFO) :
-            inputFIFO (iFIFO), 
-            outputFIFO(oFIFO) { }
+            inputFIFO (iFIFO),
+            outputFIFO(oFIFO), num_expansions(0) { }
 
         ~Parser();
 
@@ -80,33 +77,39 @@ class Parser
 
         struct ParseError
         {
-            string msg;
-            ParseError(string &m) : msg(m) { }
+            std::string msg;
+            ParseError(std::string &m) : msg(m) { }
         };
 
 
     private:
 
         StringFIFO *inputFIFO, *outputFIFO;
+        int num_expansions;
 
-        void PutString(string &s, bool addNl = true, bool Ignore = false);
-        void PutStringAsCmt(string &s, bool addNl = true, bool Ignore = false);
+        void PutString(std::string &s, bool addNl = true,
+                       IgnoreFlags Ignore = {false,false});
+        void PutStringAsCmt(std::string &s, bool addNl = true,
+                            IgnoreFlags Ignore = {false,false});
 
-        int ParseLine(string &s);
-        int ReadMacro(macro *pMacro, string &szLine);
-        int ExpandMacro(macro *pMacro, string &sLine, string &sTargetString);
+        int ParseLine(std::string &s);
+        int ReadMacro(macro *pMacro, std::string &szLine);
+        int ExpandMacro(macro *pMacro, std::string &sLine,
+                        std::string &sTargetString);
         int ThrowError(const char *format, ...);
         int ThrowWarning(const char *format, ...);
-        int FindMacros(string &sLine, string &sOut);
-        int StripReturn(string &s);
+        int FindMacros(std::string &sLine, std::string &sOut);
+        int StripReturn(std::string &s);
         int StripReturn(char *s);
-        
-        macro *GetMacroPtr(const char *macName);
-        int GetMacroString(macro *pMacro, string &sLine, string &sOut);
-        int GetMacroArgs(macro *pMacro, string &sMacro);
-        int GetMacroArgs(string &sMacName, string &sMacro, vector<string> &argVector, int iType);
 
-        map<const char *, macro *, Parser_ltstr> m_macroMap;
+        macro *GetMacroPtr(const char *macName);
+        int GetMacroString(macro *pMacro, std::string &sLine,
+                           std::string &sOut);
+        int GetMacroArgs(macro *pMacro, std::string &sMacro);
+        int GetMacroArgs(std::string &sMacName, std::string &sMacro,
+                         std::vector<std::string> &argVector, int iType);
+
+        std::map<const char *, macro *, Parser_ltstr> m_macroMap;
         char m_szError[MAX_PATH];
 };
 

@@ -4,22 +4,21 @@
  *
  *  Author:         J. Zbiciak
  *
- *  $Id: op_decode.c,v 1.18 2001/02/03 02:34:21 im14u2c Exp $
  *
  * ============================================================================
  *
  *  This module is responsible for decoding CP-1610 instructions on the fly.
  *  The main function is "fn_decode" which is registered as the "execute"
  *  function for all instructions which require decoding.  Included in this
- *  module are lookup tables used in decoding, as well as specialized decoder 
+ *  module are lookup tables used in decoding, as well as specialized decoder
  *  functions for all of the CP-1610 instruction formats.
  *
  *  Wherever possible, the CP-1610 model tries to move complexity away from
  *  the execute functions and towards the decoder.  This is due to the fact
- *  that we cache decoded functions whenever possible, and thus most 
- *  instructions will only be decoded once.  
+ *  that we cache decoded functions whenever possible, and thus most
+ *  instructions will only be decoded once.
  *
- *  Self-modifying code is supported by setting the execute functions for 
+ *  Self-modifying code is supported by setting the execute functions for
  *  locations that are modified to "fn_decode", forcing the instructions
  *  at those locations to be re-decoded.  (Actually, the two locations just
  *  before the modified location are also set to "fn_decode", because some
@@ -28,7 +27,7 @@
  *  Some perverse code may have MVII instructions that are *optionally*
  *  executed w/ an SDBD prefix.  This is handled by requiring the execute
  *  functions to update the program counter, and having MVII actually check
- *  to see if we're in DBD mode for the current cycle.  We always decode 3 
+ *  to see if we're in DBD mode for the current cycle.  We always decode 3
  *  bytes for MVII, and calculate both possible immediate operands in the
  *  decoder.   The execute function picks the correct immediate based on the
  *  DBD mode at execute time.
@@ -48,12 +47,12 @@
  *  DIS_REG_2OP         -- Decodes Register  -> Register 2-op
  *  DIS_COND_BR         -- Decodes Conditional branches
  *  DIS_DIR_2OP         -- Decodes Direct    -> Register 2-op
- *  DIS_IND_2OP         -- Decodes Indirect  -> Register 2-op 
+ *  DIS_IND_2OP         -- Decodes Indirect  -> Register 2-op
  *  DIS_IMM_2OP         -- Decodes Immediate -> Register 2-op
  * ============================================================================
  *  Execute function pointer lookup tables:
  *
- *  FN_IND_2OP          -- Indirect  -> Register 2-op 
+ *  FN_IND_2OP          -- Indirect  -> Register 2-op
  *  FN_DIR_2OP          -- Direct    -> Register 2-op
  *  FN_IMM_2OP          -- Immediate -> Register 2-op
  *  FN_COND_BR          -- Conditional branches
@@ -91,7 +90,7 @@
  *  DIS_REG_2OP         -- Decodes Register  -> Register 2-op
  *  DIS_COND_BR         -- Decodes Conditional branches
  *  DIS_DIR_2OP         -- Decodes Direct    -> Register 2-op
- *  DIS_IND_2OP         -- Decodes Indirect  -> Register 2-op 
+ *  DIS_IND_2OP         -- Decodes Indirect  -> Register 2-op
  *  DIS_IMM_2OP         -- Decodes Immediate -> Register 2-op
  * ============================================================================
  */
@@ -128,7 +127,7 @@ LOCAL  const op_decode_t dis_decode[] =
 
 LOCAL  const int dis_length[] =
 {
-    1, 1, 3, 1, 1, 1, 1, 1, 2, 2, 1, 2  
+    1, 1, 3, 1, 1, 1, 1, 1, 2, 2, 1, 2
 };
 
 
@@ -165,7 +164,7 @@ LOCAL  void     dis_impl_1op_b  (instr_t *instr, cp1600_ins_t *execute)
  */
 LOCAL  void     dis_jump        (instr_t *instr, cp1600_ins_t *execute)
 {
-    uint_32 imm0, imm1, reg0, op;
+    uint32_t imm0, imm1, reg0, op;
 
     /* -------------------------------------------------------------------- */
     /*  Set 'imm0' to be the destination address.  The dest address is      */
@@ -280,7 +279,7 @@ LOCAL  void     dis_rot_1op     (instr_t *instr, cp1600_ins_t *execute)
  */
 LOCAL  void     dis_reg_2op     (instr_t *instr, cp1600_ins_t *execute)
 {
-    uint_32 reg0, reg1, pc0, pc1, op;
+    uint32_t reg0, reg1, pc0, pc1, op;
 
 
     /* -------------------------------------------------------------------- */
@@ -296,7 +295,7 @@ LOCAL  void     dis_reg_2op     (instr_t *instr, cp1600_ins_t *execute)
     /*  Handle special case of TSTR Rx directly for minor speedup.          */
     /* -------------------------------------------------------------------- */
     op   = instr->opcode.reg_2op.op | (pc1<<3) | (pc0<<4);
-    *execute = (reg0 == reg1 && op == 2) ? 
+    *execute = (reg0 == reg1 && op == 2) ?
                         (cp1600_ins_t) fn_TST_rr :
                         (cp1600_ins_t) fn_reg_2op[op];
 
@@ -311,7 +310,7 @@ LOCAL  void     dis_reg_2op     (instr_t *instr, cp1600_ins_t *execute)
  */
 LOCAL  void     dis_cond_br     (instr_t *instr, cp1600_ins_t *execute)
 {
-    uint_32 op, imm0, imm1;
+    uint32_t op, imm0, imm1;
 
     /* -------------------------------------------------------------------- */
     /*  Look up the opcode in the cond_br table.  This opcode word has      */
@@ -336,7 +335,7 @@ LOCAL  void     dis_cond_br     (instr_t *instr, cp1600_ins_t *execute)
     /* -------------------------------------------------------------------- */
     imm0 = instr->opcode.cond_br.disp;
 
-    if (instr->opcode.cond_br.dir) 
+    if (instr->opcode.cond_br.dir)
         imm0 = ~imm0;
 
     imm0 += instr->address + 2 ;
@@ -358,7 +357,7 @@ LOCAL  void     dis_cond_br     (instr_t *instr, cp1600_ins_t *execute)
  */
 LOCAL  void     dis_dir_2op     (instr_t *instr, cp1600_ins_t *execute)
 {
-    uint_32 reg0, imm0;
+    uint32_t reg0, imm0;
 
     /* -------------------------------------------------------------------- */
     /*  Look up the opcode in the Direct->Register 2op table.               */
@@ -377,14 +376,14 @@ LOCAL  void     dis_dir_2op     (instr_t *instr, cp1600_ins_t *execute)
 
 /*
  * ============================================================================
- *  DIS_IND_2OP         -- Decodes Indirect  -> Register 2-op 
+ *  DIS_IND_2OP         -- Decodes Indirect  -> Register 2-op
  * ============================================================================
  */
 LOCAL  void     dis_ind_2op     (instr_t *instr, cp1600_ins_t *execute)
 {
-    uint_32 reg0, reg1;
-    uint_32 op;
-    uint_32 no_dbd = 0;
+    uint32_t reg0, reg1;
+    uint32_t op;
+    uint32_t no_dbd = 0;
 
     /* -------------------------------------------------------------------- */
     /*  Set 'reg0' to be the address register, and 'reg1' to be the src/    */
@@ -415,7 +414,7 @@ LOCAL  void     dis_ind_2op     (instr_t *instr, cp1600_ins_t *execute)
     instr->opcode.decoder.reg0 = reg0;
     instr->opcode.decoder.reg1 = reg1;
 }
-    
+
 /*
  * ============================================================================
  *  DIS_IMM_2OP         -- Decodes Immediate -> Register 2-op
@@ -424,7 +423,7 @@ LOCAL  void     dis_ind_2op     (instr_t *instr, cp1600_ins_t *execute)
 
 LOCAL  void     dis_imm_2op     (instr_t *instr, cp1600_ins_t *execute)
 {
-    uint_32 reg0, imm0, imm1, no_dbd = 0;
+    uint32_t reg0, imm0, imm1, no_dbd = 0;
 
     /* -------------------------------------------------------------------- */
     /*  Peek at the previous word and see if it's SDBD.  If not, we will    */
@@ -471,13 +470,13 @@ LOCAL  void     dis_imm_2op     (instr_t *instr, cp1600_ins_t *execute)
  * ============================================================================
  */
 int
-fn_decode 
+fn_decode
 (
     instr_t *instr,
     cp1600_t *cp1600
 )
 {
-    uint_16 w,pw,pc,pc2,dpc,dpc2;
+    uint16_t w, pw, pc, pc2, dpc, dpc2;
     int cycles, words, i;
     cp1600_ins_t fn_execute = (cp1600_ins_t) fn_invalid;
     instr_fmt_t  format;
@@ -560,9 +559,9 @@ fn_decode
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                 Copyright (c) 1998-2003, Joseph Zbiciak                  */
 /* ======================================================================== */

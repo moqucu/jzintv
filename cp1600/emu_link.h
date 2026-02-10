@@ -8,7 +8,7 @@
 #ifndef EMU_LINK_H_
 #define EMU_LINK_H_
 
-typedef int (*emu_link_api_t)(cp1600_t *, int *);
+typedef int emu_link_api_t(cp1600_t *, int *, void *);
 
 /* ======================================================================== */
 /*  EMU_LINK_INIT -- Initialize EMU_LINK subsystem.                         */
@@ -18,7 +18,7 @@ int emu_link_init(void);
 /* ======================================================================== */
 /*  EMU_LINK_REGISTER -- Register an API with EMU_LINK                      */
 /* ======================================================================== */
-int emu_link_register(emu_link_api_t fn, int callno);
+int emu_link_register(emu_link_api_t *fn, int callno, void *opaque);
 
 /* ======================================================================== */
 /*  EMU_LINK_DISPATCH -- Dispatch to an EMU_LINK API                        */
@@ -43,9 +43,9 @@ void emu_link_dtor(void);
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                   Copyright (c) 2005, Joseph Zbiciak                     */
 /* ======================================================================== */

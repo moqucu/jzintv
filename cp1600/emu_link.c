@@ -26,15 +26,17 @@
 #include "cp1600/emu_link.h"
 
 
-static emu_link_api_t *emu_link_api = NULL;
+static emu_link_api_t **emu_link_api = NULL;
+static void **emu_link_opq = NULL;
 static int emu_link_api_cnt = 0, emu_link_api_alloc = 0;
 
 /* ======================================================================== */
 /*  EMU_LINK_PING -- Simple API for presence detect.                        */
 /* ======================================================================== */
-LOCAL int emu_link_ping(cp1600_t *cpu, int *fail)
+LOCAL int emu_link_ping(cp1600_t *cpu, int *fail, void *opaque)
 {
     UNUSED(cpu);
+    UNUSED(opaque);
     *fail = 0;
     return 0;
 }
@@ -44,7 +46,7 @@ LOCAL int emu_link_ping(cp1600_t *cpu, int *fail)
 /* ======================================================================== */
 int emu_link_init(void)
 {
-    emu_link_api        = CALLOC(emu_link_api_t, 16);
+    emu_link_api        = CALLOC(emu_link_api_t *, 16);
     emu_link_api_cnt    = 1;
     emu_link_api_alloc  = 16;
 
@@ -62,7 +64,7 @@ int emu_link_init(void)
 /* ======================================================================== */
 /*  EMU_LINK_REGISTER -- Register an API with EMU_LINK                      */
 /* ======================================================================== */
-int emu_link_register(emu_link_api_t fn, int callno)
+int emu_link_register(emu_link_api_t *fn, int callno, void *opaque)
 {
     int old_alloc = emu_link_api_alloc;
     int i;
@@ -70,23 +72,28 @@ int emu_link_register(emu_link_api_t fn, int callno)
     while (emu_link_api_alloc <= callno)
         emu_link_api_alloc <<= 1;
 
-    emu_link_api = (emu_link_api_t *) 
-                        realloc(emu_link_api, 
-                                emu_link_api_alloc * sizeof(emu_link_api_t));
+    emu_link_api = REALLOC(emu_link_api, emu_link_api_t *, emu_link_api_alloc);
+    emu_link_opq = REALLOC(emu_link_opq, void *, emu_link_api_alloc);
 
-    if (!emu_link_api)
+    if (!emu_link_api || !emu_link_opq)
     {
+        CONDFREE(emu_link_api);
+        CONDFREE(emu_link_opq);
         fprintf(stderr, "emu_link: Out of memory\n");
         return -1;
     }
 
     for (i = old_alloc; i < emu_link_api_alloc; i++)
+    {
         emu_link_api[i] = NULL;
+        emu_link_opq[i] = NULL;
+    }
 
     if (emu_link_api[callno] != NULL)
         fprintf(stderr, "emu_link: Warning: API %d reassigned\n", callno);
-    
+
     emu_link_api[callno] = fn;
+    emu_link_opq[callno] = opaque;
 
     if (callno > emu_link_api_cnt)
         emu_link_api_cnt = callno;
@@ -113,8 +120,8 @@ void emu_link_dispatch(cp1600_t *cpu)
         cpu->r[0] = 0xFFFF;
         return;
     }
-    
-    cpu->r[0] = emu_link_api[cpu->r[1]](cpu, &fail);
+
+    cpu->r[0] = emu_link_api[cpu->r[1]](cpu, &fail, emu_link_opq[cpu->r[1]]);
     /*Dprintf(("EMU-LINK Result:  %.4X %d\n", cpu->r[0], fail));*/
 
     cpu->C = fail != 0;
@@ -142,9 +149,9 @@ void emu_link_dtor(void)
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                   Copyright (c) 2005, Joseph Zbiciak                     */
 /* ======================================================================== */

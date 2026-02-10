@@ -4,8 +4,6 @@
 #
 # 10-bit wide lookup table.
 #
-# $Id: formats.tbl,v 1.5 1999/09/06 22:41:22 im14u2c Exp $
-#
 ##############################################################################
 10,         "-1,    /* ERROR */" # all entries should be filled. 
 1ooommmddd, "fmt_ind_2op,       /* Indirect  -> Register 2-op arith */"
@@ -20,5 +18,5 @@
 00000000oo, "fmt_impl_1op_a,    /* Implied 1-op arithmetic  (a)     */"
 00000001oo, "fmt_impl_1op_b,    /* Implied 1-op arithmetic  (b)     */"
 0000000100, "fmt_jump,          /* Absolute jump instructions       */"
-.prolog "/* Auto generated, do not edit */\n\n#include \"cp1600/op_tables.h\"\nconst uint_8 dec_format[] =\n{"
+.prolog "/* Auto generated, do not edit */\n\n#include \"cp1600/op_tables.h\"\nconst uint8_t dec_format[] =\n{"
 .epilog "};\n"

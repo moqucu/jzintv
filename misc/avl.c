@@ -3,26 +3,26 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include "avl.h" 
+#include "avl.h"
 
 /*
     Types defined: (defined in avl.h)
- 
+
         TAVLTree  -- Struct containing root ptr, current compare func, etc.
         PAVLTree  -- Pointer to AVLTree structure
- 
+
         TAVLNode  -- Struct containing the data record, ptrs to chldrn, and
                      the balance factor
         PAVLNode  -- Pointer to AVLNode structure
         PPAVLNode -- Pointer to pointer to AVLNode structure
- 
+
         EAVLBal   -- Enum of balance factor values
- 
+
         EAVLOrd   -- Enum of traversal orders
- 
+
         EAVLErr   -- Enum of AVL routine error codes
         CAVLEmsg  -- Constant array of error messages corres. w/ EAVLErr
- 
+
     Types used: (defined elsewhere)
 
         TRec      -- Data record held in tree
@@ -36,8 +36,8 @@
 
     Exported functions:
 
-        int AVL_AddNode(PAVLTree tree, void * rec) 
-                --> Adds a node containing 'rec' to tree pointed to by 
+        int AVL_AddNode(PAVLTree tree, void * rec)
+                --> Adds a node containing 'rec' to tree pointed to by
                     '*root'.  Returns non-zero on error.
 
         int AVL_DelNode(PAVLTree tree, void * rec)
@@ -46,7 +46,7 @@
 
         int AVL_SearchTree(PAVLTree tree, void * rec, void ** node)
                 --> Searches tree '*tree' for node matching 'rec' by key
-                    using the current key comparison function, and places 
+                    using the current key comparison function, and places
                     result in '*node'.  Returns non-zero on error.
 
         int AVL_SearchWholeTree
@@ -85,7 +85,7 @@
         Traverse        --> implements recursive traversal of tree
         Search          --> implements nonrecursive binary search of tree
         SearchAll       --> implements recursive sequential search
-        
+
         GetNode         --> Allocates memory for one AVLNode
         PutNode         --> Deallocates memory for one AVLNode
         FillPool        --> Mallocs a pool of nodes (for GetNode)
@@ -105,17 +105,17 @@
 
 /*
     Side note:  I realize that it is considered 'incorrect' to place
-    punctuation that is associated with a word or words in quotes 
+    punctuation that is associated with a word or words in quotes
     outside the quotation marks.  However, in the field of computing,
     where quoted expressions are meant to specify a literal expression,
     to be taken exactly, and where such punctuation is not correctly
-    part of the literal expression, then the only recourses are to 
+    part of the literal expression, then the only recourses are to
     (a) wrongfully place the puctuation inside the quotes, thus making
     the literal string incorrect, (b) omit the punctuation, leading
     to confusing sentence structures, or (c) risk offending strict
     purists by placing the affected punctuation outside the quotation
     marks.  I have opted for (c) as it is the most reasonable in my
-    own opinion.  
+    own opinion.
 */
 
 const char * CAVLEmsg[]=
@@ -131,7 +131,7 @@ const char * CAVLEmsg[]=
 typedef enum { False=0, True=1 } Boolean;
 
 /* this is where we store our current key search comparison function */
-static int (*S_Comp)(void *,void *);  
+static int (*S_Comp)(void *,void *);
 
 
 
@@ -149,18 +149,18 @@ FillPool
     int i;
 
     end=(PAVLNode)malloc(CLUMPSIZE);
- 
-    if (!end) 
+
+    if (!end)
     {
         fprintf(stderr,"avl.c:  Out of memory in FillPool!\n");
         exit(1);
     }
- 
+
     for(i=CLUMPCOUNT-1;i>0;i--)
     {
         PutNode(end+i);
     }
- 
+
     return;
 }
 
@@ -169,16 +169,16 @@ GetNode
 (void)
 {
     PAVLNode node;
- 
+
     if (AVLNodePool==NULL) FillPool();
- 
+
     node=AVLNodePool;
- 
+
     AVLNodePool=node->r;
- 
+
     node->r=node->l=NULL;
     node->bal=Balanced;
-     
+
     return node;
 }
 
@@ -208,7 +208,7 @@ Rotate_Left
         c->r  =p;
         p->bal=Balanced;
         p     =c;
-    } else 
+    } else
     {
         /* LR */
         g   =c->r;
@@ -258,7 +258,7 @@ Rotate_Right
         c->l  =p;
         p->bal=Balanced;
         p     =c;
-    } else 
+    } else
     {
         /* RL */
         g   =c->l;
@@ -310,9 +310,9 @@ insert
         *pp=p;
         return False;
     }
-        
+
     i=S_Comp(p->rec,rec);
-    if (i==0) 
+    if (i==0)
     {
         *Unbal=False;
         return True;
@@ -360,9 +360,9 @@ insert
     return False;
 }
 
-int 
+int
 AVL_AddNode
-(PAVLTree tree, void * rec) 
+(PAVLTree tree, void * rec)
 {
     Boolean Unbal=False;
     Boolean in_tree;
@@ -386,7 +386,7 @@ AVL_AddNode
     return EAVL_NOERR;
 }
 
-static int 
+static int
 Traverse
 (PAVLNode node, EAVLOrd order, int (*act)(void *))
 /* Internal recursive subfunction of AVL_Traverse */
@@ -454,7 +454,7 @@ Search
     return NULL;
 }
 
-int 
+int
 AVL_SearchTree
 (PAVLTree tree, void * rec, void ** node)
 {
@@ -466,7 +466,7 @@ AVL_SearchTree
     if (tree->comp==NULL) return EAVL_NOCOMP;
 
     S_Comp=tree->comp;
-    n=Search(tree->root, rec);  
+    n=Search(tree->root, rec);
 
     if (n==NULL) return EAVL_NOTFOUND;
 
@@ -494,7 +494,7 @@ Search_Top:
 }
 
 
-int 
+int
 AVL_SearchWholeTree
 (PAVLTree tree, void * rec, PPAVLNode node, int (*comp)(void *,void *))
 {
@@ -506,7 +506,7 @@ AVL_SearchWholeTree
     if (comp==NULL) return EAVL_NOCOMP;
 
     S_Comp=comp;
-    n=SearchAll(tree->root, rec);   
+    n=SearchAll(tree->root, rec);
 
     if (n==NULL) return EAVL_NOTFOUND;
 
@@ -521,7 +521,7 @@ KillTree
 {
     PAVLNode n;
     if (node==NULL) return;
-    
+
     while (node!=NULL)
     {
         if (node->rec!=NULL) free(node->rec);
@@ -538,7 +538,7 @@ KillJustTree
 {
     PAVLNode n;
     if (node==NULL) return;
-    
+
     while (node!=NULL)
     {
         if (node->l!=NULL) KillJustTree(node->l);
@@ -559,7 +559,7 @@ AVL_KillTree
     return EAVL_NOERR;
 }
 
-int 
+int
 AVL_KillJustTree
 (PAVLTree tree)
 {
@@ -570,7 +570,7 @@ AVL_KillJustTree
     return EAVL_NOERR;
 }
 
-int 
+int
 AVL_SetTreeComp
 (PAVLTree tree, int (*comp)(void *,void *))
 {
@@ -618,7 +618,7 @@ avl_delete
         }
     }
 
-    if (i==0) 
+    if (i==0)
     {
         *Found=True;
         /* Do delete */
@@ -656,7 +656,7 @@ avl_delete
             }
         }
     /*  return True;*/
-    } 
+    }
     if (i<0)
     {
         in_tree=avl_delete(&(p->l),rec,Unbal,Found,PPrec);
@@ -744,8 +744,8 @@ dump
     if (node==NULL) return;
     dump(node->l,level+1,act);
     for(i=0;i<level;i++) printf("  .");
-    printf("(%p,%p,%c)[%p,%p]", 
-            (void*)node, node->rec, Bal[node->bal], 
+    printf("(%p,%p,%c)[%p,%p]",
+            (void*)node, node->rec, Bal[node->bal],
             (void*)node->l, (void*)node->r);
     if (act!=NULL) act(node->rec);
     printf("\n");
@@ -754,7 +754,7 @@ dump
 
 void
 AVL_DumpTreeInfo
-(PAVLTree tree,int (*act)(void *)) 
+(PAVLTree tree,int (*act)(void *))
 {
     printf("--start dump\n");
     printf("tree  ==%p\n",(void*)tree);
@@ -777,9 +777,9 @@ AVL_DumpTreeInfo
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                 Copyright (c) 1998-2001, Joseph Zbiciak                  */
 /* ======================================================================== */

@@ -25,9 +25,9 @@
 /* ======================================================================== */
 /*  Utility functions for pulling apart frames.                             */
 /* ======================================================================== */
-static inline uint_32 get_32(uint_8 **buf)
+static inline uint32_t get_32(uint8_t **buf)
 {
-    uint_32 word;
+    uint32_t word;
 
     word = ((*buf)[3] << 24) |
            ((*buf)[2] << 16) |
@@ -39,9 +39,9 @@ static inline uint_32 get_32(uint_8 **buf)
     return word;
 }
 
-static inline uint_16 get_16(uint_8 **buf)
+static inline uint16_t get_16(uint8_t **buf)
 {
-    uint_16 word;
+    uint16_t word;
 
     word = ((*buf)[1] <<  8) |
            ((*buf)[0] <<  0);
@@ -51,9 +51,9 @@ static inline uint_16 get_16(uint_8 **buf)
     return word;
 }
 
-static inline uint_8 get_8(uint_8 **buf) 
-{ 
-    return *(*buf)++; 
+static inline uint8_t get_8(uint8_t **buf)
+{
+    return *(*buf)++;
 }
 
 #define GET_32(buf) get_32(&buf)
@@ -83,17 +83,17 @@ typedef struct frame_t
 {
     struct frame_t *next, *prev;
 
-    uint_32 stic_chg;
-    uint_32 gram_chg[2];
-    uint_32 btab_chg[8];
-    uint_32 psg0_chg;
-    uint_32 psg1_chg;
+    uint32_t stic_chg;
+    uint32_t gram_chg[2];
+    uint32_t btab_chg[8];
+    uint32_t psg0_chg;
+    uint32_t psg1_chg;
 
-    uint_16 stic[32 ];
-    uint_16 gram[64 ];  // tile_db indices, not images.
-    uint_16 btab[240];
-    uint_8  psg0[14 ];
-    uint_8  psg1[14 ];
+    uint16_t stic[32 ];
+    uint16_t gram[64 ];  // tile_db indices, not images.
+    uint16_t btab[240];
+    uint8_t  psg0[14 ];
+    uint8_t  psg1[14 ];
 } frame_t;
 
 /* ======================================================================== */
@@ -105,7 +105,7 @@ typedef struct frame_t
 
 typedef struct tile_t
 {
-    uint_8 tile[8];
+    uint8_t tile[8];
     struct tile_t *hs_next; /* chained hashing.                             */
 } tile_t;
 
@@ -116,9 +116,9 @@ tile_t *tile_hash[HASH_SZ];
 tile_t  tile_db[MAX_TILES];
 int num_tiles = 0;
 
-int tile_to_id(uint_8 *tile)
+int tile_to_id(uint8_t *tile)
 {
-    uint_32 r0, r1;
+    uint32_t r0, r1;
     int hash;
     int i;
     tile_t *t;
@@ -175,13 +175,13 @@ frame_t *read_demo_file(char *fname)
     frame_t *prev = NULL;
     FILE *f;
 
-    uint_8 hdr[HDR_SZ], *buf;
-    uint_8 stic_tmp[32*2];
-    uint_8 gram_tmp[512];
-    uint_8 btab_tmp[240*2];
-    uint_8 psg0_tmp[14];
-    uint_8 psg1_tmp[14];
-    uint_32 sig;
+    uint8_t hdr[HDR_SZ], *buf;
+    uint8_t stic_tmp[32*2];
+    uint8_t gram_tmp[512];
+    uint8_t btab_tmp[240*2];
+    uint8_t psg0_tmp[14];
+    uint8_t psg1_tmp[14];
+    uint32_t sig;
     int r;
     int i, j;
     int stic_cnt, gram_cnt, btab_cnt, psg0_cnt, psg1_cnt;
@@ -213,7 +213,7 @@ frame_t *read_demo_file(char *fname)
         curr->prev = prev;
         if (prev)
             prev->next = curr;
-        if (!head) 
+        if (!head)
             head = curr;
 
         buf = hdr;
@@ -222,11 +222,11 @@ frame_t *read_demo_file(char *fname)
 
         if (sig != 0x2A3A4A5A)
         {
-            fprintf(stderr, 
+            fprintf(stderr,
                     "Expected frame signature, got %.8X instead\n"
                     "File offset:  %llu\n"
                     "Frame number: %d\n",
-                    sig, (uint_64)ftell(f), frame_no);
+                    sig, (uint64_t)ftell(f), frame_no);
             exit(1);
         }
 
@@ -277,45 +277,45 @@ frame_t *read_demo_file(char *fname)
         if (stic_cnt &&
             (r = fread(stic_tmp, 2, stic_cnt, f)) != stic_cnt)
         {
-            fprintf(stderr, 
+            fprintf(stderr,
                     "Short read getting STIC regs from frame.\n"
-                    "File offset:  %llu\n", (uint_64)ftell(f));
+                    "File offset:  %llu\n", (uint64_t)ftell(f));
             exit(1);
         }
 
         if (gram_cnt &&
             (r = fread(gram_tmp, 8, gram_cnt, f)) != gram_cnt)
         {
-            fprintf(stderr, 
+            fprintf(stderr,
                     "Short read getting GRAM tiles from frame.\n"
-                    "File offset:  %llu\n", (uint_64)ftell(f));
+                    "File offset:  %llu\n", (uint64_t)ftell(f));
             exit(1);
         }
 
         if (btab_cnt &&
             (r = fread(btab_tmp, 2, btab_cnt, f)) != btab_cnt)
         {
-            fprintf(stderr, 
+            fprintf(stderr,
                     "Short read getting BTAB cards from frame.\n"
-                    "File offset:  %llu\n", (uint_64)ftell(f));
+                    "File offset:  %llu\n", (uint64_t)ftell(f));
             exit(1);
         }
 
         if (psg0_cnt &&
             (r = fread(psg0_tmp, 1, psg0_cnt, f)) != psg0_cnt)
         {
-            fprintf(stderr, 
+            fprintf(stderr,
                     "Short read getting PSG0 registers from frame.\n"
-                    "File offset:  %llu\n", (uint_64)ftell(f));
+                    "File offset:  %llu\n", (uint64_t)ftell(f));
             exit(1);
         }
 
         if (psg1_cnt &&
             (r = fread(psg1_tmp, 1, psg1_cnt, f)) != psg1_cnt)
         {
-            fprintf(stderr, 
+            fprintf(stderr,
                     "Short read getting PSG1 registers from frame.\n"
-                    "File offset:  %llu\n", (uint_64)ftell(f));
+                    "File offset:  %llu\n", (uint64_t)ftell(f));
             exit(1);
         }
 
@@ -393,7 +393,7 @@ main(int argc, char *argv[])
                 putchar((tile_db[i].tile[j] << k) & 0x80 ? '#': '.');
             putchar('\n');
         }
-    }         
+    }
 
     for (i = 0; i < 64; i++)
         printf("%4d", gr_chg_hist[i]);

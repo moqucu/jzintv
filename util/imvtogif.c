@@ -12,7 +12,7 @@ mvi_t movie;
  *  GFX_STIC_PALETTE -- The STIC palette.
  * ============================================================================
  */
-uint_8 palette[17][3] = 
+uint8_t palette[17][3] =
 {
     /* -------------------------------------------------------------------- */
     /*  I generated these colors by directly eyeballing my television       */
@@ -22,6 +22,7 @@ uint_8 palette[17][3] =
     /*  to Tint/Brightness/Contrast settings, so your mileage may vary      */
     /*  with this particular pallete setting.                               */
     /* -------------------------------------------------------------------- */
+#if 1
     { 0x00, 0x00, 0x00 },
     { 0x00, 0x2D, 0xFF },
     { 0xFF, 0x3D, 0x10 },
@@ -38,13 +39,32 @@ uint_8 palette[17][3] =
     { 0xA4, 0x96, 0xFF },
     { 0x75, 0xCC, 0x80 },
     { 0xB5, 0x1A, 0x58 },
+#else
+    { 0x00, 0x00, 0x00 },
+    { 0x00, 0x16, 0xFE },
+    { 0xFE, 0x5A, 0x02 },
+    { 0xC0, 0xD8, 0x63 },
+    { 0x00, 0xB7, 0x00 },
+    { 0x00, 0xE6, 0x18 },
+    { 0xF0, 0xFF, 0x56 },
+    { 0xFD, 0xFD, 0xFF },
+    { 0xBF, 0xC3, 0xCA },
+    { 0x00, 0xC8, 0xF0 },
+    { 0xFC, 0xCA, 0x23 },
+    { 0x20, 0x80, 0x00 },
+    { 0xFF, 0x5E, 0xA8 },
+    { 0xA0, 0x90, 0xFF },
+    { 0x90, 0xFF, 0x60 },
+    { 0xC0, 0x10, 0x7A },
+#endif
 
     /* for debug */
     { 0xFF, 0x80, 0x80 },
 };
 
-uint_8 curr[MVI_MAX_X * MVI_MAX_Y];
-uint_8 prev[MVI_MAX_X * MVI_MAX_Y];
+uint8_t curr[MVI_MAX_X * MVI_MAX_Y];
+uint8_t prev[MVI_MAX_X * MVI_MAX_Y];
+uint8_t scaled[MVI_MAX_X * MVI_MAX_Y * 2];
 
 const char * typedesc[6] =
 {
@@ -60,35 +80,58 @@ int color_histo[65536];
 int color_votes[16];
 int color_map[16];
 
-uint_8 map_palette[16][3];
+uint8_t map_palette[16][3];
+
+const char *prog;
+
+static void usage( void )
+{
+    fprintf(stderr, "%s [flags] input.imv output.gif\n", prog);
+    fprintf(stderr, "Flags:\n"
+            "    -d##   Set minimum delay to ##ms, default 50ms.\n"
+            "    -D##   Assume GIF decode delay of ##ms, default 3.33ms.\n"
+            "    -s     Stretch horizontallly 2x.\n"
+            "    -f     Flat images (no transparency or optimization).\n");
+    exit(1);
+}
 
 int main(int argc, char *argv[])
 {
     FILE *fi, *fo;
-    uint_8 bbox[8][4];
+    uint8_t bbox[8][4];
     int fr, out_fr = 0;
     int flag;
     int i, j;
     gif_t gif;
     int prev_gif_time, curr_gif_time, delay;
-    int ret, wrote = 0, skip = 0;
+    /* int ret, wrote = 0, skip = 0; */
+    int ret, wrote = 0;
     int early = 0;
     int same = 0;
     int n_cols = 16;
     int mode = 0;
+    int min_delay = 15, stretch = 0, dec_delay = 1;
 
-    if (argc == 4 && argv[1][0] == '-' && argv[1][1] == '\0')
+    prog = argv[0];
+
+    while ( argc >= 4 && argv[1][0] == '-' )
     {
-        mode = 1;
+        if      ( argv[1][1] == '\0' ) mode = 1;
+        else if ( argv[1][1] == 'f'  ) mode = 1;
+        else if ( argv[1][1] == 'd'  ) min_delay = atof(&argv[1][2])*3/10;
+        else if ( argv[1][1] == 'D'  ) dec_delay = atof(&argv[1][2])*3/10;
+        else if ( argv[1][1] == 's'  ) stretch = 1;
+        else
+        {
+            fprintf(stderr, "%s: unexpected flag %s\n", prog, argv[1] );
+            usage();
+        }
+
         argc--;
         argv++;
     }
 
-    if (argc != 3)
-    {
-        fprintf(stderr, "%s [-] input.imv output.gif\n", argv[0]);
-        exit(1);
-    }
+    if (argc != 3) usage();
 
     mvi_init(&movie, MVI_MAX_X, MVI_MAX_Y);
 
@@ -122,7 +165,7 @@ int main(int argc, char *argv[])
             continue;
 
         for (i = 0; i < movie.x_dim * movie.y_dim; i++)
-            mask |= 1 << curr[i];
+            mask |= 1u << curr[i];
 
         j = 0;
         for (i = 0; i < 16; i++)
@@ -145,7 +188,7 @@ int main(int argc, char *argv[])
     for (i = 0; i < 65536; i++)
     {
         for (j = 0; j < 16; j++)
-            if (i & (1 << j))
+            if (i & (1u << j))
                 color_votes[j] += color_histo[i];
     }
 
@@ -217,7 +260,8 @@ int main(int argc, char *argv[])
             break;
     }
 
-    ret = gif_start(&gif, fo, movie.x_dim, movie.y_dim, map_palette, n_cols,1);
+    ret = gif_start(&gif, fo, stretch ? 2 * movie.x_dim : movie.x_dim,
+                              movie.y_dim, (gif_pal_t)map_palette, n_cols,1);
     if (ret < 0)
     {
         fprintf(stderr, "Error starting GIF file %s\n", argv[2]);
@@ -232,25 +276,41 @@ int main(int argc, char *argv[])
         curr_gif_time += 5;
         fr++;
 
-        if ((flag & MVI_FR_SAME) && !early)    { skip++; same++;    continue; }
-        if (curr_gif_time - prev_gif_time <15) { skip++; early = 1; continue; }
-/*      if (curr_gif_time - prev_gif_time <10) { skip++; early = 1; continue; }
-*/      early = 0;
+        /* if ((flag & MVI_FR_SAME) && !early)    { skip++; same++;    continue; } */
+        if ((flag & MVI_FR_SAME) && !early)    { same++;    continue; }
+        if ( min_delay > 0 && curr_gif_time - prev_gif_time < min_delay )
+        {
+            /* skip++; */
+            early = 1;
+            continue;
+        }
+
+        early = 0;
 
         delay = (curr_gif_time - prev_gif_time) / 3;
 
-        prev_gif_time += 3*delay + 2;
+        prev_gif_time += 3*delay + dec_delay;
 /*printf("skip = %d, delay = %d, curr_gif_time = %d, prev_gif_time = %d\n", skip, delay, curr_gif_time, prev_gif_time);*/
 
         for (i = 0; i < movie.x_dim * movie.y_dim; i++)
             prev[i] = color_map[prev[i]];
 
-        ret = gif_wr_frame_m(&gif, prev, delay, mode);
+        if ( !stretch )
+        {
+            ret = gif_wr_frame_m(&gif, prev, delay, mode);
+        } else
+        {
+            for (i = 0; i < movie.x_dim * movie.y_dim; i++)
+                scaled[ i*2 + 0 ] = scaled[ i*2 + 1 ] = prev[i];
+
+            ret = gif_wr_frame_m(&gif, scaled, delay, mode);
+        }
+
         if (ret == 0)
         {
             memcpy(prev, curr, movie.x_dim * movie.y_dim);
-            prev_gif_time -= 3*delay + 2;
-            skip++;
+            prev_gif_time -= 3*delay + dec_delay;
+            /* skip++; */
             continue;
         }
         if (ret < 0)
@@ -262,7 +322,7 @@ int main(int argc, char *argv[])
         wrote += ret;
 
         memcpy(prev, curr, movie.x_dim * movie.y_dim);
-        skip = 0;
+        /* skip = 0; */
         out_fr++;
 /*if (out_fr == 100) break;*/
     }
@@ -274,7 +334,16 @@ int main(int argc, char *argv[])
     for (i = 0; i < movie.x_dim * movie.y_dim; i++)
         prev[i] = color_map[prev[i]];
 
-    ret = gif_wr_frame_m(&gif, prev, delay, mode);
+    if ( !stretch )
+    {
+        ret = gif_wr_frame_m(&gif, prev, delay, mode);
+    } else
+    {
+        for (i = 0; i < movie.x_dim * movie.y_dim; i++)
+            scaled[ i*2 + 0 ] = scaled[ i*2 + 1 ] = prev[i];
+
+        ret = gif_wr_frame_m(&gif, scaled, delay, mode);
+    }
     if (ret < 0)
     {
         fprintf(stderr, "Error writing frame %d of GIF file %s\n",
@@ -292,10 +361,10 @@ int main(int argc, char *argv[])
     wrote += ret;
     fclose(fo);
 
-    printf("Decoded %d source frames (%d dupes, %d dropped)\n", 
+    printf("Decoded %d source frames (%d dupes, %d dropped)\n",
             fr, same, fr - out_fr - same);
     printf("Encoded %d unique frames\n", out_fr);
-    printf("Encoded %d bytes (%d bytes/source frame, %d bytes/unique frame)\n", 
+    printf("Encoded %d bytes (%d bytes/source frame, %d bytes/unique frame)\n",
             wrote, wrote / fr, wrote / out_fr);
     printf("GIF frame type breakdown:\n");
     for (i = 0; i < 6; i++)

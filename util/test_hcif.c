@@ -4,14 +4,13 @@
  *
  *  Author:         J. Zbiciak
  *
- *  $Id: test_hcif.c,v 1.5 2002/04/17 18:31:37 im14u2c Exp $
  *
  * ============================================================================
  *  This program is a simple utility for testing the "Nudds/Moeller
  *  Hand Controller Interface", a device which allows connecting actual
  *  Intellivision Hand Controllers via a PC printer port.
  *
- *  This utility only works under Linux on a PC.  When built on unsupported 
+ *  This utility only works under Linux on a PC.  When built on unsupported
  *  platforms, this utility merely prints an error and exits.
  *
  *  Usage:  "test_hcif [LPT# [Rate]]"
@@ -22,13 +21,13 @@
  */
 
 
-#if (!defined(linux) && !defined(WIN32)) || !defined(i386)
+#if (!defined(PLAT_LINUX) && !defined(WIN32)) || !defined(i386)
 
 #include <stdio.h>
 
 /*
  * ===========================================================================
- *  Handle unsupported platforms by providing a short 'main()' which 
+ *  Handle unsupported platforms by providing a short 'main()' which
  *  prints an error message and exits.
  * ===========================================================================
  */
@@ -94,14 +93,14 @@ void init_ports(unsigned long base)
 /*
  * ===========================================================================
  *  HCIF_DELAY   -- Amount of time to sleep when reading the HCIF, in
- *                  nanoseconds. 
+ *                  nanoseconds.
  * ===========================================================================
  */
 struct timespec hcif_delay = { 0, 10000000 };   /* 10ms */
 
 /*
  * ===========================================================================
- *  HCIF_RATE    -- Set the (approximate) HCIF query rate. 
+ *  HCIF_RATE    -- Set the (approximate) HCIF query rate.
  * ===========================================================================
  */
 void hcif_rate(unsigned rate)
@@ -121,7 +120,7 @@ inline void hcif_sleep(void)
     nanosleep(&delay, &remain); /* don't bother looping. */
 
 #if 0
-    while (nanosleep(&delay, &remain) == -1 && errno == EINTR) 
+    while (nanosleep(&delay, &remain) == -1 && errno == EINTR)
         delay = remain;
 #endif
 }
@@ -244,7 +243,7 @@ double elapsed(void)
     static struct timeval start;
     static int init = 0;
     struct timeval now;
-    uint_32 usec, sec;
+    uint32_t usec, sec;
 
     if (!init)
     {
@@ -285,7 +284,6 @@ int main(int argc, char *argv[])
     printf("==============================================================\n");
     printf(" Test Utility for the Nudds/Moeller Hand Controller Interface\n");
     printf(" By Joseph Zbiciak.\n");
-    printf(" Version $Id: test_hcif.c,v 1.5 2002/04/17 18:31:37 im14u2c Exp $\n");
     printf("==============================================================\n");
     printf("\n");
 
@@ -323,7 +321,7 @@ int main(int argc, char *argv[])
         port = ports[lpt - 1];
     }
 
-    printf("Attempting to access HCIF on LPT%d [port 0x%.3lX], rate = %d Hz\n", 
+    printf("Attempting to access HCIF on LPT%d [port 0x%.3lX], rate = %d Hz\n",
             lpt, port, rate);
 
     fflush(stdout);
@@ -377,9 +375,9 @@ int main(int argc, char *argv[])
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                 Copyright (c) 1998-1999, Joseph Zbiciak                  */
 /* ======================================================================== */

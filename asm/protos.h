@@ -1,3 +1,5 @@
+#include "intvec.h"
+
 /* frasmain */
 int asm_main(int argc, char *argv[]);
 void frafatal(char * str);
@@ -18,18 +20,27 @@ void listouthex(void);
 void outhexblock(void);
 void flushhex(void);
 void frp2undef(struct symel *symp);
-void frp2warn(char *str);
-void frp2error(char *str);
+void frp2warn(const char *str);
+void frp2error(const char *str);
 void flushsourceline(void);
 void sm_outpath(void);
 void sm_outrange(int lo, int hi);
 void sm_flush(void);
 
+int format_time_string(const struct tm *const t, 
+                       const struct tm *const gmt,
+                       const char *const fmt, 
+                       char *const bufbeg, 
+                       const int space);
+intvec_t *unpack_time_exprs(const struct tm *const t, 
+                            const struct tm *const gmt,
+                            const char *const fmt);
+
 /* frapsub */
 
 char *savestring(const char *stx, int len);
 void clrexpr(void);
-int exprnode(int swact, int left, int op, int right, int value, 
+int exprnode(int swact, int left, int op, int right, int value,
              struct symel *symbol);
 struct symel *allocsym(void);
 int syhash(const char *str);
@@ -53,6 +64,8 @@ void pevalexpr(int sub, int exn);
 /*void polout(char ch);*/
 void polnumout(unsigned int inv);
 int pepolcon(int esub);
+unsigned long rotl16(unsigned long val, int amt);
+unsigned long rotl32(unsigned long val, int amt);
 
 /* fryylex */
 
@@ -63,7 +76,8 @@ void frarptbreak(void);
 void frarptpush(int iters);
 void frarptendr(void);
 void frarptreset(void);
-int fra_next_line(char *buf, int maxlen, int *ignore, void *u);
+struct ignore_flags;
+int fra_next_line(char *buf, int maxlen, struct ignore_flags *ignore, void *u);
 const char *fra_get_pos(int *line, void *u);
 int  fra_get_eof(void *u);
 void fra_rpt_err(const char *buf, void *u);
@@ -76,4 +90,3 @@ int lexintercept(void);
 void setreserved(void);
 int cpumatch(char *str);
 int yyparse(void);
-

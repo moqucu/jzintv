@@ -2,7 +2,6 @@
  * ============================================================================
  *  Title:    Controller pads via Joe Fisher's Classic Gaming Controller
  *  Author:   J. Zbiciak
- *  $Id$
  * ============================================================================
  *  Some code in this module comes from Joe Fisher's reference code.
  * ============================================================================
@@ -19,7 +18,7 @@
 
 #ifdef CGC_THREAD
 
-#include "sdl.h"
+#include "sdl_jzintv.h"
 #include <termios.h>
 #include <fcntl.h>
 
@@ -36,10 +35,7 @@ LOCAL int pad_cgc_scanner(void *opaque)
 {
     pad_cgc_t *pad = (pad_cgc_t *)opaque;
     char i_byte[2], o_byte[2];
-    int side = 0;
     int scans = 0, start, end;
-
-    side = 1;
 
     start = SDL_GetTicks();
     o_byte[0] = 3;
@@ -60,19 +56,19 @@ LOCAL int pad_cgc_scanner(void *opaque)
 
         tcflush(pad->fd, TCIOFLUSH);
 
-        if (write(pad->fd, &o_byte[0], 1) != 1) goto error; 
+        if (write(pad->fd, &o_byte[0], 1) != 1) goto error;
         if (read (pad->fd, &i_byte[0], 1) != 1) goto error;
-        if (write(pad->fd, &o_byte[1], 1) != 1) goto error; 
+        if (write(pad->fd, &o_byte[1], 1) != 1) goto error;
         if (read (pad->fd, &i_byte[1], 1) != 1) goto error;
 
         pad->val[0] = i_byte[0];    // right side
         pad->val[1] = i_byte[1];    // left side
 
-        if (pad->die) 
+        if (pad->die)
             break;
 
         continue;
-        
+
 error:
         /* ------------------------------------------------------------ */
         /*  If for some reason we get errors on the reads or writes,    */
@@ -104,7 +100,7 @@ error:
 /* ======================================================================== */
 /*  PAD_CGC_REAPER -- Ask all the CGC worker threads to die, politely.      */
 /* ======================================================================== */
-LOCAL void pad_cgc_reaper(periph_p unused)
+LOCAL void pad_cgc_reaper(periph_t *const unused)
 {
     int i;
 
@@ -125,14 +121,14 @@ LOCAL void pad_cgc_reaper(periph_p unused)
 /* ======================================================================== */
 /*  PAD_CGC_READ -- Returns the current state of the pads.                  */
 /* ======================================================================== */
-uint_32 pad_cgc_read(periph_t *p, periph_t *r, uint_32 a, uint_32 d)
+uint32_t pad_cgc_read(periph_t *p, periph_t *r, uint32_t a, uint32_t d)
 {
-    pad_cgc_t *pad = (pad_cgc_t*)p;
+    pad_cgc_t *pad = PERIPH_AS(pad_cgc_t, p);
     int side = a & 1;
-    uint_16 value;
+    uint16_t value;
 
-    UNUSED(r);    
-    UNUSED(d);    
+    UNUSED(r);
+    UNUSED(d);
 
     /* -------------------------------------------------------------------- */
     /*  Ignore accesses that are outside our address space.                 */
@@ -157,11 +153,11 @@ uint_32 pad_cgc_read(periph_t *p, periph_t *r, uint_32 a, uint_32 d)
 /* ======================================================================== */
 /*  PAD_CGC_WRITE -- Looks for changes in I/O mode on PSG I/O ports.        */
 /* ======================================================================== */
-void pad_cgc_write(periph_t *p, periph_t *r, uint_32 a, uint_32 d)
+void pad_cgc_write(periph_t *p, periph_t *r, uint32_t a, uint32_t d)
 {
-    pad_cgc_t *pad = (pad_cgc_t*)p;
+    pad_cgc_t *pad = PERIPH_AS(pad_cgc_t, p);
 
-    UNUSED(r);    
+    UNUSED(r);
 
     /* -------------------------------------------------------------------- */
     /*  Capture writes to the 'control' register in the PSG, looking for    */
@@ -184,16 +180,16 @@ void pad_cgc_write(periph_t *p, periph_t *r, uint_32 a, uint_32 d)
 /* ======================================================================== */
 int pad_cgc_linux_init
 (
-    pad_cgc_t       *pad,           /*  pad_cgc_t structure to initialize   */
-    uint_32         addr,           /*  Base address of pad.                */
-    const char      *cgc_dev        /*  path to CGC device.                 */
+    pad_cgc_t      *pad,            /*  pad_cgc_t structure to initialize   */
+    uint32_t        addr,           /*  Base address of pad.                */
+    const char     *cgc_dev         /*  path to CGC device.                 */
 )
 {
     static int reaper = 0;
     SDL_Thread *th;
     struct termios tio;
     int fd, i;
-    char o_byte, i_byte;
+    char o_byte, i_byte = 0;
 
     /* -------------------------------------------------------------------- */
     /*  Make sure we don't have too many CGC's registered.                  */
@@ -216,7 +212,7 @@ int pad_cgc_linux_init
         return -1;
     }
 
-    pad->fd = fd; 
+    pad->fd = fd;
 
     /* -------------------------------------------------------------------- */
     /*  Ugh.  CGC is over a tty, so we need to set the terminal attribs.    */
@@ -274,8 +270,8 @@ int pad_cgc_linux_init
     for (i = 0; i < 10; i++)
     {
         tcflush(pad->fd, TCIOFLUSH);
-        write(fd, &o_byte, 1);
-        if (read (fd, &i_byte, 1) != 1)
+        if (write(fd, &o_byte, 1) != 1 ||
+            read (fd, &i_byte, 1) != 1)
         {
             fprintf(stderr, "Could not synchronize with CGC %s\n", cgc_dev);
             return -1;
@@ -283,7 +279,7 @@ int pad_cgc_linux_init
     }
     if (i_byte != 0x52)
     {
-        fprintf(stderr, "Unexpected sync byte %.2X synchronizing with %s\n", 
+        fprintf(stderr, "Unexpected sync byte %.2X synchronizing with %s\n",
                 0xFF & i_byte, cgc_dev);
         return -1;
     }
@@ -291,7 +287,11 @@ int pad_cgc_linux_init
     /* -------------------------------------------------------------------- */
     /*  Establish a scanner thread.                                         */
     /* -------------------------------------------------------------------- */
+#ifndef USE_SDL2
     th = SDL_CreateThread(pad_cgc_scanner, (void*)pad);
+#else
+    th = SDL_CreateThread(pad_cgc_scanner, "jzintv CGC scanner", (void*)pad);
+#endif
 
     if (!th)
     {
@@ -305,7 +305,6 @@ int pad_cgc_linux_init
     cgc_struct[cgc_threads  ] = pad;
     cgc_thread[cgc_threads++] = th;
 
-
     /* -------------------------------------------------------------------- */
     /*  Set up the emulator "peripheral."                                   */
     /* -------------------------------------------------------------------- */
@@ -313,12 +312,13 @@ int pad_cgc_linux_init
     pad->periph.write     = pad_cgc_write;
     pad->periph.peek      = pad_cgc_read;
     pad->periph.poke      = pad_cgc_write;
-    pad->periph.dtor      = reaper ? NULL : (reaper = 1, pad_cgc_reaper);
+    pad->periph.dtor      = reaper ? NULL 
+                                   : ((void)(reaper = 1), pad_cgc_reaper);
     pad->periph.tick      = NULL;
     pad->periph.min_tick  = 0;
     pad->periph.max_tick  = ~0U;
 
-    jzp_printf("pads_cgc:  CGC @ \"%s\" (fd %d) mapped to $%.4X-$%.4X\n", 
+    jzp_printf("pads_cgc:  CGC @ \"%s\" (fd %d) mapped to $%.4X-$%.4X\n",
             cgc_dev, fd, addr + 0xE, addr + 0xF);
 
     pad->periph.addr_base = addr;
@@ -344,9 +344,9 @@ int pad_cgc_linux_init
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                 Copyright (c) 2004-+Inf, Joseph Zbiciak                  */
 /* ======================================================================== */

@@ -2,6 +2,7 @@
 %option case-insensitive
 %option never-interactive
 %option noyywrap
+%option noinput
 %option batch
 %option 8bit
 %option nounput
@@ -20,18 +21,24 @@
 %x SEC_MC2
 
 %{
+/* Clang doesn't like the unreachable code in Flex's generated output. */
+#ifdef __clang__
+#pragma clang diagnostic ignored "-Wunreachable-code"
+#endif
 
 /* put any #includes here */
 #include "config.h"
+#include "lzoe/lzoe.h"
 #include "bincfg/bincfg.h"
 #include "bincfg/bincfg_grmr.tab.h"
+#include "misc/types.h"
 
-extern int  bc_lex(void);
-int         bc_line_no = 1;
-int         bc_dec; 
-uint_32     bc_hex;
-char       *bc_txt = NULL;
-static int bc_txt_alloc = 0;
+extern int      bc_lex(void);
+int             bc_line_no = 1;
+int             bc_dec; 
+uint32_t         bc_hex;
+char           *bc_txt = NULL;
+static unsigned bc_txt_alloc = 0;
 
 typedef enum nlsm_t 
 {
@@ -45,10 +52,11 @@ typedef enum nlsm_t
 static nlsm_t nlsm_state = NLSM_START;
 
 /* Simple character-at-a-time state machine for reading input.  It serves
-   two purposes:  
+   three purposes:  
 
    1.  Convert Mac and Windows style NL to UNIX style.
    2.  Insert an extra NL at EOF to ensure the last line is NL terminated
+   3.  Reads from an LZFILE* instead of a FILE*.
 */
 static int nlsm_next_char(void)
 {
@@ -66,7 +74,7 @@ again:
         return EOF;
     }
 
-    next_char = fgetc(yyin);
+    next_char = lzoe_fgetc( (LZFILE *)bc_in );
 
     if (nlsm_state == NLSM_DIDEOF)
     {
@@ -99,36 +107,37 @@ again:
 }
 
 
-#define YYTEXT_TO_BC_TXT \
+#define YYTEXT_TO_BC_TXT(unquote) \
         do {                                                            \
-            if (yyleng > bc_txt_alloc)                                  \
+            size_t uyyleng = yyleng > 0 ? yyleng : 0;                   \
+            if (uyyleng >= bc_txt_alloc)                                \
             {                                                           \
-                if (bc_txt)                                             \
-                {                                                       \
-                    bc_txt_alloc = bc_txt_alloc << 1;                   \
-                    free(bc_txt);                                       \
-                } else                                                  \
-                {                                                       \
+                if (!bc_txt_alloc)                                      \
                     bc_txt_alloc = 256;                                 \
-                    while (bc_txt_alloc < yyleng)                       \
-                        bc_txt_alloc <<= 1;                             \
-                }                                                       \
                                                                         \
-                bc_txt = (char *)malloc(bc_txt_alloc);                  \
+                while (bc_txt_alloc <= uyyleng)                         \
+                    bc_txt_alloc <<= 1;                                 \
+                                                                        \
+                bc_txt = (char *)realloc(bc_txt, bc_txt_alloc);         \
                                                                         \
                 if (!bc_txt)                                            \
                     return TOK_ERROR_OOM;                               \
             }                                                           \
                                                                         \
-            strcpy(bc_txt, yytext);                                     \
+            if (!unquote || uyyleng < 2)                                \
+                strcpy(bc_txt, yytext);                                 \
+            else                                                        \
+                strcpy(bc_txt, cfg_unquote_str(yytext));                \
         } while (0)
 
 #define YY_INPUT(buf,result,max_size)                                   \
         do {                                                            \
-            int c_, i_;                                                 \
+            int c_;                                                     \
+            unsigned i_;                                                \
+            unsigned ms = max_size > 0 ? max_size : 0;                  \
                                                                         \
             i_ = 0;                                                     \
-            while (i_ < max_size && (c_ = nlsm_next_char()) != EOF)     \
+            while (i_ < ms && (c_ = nlsm_next_char()) != EOF)           \
                 buf[i_++] = c_;                                         \
                                                                         \
             result = i_ > 0 ? i_ : YY_NULL;                             \
@@ -187,12 +196,16 @@ NAME    [A-Za-z_0-9\{\}"']+
 <SEC_ATR>"RAM"      {   return TOK_RAM;                                 }
 <SEC_ATR>"ROM"      {   return TOK_ROM;                                 }
 <SEC_ATR>"WOM"      {   return TOK_WOM;                                 }
+<SEC_ATR>"PAGE"     {   return TOK_PAGE;                                }
 
 %{ 
 /* -------------------------------------------------------------------- */
 /*  Keywords that are only valid in the mapping section.                */
 /* -------------------------------------------------------------------- */
 %} 
+<SEC_MAP>"RAM"      {   return TOK_RAM;                                 }
+<SEC_MAP>"ROM"      {   return TOK_ROM;                                 }
+<SEC_MAP>"WOM"      {   return TOK_WOM;                                 }
 <SEC_MAP>"PAGE"     {   return TOK_PAGE;                                }
 
 %{ 
@@ -245,37 +258,45 @@ NAME    [A-Za-z_0-9\{\}"']+
                                     BEGIN(SEC_MC2);
                                     bc_dec = atoi(yytext);
                                     sscanf(yytext    , "%x", &bc_hex); 
-                                    YYTEXT_TO_BC_TXT;
+                                    YYTEXT_TO_BC_TXT(0);
                                     return  TOK_DEC;    
                                 }
 <SEC_MC1,SEC_MC2>[A-F0-9]+      {   
                                     BEGIN(SEC_MC2);
                                     bc_dec = atoi(yytext);
                                     sscanf(yytext    , "%x", &bc_hex); 
-                                    YYTEXT_TO_BC_TXT;
+                                    YYTEXT_TO_BC_TXT(0);
                                     return  TOK_HEX;    
                                 }
 <SEC_MC1,SEC_MC2>\$[A-F0-9]+    {   
                                     BEGIN(SEC_MC2);
                                     bc_dec = atoi(yytext + 1);
                                     sscanf(yytext + 1, "%x", &bc_hex); 
-                                    YYTEXT_TO_BC_TXT;
+                                    YYTEXT_TO_BC_TXT(0);
                                     return  TOK_HEX;    
                                 }
 <SEC_MC1,SEC_MC2>"-"    {   BEGIN(SEC_MC2); return '-';                 }
 <SEC_MC1,SEC_MC2>","    {   BEGIN(SEC_MC2); return ',';                 }
+<SEC_MC1,SEC_MC2>":"    {   BEGIN(SEC_MC2); return ':';                 }
+<SEC_MC1,SEC_MC2>"PAGE" {   BEGIN(SEC_MC2); return TOK_PAGE;            }
 <SEC_MC1,SEC_MC2>;.*    {   BEGIN(SEC_MC2); /* eat comments.  */        }
 <SEC_MC1,SEC_MC2>\n     {   bc_line_no++; BEGIN(SEC_MC0); return '\n';  }
 <SEC_MC1,SEC_MC2>"["    {   yyless(0); BEGIN(INITIAL);   /*]*/          }
 
+<SEC_MC1>\"([^\n\r"]*|\\\")*\"  {
+                                    BEGIN(SEC_MC2);
+                                    YYTEXT_TO_BC_TXT(1);
+                                    return TOK_STRING;
+                                }
+
 <SEC_MC1>[^ \t\n\r;\[\]\$\=\-\,][^ \t\n\r;\[\]\$]* {   
                                     BEGIN(SEC_MC2);
-                                    YYTEXT_TO_BC_TXT;                
+                                    YYTEXT_TO_BC_TXT(0);                
                                     return  TOK_NAME;   
                                 }
 
 <SEC_MC1,SEC_MC2>[ \t\r]* { /* ignore whitespace. */                    }
-<SEC_MC1,SEC_MC2>.      {   YYTEXT_TO_BC_TXT; return TOK_ERROR_BAD;     }
+<SEC_MC1,SEC_MC2>.        { YYTEXT_TO_BC_TXT(0); return TOK_ERROR_BAD;  }
 
 %{ 
 /* -------------------------------------------------------------------- */
@@ -285,25 +306,25 @@ NAME    [A-Za-z_0-9\{\}"']+
 -[0-9]+     {   
                 bc_dec = atoi(yytext);
                 sscanf(yytext + 1, "%x", &bc_hex); 
-                YYTEXT_TO_BC_TXT;
+                YYTEXT_TO_BC_TXT(0);
                 return  TOK_DECONLY;    
             }
 [0-9]+      {   
                 bc_dec = atoi(yytext);
                 sscanf(yytext    , "%x", &bc_hex); 
-                YYTEXT_TO_BC_TXT;
+                YYTEXT_TO_BC_TXT(0);
                 return  TOK_DEC;    
             }
 [A-F0-9]+   {   
                 bc_dec = atoi(yytext);
                 sscanf(yytext    , "%x", &bc_hex); 
-                YYTEXT_TO_BC_TXT;
+                YYTEXT_TO_BC_TXT(0);
                 return  TOK_HEX;    
             }
 \$[A-F0-9]+ {   
                 bc_dec = atoi(yytext + 1);
                 sscanf(yytext + 1, "%x", &bc_hex); 
-                YYTEXT_TO_BC_TXT;
+                YYTEXT_TO_BC_TXT(0);
                 return  TOK_HEX;    
             }
 "="         {   return '=';                                             }
@@ -315,18 +336,31 @@ NAME    [A-Za-z_0-9\{\}"']+
                 return '\n';        /* comments and newlines are same */
             }
 
-<SEC_VAR>[^ \t\n\r;\[\]\$\=\-\,][^ \t\n\r;\[\]\$]* {   
-                YYTEXT_TO_BC_TXT;                
-                return  TOK_NAME;   
+<SEC_VAR>[^ \t\n\r;\[\]\$\=\-\,\"]+ {   
+                YYTEXT_TO_BC_TXT(0);                
+                return TOK_NAME;   
+            }
+
+<SEC_VAR>\"([^\n\r"]*|\\\")*\" {
+                YYTEXT_TO_BC_TXT(1);
+                return TOK_STRING;
             }
 
 [ \t\r]+    {   /* eat whitespace */                                    }
-[^ \t\n\r\=\-\,\[\]A-Z0-9;]+ { YYTEXT_TO_BC_TXT; 
-    printf("BAD2: %d\n", yytext[0]);
-    return TOK_ERROR_BAD;  }
-.                            { YYTEXT_TO_BC_TXT; 
-    printf("BAD3: %d\n", yytext[0]);
-    return TOK_ERROR_BAD;  }
+[^ \t\n\r\=\-\,\[\]A-Z0-9;]+ { 
+    YYTEXT_TO_BC_TXT(0); 
+#ifdef DEBUG
+    fprintf(stderr, "BAD2: %d\n", yytext[0]);
+#endif
+    return TOK_ERROR_BAD;
+}
+.           {
+    YYTEXT_TO_BC_TXT(0); 
+#ifdef DEBUG
+    fprintf(stderr, "BAD3: %d\n", yytext[0]);
+#endif
+    return TOK_ERROR_BAD;  
+}
 
 %%
 
@@ -341,9 +375,9 @@ NAME    [A-Za-z_0-9\{\}"']+
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                 Copyright (c) 2003-+Inf, Joseph Zbiciak                  */
 /* ======================================================================== */

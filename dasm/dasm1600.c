@@ -31,7 +31,7 @@ int diff_mode = 0;
 #define DISPMINUS "$%.4X",addr+1-w2
 #define DISPPLUS  "$%.4X",addr+2+w2
 
-#define OPCODE(Q)      snprintf(display_buffer.opcode_field,sizeof(display_buffer.opcode_field),Q)
+#define OPCODE(Q)      snprintf(display_buffer.opcode_field,sizeof(display_buffer.opcode_field),"%s",Q)
 #define OPERAND1(Q)    snprintf(display_buffer.operand1_field,sizeof(display_buffer.operand1_field),Q)
 #define OPERAND2(Q)    {snprintf(display_buffer.operand2_field,sizeof(display_buffer.operand2_field),Q); \
                        strcpy(display_buffer.operanddel_field,",");}
@@ -85,7 +85,7 @@ struct tag_display_buffer
     char word1_field[10];
     char word2_field[10];
     char word3_field[10];
-    char char_field[10]; 
+    char char_field[10];
     char opcode_field[10];
     char operand1_field[10];
     char operanddel_field[10];
@@ -113,7 +113,7 @@ static int gen_label(int addr)
 
 int main(int argc, char **argv)
 {
-    int addr; 
+    int addr;
     unsigned char c1, c2;
     int w1, w2=0, w3=0, s=0, i1, i2, i3, sign;
     int i, j, k;
@@ -183,7 +183,7 @@ int main(int argc, char **argv)
 
     while(fgets(buffer, 256, fpsym) && !done)
     {
-        int args; 
+        int args;
         found = 0;
         args = sscanf(buffer,"%255s %x %x", command, &temp, &temp2);
         i = 0;
@@ -206,7 +206,7 @@ int main(int argc, char **argv)
                         j = args - 1;
                         if (j == 0) break;
                         if (j == 1) temp2 = temp;
-                        if (temp2 < temp) 
+                        if (temp2 < temp)
                         {
                             fprintf(stderr,"'data' arg order\n");
                             exit(1);
@@ -230,7 +230,7 @@ int main(int argc, char **argv)
                     }
                 }
                 found = 1;
-            }                
+            }
             i++;
         }
 #if 0
@@ -258,8 +258,17 @@ int main(int argc, char **argv)
         while ((datatype[addr] & 8) && (addr < 0x10000)) addr++;
         if (addr == 0x10000) break;
 
-        fread(&c1,1,1,fpcode);
-        fread(&c2,1,1,fpcode);
+        if (fread(&c1,1,1,fpcode) != 1 ||
+            fread(&c2,1,1,fpcode) != 1)
+        {
+            if (feof(fpcode))
+                break;
+
+            perror("fread()");
+            fprintf(stderr, "Error reading binary file.\n");
+            exit(1);
+        }
+
         if (reverse_bytes)
             code[addr] = (((unsigned short)c2)<<8)+c1;
         else
@@ -269,9 +278,8 @@ int main(int argc, char **argv)
         addr++;
     }
 
-    fprintf(stderr,"Finished reading code file...\n");
-
-    endaddr = addr-1;
+    endaddr = addr;
+    fprintf(stderr,"Finished reading code file... endaddr=%04X\n", endaddr);
 
     for(pass=1;pass<3;pass++)
     {
@@ -317,8 +325,8 @@ int main(int argc, char **argv)
                 while (i > addr)
                     datatype[--i] |= 1;
         }
-        
-        if ((addr+1 < endaddr) && 
+
+        if ((addr+1 < endaddr) &&
             (datatype[addr] & 16) && (datatype[addr+1] & 16))
         {
             strcpy(display_buffer.char_field, "     ");
@@ -436,7 +444,7 @@ int main(int argc, char **argv)
                                         if ((w2 & 3)==0)
                                         {
                                             OPCODE("J");
-                                            labeladdr = ((w2&0xfc)<<8)+(w3&0x3ff);                           
+                                            labeladdr = ((w2&0xfc)<<8)+(w3&0x3ff);
                                             datatype[labeladdr] |= 2;
                                             if (pass == 2)
                                             {
@@ -455,7 +463,7 @@ int main(int argc, char **argv)
                                         else if ((w2 & 3)==1)
                                         {
                                             OPCODE("JE");
-                                            labeladdr = ((w2&0xfc)<<8)+(w3&0x3ff);                           
+                                            labeladdr = ((w2&0xfc)<<8)+(w3&0x3ff);
                                             datatype[labeladdr] |= 2;
                                             if (pass == 2)
                                             {
@@ -474,7 +482,7 @@ int main(int argc, char **argv)
                                         else if ((w2 & 3)==2)
                                         {
                                             OPCODE("JD");
-                                            labeladdr = ((w2&0xfc)<<8)+(w3&0x3ff);                           
+                                            labeladdr = ((w2&0xfc)<<8)+(w3&0x3ff);
                                             datatype[labeladdr] |= 2;
                                             if (pass == 2)
                                             {
@@ -499,7 +507,7 @@ int main(int argc, char **argv)
                                         {
                                             OPCODE("JSR");
                                             OPERAND1(RB);
-                                            labeladdr = ((w2&0xfc)<<8)+(w3&0x3ff);                           
+                                            labeladdr = ((w2&0xfc)<<8)+(w3&0x3ff);
                                             datatype[labeladdr] |= 2;
                                             if (pass == 2)
                                             {
@@ -519,7 +527,7 @@ int main(int argc, char **argv)
                                         {
                                             OPCODE("JSRE");
                                             OPERAND1(RB);
-                                            labeladdr = ((w2&0xfc)<<8)+(w3&0x3ff);                           
+                                            labeladdr = ((w2&0xfc)<<8)+(w3&0x3ff);
                                             datatype[labeladdr] |= 2;
                                             if (pass == 2)
                                             {
@@ -539,7 +547,7 @@ int main(int argc, char **argv)
                                         {
                                             OPCODE("JSRD");
                                             OPERAND1(RB);
-                                            labeladdr = ((w2&0xfc)<<8)+(w3&0x3ff);                           
+                                            labeladdr = ((w2&0xfc)<<8)+(w3&0x3ff);
                                             datatype[labeladdr] |= 2;
                                             if (pass == 2)
                                             {
@@ -632,8 +640,6 @@ int main(int argc, char **argv)
                             OPERAND1(R3);
                             break;
                         }
-
-                        break;
                     }
                     break;
                 }
@@ -698,7 +704,6 @@ int main(int argc, char **argv)
                             MAYBE2_2;
                             break;
                         }
-                        break;
                     }
                     break;
                 }
@@ -710,7 +715,7 @@ int main(int argc, char **argv)
                         OPERAND1(R2);
                     }
                     else
-                    if ((w1 & 0x3) == 7)
+                    if ((w1 & 0x7) == 7)
                     {
                         OPCODE("JR");
                         OPERAND1(R2);
@@ -787,13 +792,13 @@ int main(int argc, char **argv)
                                 display_buffer.operand1_field[0] = 'G';
                         }
                     }
-                    else 
+                    else
 #endif
                     if ((w1 & 0x1f) == 0x8 && (w2 == 0x0000))
                     {
                         OPCODE("NOPP");
                     }
-                    else 
+                    else
                     {
                         if ((w1 & 0x10) == 0x00)
                         {
@@ -803,6 +808,7 @@ int main(int argc, char **argv)
                             OPCODE("BEXT");
                             OPERAND2(EXT);
                         }
+#if 0
                         DISP_1;
                         if(sign)
                             labeladdr = addr+1-w2;
@@ -816,7 +822,21 @@ int main(int argc, char **argv)
                             else
                                 display_buffer.operand1_field[0] = 'G';
                         }
+#else
+                        if(sign)
+                            labeladdr = addr+1-w2;
+                        else
+                            labeladdr = addr+2+w2;
+                        datatype[labeladdr] |= 2;
+                        if (pass == 2)
+                        {
+                            snprintf(display_buffer.operand1_field,
+                                    sizeof(display_buffer.operand1_field),
+                                    "L%.4X", gen_label(labeladdr));
+                        }
+#endif
                     }
+
                     break;
                 }
                 case 9:
@@ -1027,16 +1047,15 @@ int main(int argc, char **argv)
                     }
                     break;
                 }
-                break;
             }
         }
 
         if (pass == 2)
         {
-            char buf[11];
+            char buf[20];
 
             snprintf(buf, sizeof(buf), "%s%s",
-                    display_buffer.operand1_field, 
+                    display_buffer.operand1_field,
                     display_buffer.operanddel_field);
 
             if (datatype[addr] & 2)
@@ -1046,14 +1065,14 @@ int main(int argc, char **argv)
 
             if (strstr(display_buffer.opcode_field, "illop") != NULL)
             {
-                    printf("%-7s DECLE   $%s", 
+                    printf("%-7s DECLE   $%s",
                             display_buffer.label_field,
                             display_buffer.word1_field);
                     if (display_buffer.word2_field[0])
-                            printf(", $%s", 
+                            printf(", $%s",
                                     display_buffer.word2_field);
                     if (display_buffer.word3_field[0])
-                            printf(", $%s", 
+                            printf(", $%s",
                                     display_buffer.word3_field);
                     printf("\n");
             } else
@@ -1082,7 +1101,7 @@ int main(int argc, char **argv)
             }
         } else
             datatype[addr] |= 4;
-     
+
 
         addr = (addr + s - 1) & 0xffff;
     }
@@ -1146,9 +1165,9 @@ int main(int argc, char **argv)
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                Copyright (c) 1998-2000, Frank Palazzolo                  */
 /* ======================================================================== */

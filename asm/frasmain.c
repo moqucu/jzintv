@@ -4,19 +4,19 @@ TITLE:      Frankenstein Cross Assemblers;
 VERSION:    2.0;
 DESCRIPTION: "  Reconfigurable Cross-assembler producing Intel (TM)
             Hex format object records.  ";
-KEYWORDS:   cross-assemblers, 1805, 2650, 6301, 6502, 6805, 6809, 
+KEYWORDS:   cross-assemblers, 1805, 2650, 6301, 6502, 6805, 6809,
             6811, tms7000, 8048, 8051, 8096, z8, z80;
 SYSTEM:     UNIX, MS-Dos ;
 FILENAME:   frasmain.c;
-WARNINGS:   "This software is in the public domain.  
-            Any prior copyright claims are relinquished.  
-    
-            This software is distributed with no warranty whatever.  
-            The author takes no responsibility for the consequences 
+WARNINGS:   "This software is in the public domain.
+            Any prior copyright claims are relinquished.
+
+            This software is distributed with no warranty whatever.
+            The author takes no responsibility for the consequences
             of its use.
 
             Yacc (or Bison) required to compile."  ;
-SEE-ALSO:   base.doc, as*.doc (machine specific appendices) , 
+SEE-ALSO:   base.doc, as*.doc (machine specific appendices) ,
             as*.1 (man pages);
 AUTHORS:    Mark Zenier;
 COMPILERS:  Microport Sys V/AT, ATT Yacc, Turbo C V1.5, Bison (CUG disk 285)
@@ -30,18 +30,19 @@ COMPILERS:  Microport Sys V/AT, ATT Yacc, Turbo C V1.5, Bison (CUG disk 285)
             September 14, 1990  v 1.5  Dosified
 */
 
-#define Global
-
 #include "config.h"
+#include "lzoe/lzoe.h"
 #include "file/file.h"
 #include "frasmdat.h"
 #include "file/file.h"
 #include "../imasm/c_wrap.h"
 #include "icart/icartrom.h"
-#include "types.h"
+#include "as1600_types.h"
 #include "protos.h"
 #include "intermed.h"
+#include "collect.h"
 
+FILE *romoutf, *binoutf, *cfgoutf, *loutf;
 char *cfgfn = NULL, *binfn  = NULL, *romfn    = NULL;
 char *hexfn = NULL, *loutfn = NULL, *srcmapfn = NULL;
 int errorcnt = 0, warncnt = 0;
@@ -52,24 +53,65 @@ static char *symbfn;
 static int  symbflag = FALSE;
 char hexcva[17] = "0123456789ABCDEF";
 FILE *smapf = NULL;
-
+int  currseg, currpag;
+int *(chtatab[NUM_CHTA]);
+int  locctr;
 ictype_t icart_type = ICART;
+struct evalrel evalr[NUMPEXP];
 
-unsigned int memory_bitmap[65536 >> 5]; 
+//unsigned int memory_bitmap[65536 >> 5];
 int show_map = FALSE;
 
-#ifdef NOGETOPT
-#include "getopt.h"
-#endif
-
-#ifdef macintosh
-#include "getopt.h"
-#include "console.h"
-#endif
+time_t asm_time = 0;
+struct tm asm_time_local;
+struct tm asm_time_gmt;
 
 path_t *as1600_search_path = NULL;
 
 extern struct parser_callbacks imasm_hooks;
+
+LOCAL void usage(void) 
+{
+    printf("AS1600 (%s)\n", svn_revision ? svn_revision : "revision unknown");
+    printf(
+"Usage:\n"
+"   as1600 [flags] input.asm\n"
+"\n"
+"Flags:\n"
+"\n"
+"   -o <file>   --out-file=<file>     Output file name\n"
+"   -l <file>   --list-file=<file>    Specify listing file\n"
+"   -s <file>   --sym-file=<file>     Specify symbol dump file\n"
+"   -j <file>   --src-map=<file>      Specify source-map file\n"
+"   -i <path>   --include=<path>      Append <path> to include path\n"
+"   -m          --show-map            Summarize memory map after assembly\n"
+"   -3   -c     --cc3                 Assemble .ROMs for CC3\n"
+"   -h   -?     --help                Show this usage info\n"
+"   -v          --version             Show assembler version\n"
+"   -e          --err-if-overwritten  Set ERR_IF_OVERWRITTEN to 1 initially\n"
+"\n"
+"The output file type is determined by the extension on the provided output\n"
+"filename (.bin or .rom).  If you omit the extension, AS1600 will attempt to\n"
+"output both formats.  Some features, such as page-flipping or bankswitching\n"
+"only work in one format; AS1600 will warn if it detects a mismatch.\n"
+"\n"
+    );
+}
+   
+static struct option longopts[] = 
+{ 
+    { "cc3",                0,  NULL,   '3' },
+    { "include",            1,  NULL,   'i' },
+    { "list-file",          1,  NULL,   'l' },
+    { "out-file",           1,  NULL,   'o' },
+    { "show-map",           0,  NULL,   'm' },
+    { "sym-file",           1,  NULL,   's' },
+    { "src-map",            1,  NULL,   'j' },
+    { "version",            0,  NULL,   'v' },
+    { "help",               0,  NULL,   '?' },
+    { "err-if-overwritten", 0,  NULL,   'e' },
+    { NULL,                 0,  NULL,   0   },
+};
 
 int asm_main(int argc, char *argv[])
 /*
@@ -88,32 +130,24 @@ int asm_main(int argc, char *argv[])
     extern int optind;
     int grv;
     int cart_type = 0;
+    int err_if_overwrite = 0;
+
+    /* Set the "current assembly time" to the time we started, not some
+       later time, and keep it fixed throughout. */
+    asm_time       = time(0);
+    asm_time_local = *localtime(&asm_time);
+    asm_time_gmt   = *gmtime(&asm_time);
 
     /* -------------------------------------------------------------------- */
-    /*  Figure out out our executable's path.                               */
+    /*  Figure out out our executable's path.  If none, don't set one.      */
     /* -------------------------------------------------------------------- */
-    {
-        char *s;
-
-        exe_path = strdup(argv[0]);
-
-        s = strrchr(exe_path, PATH_SEP);
-        if (s)
-            *s = 0;
-        else
-        {
-            free(exe_path);
-            exe_path = NULL;
-        }
-    }
-
-#ifdef macintosh
-    argc = ccommand( &argv );
-#endif
+    if (!exe_path)
+        exe_path = get_exe_dir(argv[0]);
 
     grv = cpumatch(argv[0]);
 
-    while( (grv = getopt(argc, argv, "mdj:h:o:l:s:p:i:c")) != EOF)
+    while( (grv = getopt_long(argc, argv, "mdj:o:l:s:p:i:c3v?he",
+                              longopts, NULL)) != EOF)
     {
         switch(grv)
         {
@@ -121,7 +155,6 @@ int asm_main(int argc, char *argv[])
             as1600_search_path = append_path(as1600_search_path, optarg);
             break;
         case 'o':
-        case 'h':
             hexfn = optarg;
             hexflag = hexvalid = TRUE;
             break;
@@ -129,7 +162,7 @@ int asm_main(int argc, char *argv[])
         case 'j':
             srcmapfn = optarg;
             break;
-        
+
         case 'l':
             loutfn = optarg;
             listflag = TRUE;
@@ -151,19 +184,33 @@ int asm_main(int argc, char *argv[])
         case 'p':
             if( ! cpumatch(optarg) )
             {
-                fprintf(stderr, "%s: no match on CPU type %s, default used\n", 
+                fprintf(stderr, "%s: no match on CPU type %s, default used\n",
                     argv[0], optarg);
             }
             break;
 
+        case '3':
         case 'c':
             cart_type++;
             if (cart_type == 1) icart_type = CC3_STD;
             if (cart_type == 2) icart_type = CC3_ADV;
             break;
 
-        case '?':
+        case 'v':
+            if (svn_revision)
+                printf("AS1600 built from %s\n", svn_revision);
+            else
+                printf("AS1600 revision unknown\n");
+            exit(0);
+
+        case 'e':
+            err_if_overwrite = 1;
             break;
+
+        case '?':
+        case 'h':
+            usage();
+            exit(0);
         }
     }
 
@@ -171,13 +218,13 @@ int asm_main(int argc, char *argv[])
     {
         if(strcmp(argv[optind], "-") == 0)
         {
-            yyin = stdin;
+            yyin = lzoe_filep( stdin );
         }
         else
         {
-            if( (yyin = fopen(argv[optind], "r")) == (FILE *)NULL)
+            if( !(yyin = lzoe_fopen(argv[optind], "r")) )
             {
-                fprintf(stderr, 
+                fprintf(stderr,
                     "%s: cannot open input file %s\n",
                     argv[0], argv[optind]);
                 exit(1);
@@ -192,12 +239,12 @@ int asm_main(int argc, char *argv[])
 
     as1600_search_path = append_path(as1600_search_path, ".");
 
-    as1600_search_path = parse_path_string(as1600_search_path, 
+    as1600_search_path = parse_path_string(as1600_search_path,
                                             getenv("AS1600_PATH"));
 
     if(listflag)
     {
-        if(strcmp(argv[optind], loutfn) == 0) 
+        if(strcmp(argv[optind], loutfn) == 0)
         {
             fprintf(stderr, "%s: list file overwrites input %s\n",
                 argv[0], loutfn);
@@ -218,7 +265,7 @@ int asm_main(int argc, char *argv[])
 
     if (srcmapfn)
     {
-        if(strcmp(argv[optind], srcmapfn) == 0) 
+        if(strcmp(argv[optind], srcmapfn) == 0)
         {
             fprintf(stderr, "%s: source map file overwrites input %s\n",
                     argv[0], srcmapfn);
@@ -237,19 +284,24 @@ int asm_main(int argc, char *argv[])
     setophash();
     setreserved();
     elseifstk[0] = endifstk[0] = If_Err;
+    expmacstk[0] = TRUE;
     emit_entering_file(argv[optind]);
     infilestk[0].fpt  = yyin;
     infilestk[0].fnm  = argv[optind];
     infilestk[0].line = 0;
     currfstk = 0;
     currseg = 0;
+    currpag = -1;
 
     init_parser(&imasm_hooks);
-    
+    collect_init();
+    if (err_if_overwrite)
+        collect_set_overwrite_flags(1, -1);
+
     yyparse();
 
     close_parser();
-    
+
     if(ifstkpt != 0)
         fraerror("active IF at end of file");
 
@@ -262,7 +314,7 @@ int asm_main(int argc, char *argv[])
 
     if(symbflag)
     {
-        if(strcmp(argv[optind], symbfn) == 0) 
+        if(strcmp(argv[optind], symbfn) == 0)
         {
             fprintf(stderr, "%s: symbol file overwrites input %s\n",
                 argv[0], symbfn);
@@ -279,7 +331,7 @@ int asm_main(int argc, char *argv[])
         }
     }
 
-    
+
     intermed_start_pass_2();
 
     if(errorcnt > 0)
@@ -289,7 +341,15 @@ int asm_main(int argc, char *argv[])
     {
         int hexfn_len = strlen(hexfn);
         char *s = hexfn + hexfn_len;
-        char *ext = strrchr(hexfn, '.');  /* look for an extension */
+        char *ext, *tail1, *tail2;
+
+        /* Only examine the last path component */
+        tail1 = strrchr(hexfn, '/');
+        if (!tail1) tail1 = hexfn;
+        tail2 = strrchr(tail1, '\\');
+        if (!tail2) tail2 = tail1;
+
+        ext = strrchr(tail2, '.');  /* look for an extension */
 
         if (ext == NULL || ext == hexfn)
         {   /* no extension */
@@ -297,13 +357,13 @@ int asm_main(int argc, char *argv[])
             cfgfn = (char *)malloc(hexfn_len + 5);
             romfn = (char *)malloc(hexfn_len + 5);
             if (!binfn || !cfgfn || !romfn)
-            { 
+            {
                 fprintf(stderr, "%s: Out of memory\n", argv[0]);
                 exit(1);
             }
-            snprintf(binfn, hexfn_len+5, "%s.bin", hexfn);    
-            snprintf(cfgfn, hexfn_len+5, "%s.cfg", hexfn);    
-            snprintf(romfn, hexfn_len+5, "%s.rom", hexfn);    
+            snprintf(binfn, hexfn_len+5, "%s.bin", hexfn);
+            snprintf(cfgfn, hexfn_len+5, "%s.cfg", hexfn);
+            snprintf(romfn, hexfn_len+5, "%s.rom", hexfn);
             if (!cart_type) icart_type = ICART;
         } else if (stricmp(ext, ".rom")==0)
         {
@@ -317,8 +377,8 @@ int asm_main(int argc, char *argv[])
         {
             binfn = hexfn;
             cfgfn = strdup(hexfn);
-            if (!cfgfn) 
-            { 
+            if (!cfgfn)
+            {
                 fprintf(stderr, "%s: Out of memory\n", argv[0]);
                 exit(1);
             }
@@ -327,12 +387,12 @@ int asm_main(int argc, char *argv[])
             strcpy(s, ".cfg");
         } else
         {
-            fprintf(stderr, "%s: Unknown output file extension '%s'\n", 
+            fprintf(stderr, "%s: Unknown output file extension '%s'\n",
                     argv[0], ext);
             hexflag = FALSE;
         }
 
-        { 
+        {
             char *tmp[3] = {binfn, cfgfn, romfn};
             FILE **ftmp[3] = {&binoutf, &cfgoutf, &romoutf};
             int ck;
@@ -349,7 +409,7 @@ int asm_main(int argc, char *argv[])
             if (hexflag)
                 for (ck = 0; ck < 3; ck++)
                 {
-                    if (!tmp[ck]) 
+                    if (!tmp[ck])
                         continue;
                     *ftmp[ck] = fopen(tmp[ck], "wb");
                     if (!*ftmp[ck])
@@ -382,9 +442,9 @@ int asm_main(int argc, char *argv[])
 
     if(listflag)
     {
-        fprintf(stderr, " ERROR SUMMARY - ERRORS DETECTED %d\n", 
+        fprintf(stderr, " ERROR SUMMARY - ERRORS DETECTED %d\n",
             errorcnt);
-        fprintf(stderr, "               -  WARNINGS       %d\n", 
+        fprintf(stderr, "               -  WARNINGS       %d\n",
             warncnt);
     }
 
@@ -393,7 +453,7 @@ int asm_main(int argc, char *argv[])
 
     if(srcmapfn)
         fclose(smapf);
-    
+
     if(hexflag)
     {
         if (binoutf) fclose(binoutf);
@@ -406,45 +466,15 @@ int asm_main(int argc, char *argv[])
             if (romfn) unlink(romfn);
         }
     }
-    
+
     if (show_map)
-    {
-        int i, start = -1, end = -1, tot_size = 0;
-
-        printf(" MEMORY MAP SUMMARY\n");
-
-        for (i = 0; i < 65536; i++)
-        {
-            if ((memory_bitmap[i >> 5] & (1 << (i & 31))) != 0)
-            {
-                end = i;
-                if (start == -1) 
-                    start = i;
-            } else 
-            {
-                if (start != -1)
-                {
-                    printf("   $%.4X - $%.4X (%d words)\n", 
-                           start, end, end - start + 1);
-                    tot_size += end - start + 1;
-                }
-                start = end = -1;
-            }
-        }
-        if (start != -1)
-        {
-            printf("   $%.4X - $%.4X (%d words)\n", 
-                   start, end, end - start + 1);
-        tot_size += end - start + 1;
-        }
-        printf(" TOTAL INITIALIZED SIZE   %d words\n", tot_size);
-    }
+        collect_show_map();
 
     intermed_finish(debugmode);
-    
+
     exit(errorcnt > 0 ? 2 : 0);
 }
-        
+
 
 void frafatal(char * str)
 /*
@@ -457,7 +487,7 @@ void frafatal(char * str)
     fprintf(stderr, "Fatal error - %s\n",str);
 
     intermed_finish(debugmode);
-        
+
     exit(2);
 }
 
@@ -469,7 +499,7 @@ void frawarn(char * str)
     globals     the count of warnings
 */
 {
-    emit_warnerr(infilestk[currfstk].fnm, infilestk[currfstk].line, 
+    emit_warnerr(infilestk[currfstk].fnm, infilestk[currfstk].line,
                  WARNING, "%s", str);
 }
 
@@ -481,7 +511,7 @@ void fraerror(const char * str)
     globals     count of errors
 */
 {
-    emit_warnerr(infilestk[currfstk].fnm, infilestk[currfstk].line, 
+    emit_warnerr(infilestk[currfstk].fnm, infilestk[currfstk].line,
                  ERROR, "%s", str);
 }
 
@@ -504,7 +534,7 @@ void fracherror(char *str, char *start, char *beyond)
     }
     bcbuff[cnt] = '\0';
 
-    emit_warnerr(infilestk[currfstk].fnm, infilestk[currfstk].line, 
+    emit_warnerr(infilestk[currfstk].fnm, infilestk[currfstk].line,
                  ERROR, "%s '%s'", str, bcbuff);
 }
 

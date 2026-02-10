@@ -2,7 +2,8 @@
 ## subMakefile for ivoice
 ##############################################################################
 
-ivoice/ivoice.o: ivoice/ivoice.c ivoice/ivoice.h ivoice/subMakefile
-ivoice/ivoice.o: gfx/gfx.h stic/stic.h speed/speed.h demo/demo.h
+ivoice/ivoice.$(O): ivoice/ivoice.c ivoice/ivoice.h ivoice/subMakefile
+ivoice/ivoice.$(O): gfx/gfx.h gfx/palette.h stic/stic.h speed/speed.h
+ivoide/ivoice.$(O): demo/demo.h lzoe/lzoe.h
 
-OBJS+=ivoice/ivoice.o
+OBJS += ivoice/ivoice.$(O)

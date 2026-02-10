@@ -1,22 +1,6 @@
 /* ======================================================================== */
 /*  ECScable Interface and Protocol Routines.                               */
 /*  By Joe Zbiciak                                                          */
-/* ------------------------------------------------------------------------ */
-/*  This program is free software; you can redistribute it and/or modify    */
-/*  it under the terms of the GNU General Public License as published by    */
-/*  the Free Software Foundation; either version 2 of the License, or       */
-/*  (at your option) any later version.                                     */
-/*                                                                          */
-/*  This program is distributed in the hope that it will be useful,         */
-/*  but WITHOUT ANY WARRANTY; without even the implied warranty of          */
-/*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
-/*  General Public License for more details.                                */
-/*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
-/* ------------------------------------------------------------------------ */
-/*                 Copyright (c) 2000-2001, Joseph Zbiciak                  */
 /* ======================================================================== */
 #ifndef ECS_CABLE_H_
 #define ECS_CABLE_H_ 1
@@ -53,11 +37,11 @@ void ec_init_ports(unsigned long base);
 int ec_upload
 (
     ecscable_t *ec,        /* ECScable structure                            */
-    uint_16    addr,       /* Address to upload to.                         */
-    uint_16    len,        /* Total length of upload.                       */
-    uint_16    *data,      /* Data to upload.                               */
-    int        width,      /* Width of data to upload.                      */
-    int        icart       /* If non-zero, address is in Intellicart space. */
+    uint16_t    addr,      /* Address to upload to.                         */
+    uint16_t    len,       /* Total length of upload.                       */
+    uint16_t   *data,      /* Data to upload.                               */
+    int         width,     /* Width of data to upload.                      */
+    int         icart      /* If non-zero, address is in Intellicart space. */
 );
 
 /* ------------------------------------------------------------------------ */
@@ -66,11 +50,11 @@ int ec_upload
 int ec_download
 (
     ecscable_t *ec,        /* ECScable structure                            */
-    uint_16    addr,       /* Address to upload to.                         */
-    uint_16    len,        /* Total length of download.                     */
-    uint_16    *data,      /* Data to download.                             */
-    int        width,      /* Width of data to download.                    */
-    int        icart       /* If non-zero, address is in Intellicart space. */
+    uint16_t    addr,      /* Address to upload to.                         */
+    uint16_t    len,       /* Total length of download.                     */
+    uint16_t   *data,      /* Data to download.                             */
+    int         width,     /* Width of data to download.                    */
+    int         icart      /* If non-zero, address is in Intellicart space. */
 );
 
 /* ------------------------------------------------------------------------ */
@@ -170,7 +154,7 @@ int ec_send_cmdhdr(ecscable_t *ec, int addr, int len);
 /*  sent, otherwise only the remaining bytes are sent.  This eliminates     */
 /*  the need for length bytes in the stream.                                */
 /* ------------------------------------------------------------------------ */
-int ec_send_bytes(ecscable_t *ec, uint_16 *data, int len);
+int ec_send_bytes(ecscable_t *ec, uint16_t *data, int len);
 
 /* ------------------------------------------------------------------------ */
 /*  EC_SEND_DECLES   -- Send an array of 10-bit data.                       */
@@ -202,7 +186,7 @@ int ec_send_bytes(ecscable_t *ec, uint_16 *data, int len);
 /*  the need for length bytes in the stream.                                */
 /*                                                                          */
 /* ------------------------------------------------------------------------ */
-int ec_send_decles(ecscable_t *ec, uint_16 *data, int len);
+int ec_send_decles(ecscable_t *ec, uint16_t *data, int len);
 
 /* ------------------------------------------------------------------------ */
 /*  EC_SEND_WORDS    -- Send an array of 16-bit data.                       */
@@ -228,7 +212,7 @@ int ec_send_decles(ecscable_t *ec, uint_16 *data, int len);
 /*  sent, otherwise only the remaining words are sent.  This eliminates     */
 /*  the need for length bytes in the stream.                                */
 /* ------------------------------------------------------------------------ */
-int ec_send_words(ecscable_t *ec, uint_16 *data, int len);
+int ec_send_words(ecscable_t *ec, uint16_t *data, int len);
 
 /* ------------------------------------------------------------------------ */
 /*  EC_RECV_BYTES    -- Send an array of 8-bit data.                        */
@@ -241,7 +225,7 @@ int ec_send_words(ecscable_t *ec, uint_16 *data, int len);
 /*   |   D7a  |   D6a  |   D5a  |   D4a  | (clk)  |                         */
 /*   +--------+--------+--------+--------+--------+                         */
 /* ------------------------------------------------------------------------ */
-int ec_recv_bytes(ecscable_t *ec, uint_16 *data, int len);
+int ec_recv_bytes(ecscable_t *ec, uint16_t *data, int len);
 
 /* ------------------------------------------------------------------------ */
 /*  EC_RECV_DECLES   -- Send an array of 10-bit data.                       */
@@ -257,7 +241,7 @@ int ec_recv_bytes(ecscable_t *ec, uint_16 *data, int len);
 /*   |   n/a  |   n/a  |   D9a  |   D8a  | (clk)  |                         */
 /*   +--------+--------+--------+--------+--------+                         */
 /* ------------------------------------------------------------------------ */
-int ec_recv_decles(ecscable_t *ec, uint_16 *data, int len);
+int ec_recv_decles(ecscable_t *ec, uint16_t *data, int len);
 
 /* ------------------------------------------------------------------------ */
 /*  EC_RECV_WORDS    -- Send an array of 16-bit data.                       */
@@ -276,7 +260,7 @@ int ec_recv_decles(ecscable_t *ec, uint_16 *data, int len);
 /*   |   D15a |   D14a |   D13a |   D12a | (clk)  |                         */
 /*   +--------+--------+--------+--------+--------+                         */
 /* ------------------------------------------------------------------------ */
-int ec_recv_words(ecscable_t *ec, uint_16 *data, int len);
+int ec_recv_words(ecscable_t *ec, uint16_t *data, int len);
 
 /* ------------------------------------------------------------------------ */
 /*  EC_SLEEP         -- Wrapper around nanosleep().                         */
@@ -295,9 +279,9 @@ void ec_sleep(long len);
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                 Copyright (c) 1998-2001, Joseph Zbiciak                  */
 /* ======================================================================== */

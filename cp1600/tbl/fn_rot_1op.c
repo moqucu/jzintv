@@ -1,7 +1,7 @@
 /* Auto generated, do not edit */
 
 #include "cp1600/op_tables.h"
-const cp1600_ins_t fn_rot_1op[] =
+cp1600_ins_t *const fn_rot_1op[] =
 {
 /*0000*/     fn_SWAP1_r,
 /*0001*/     fn_SWAP2_r,

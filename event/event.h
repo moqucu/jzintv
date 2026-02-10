@@ -1,6 +1,6 @@
 /*
  * ============================================================================
- *  Title:    
+ *  Title:    Event interface.
  *  Author:   J. Zbiciak
  * ============================================================================
  *
@@ -8,107 +8,76 @@
  *
  * ============================================================================
  */
-#ifndef _EVENT_H_
-#define _EVENT_H_
+#ifndef EVENT_H_
+#define EVENT_H_
 
-
-/*
- * ============================================================================
- *  EVENT_NAME_T     -- Structure used to map event names to numbers.
- * ============================================================================
- */
-typedef struct event_name_t
-{
-    const char *name;           /* Printable name for event.        */
-    uint_32     event_num;      /* Event index number into mask_tbl */
-} event_name_t;
-
-/*
- * ============================================================================
- *  EVENT_MASK_T     -- Structure containing AND/OR masks for an event.
- * ============================================================================
- */
-typedef struct event_mask_t
-{
-    v_uint_32   *word;          /* Word to mask, or NULL if none.   */
-    uint_32     and_mask[2];    /* AND masks (up/down)              */
-    uint_32     or_mask [2];    /* OR masks (up/down)               */
-} event_mask_t;
-
-
-/*
- * ============================================================================
- *  EVENT_T          -- Event Subsystem object
- * ============================================================================
- */
+/* ======================================================================== */
+/*  EVENT_T          -- Event Subsystem object                              */
+/* ======================================================================== */
 typedef struct evt_pvt_t evt_pvt_t;
 typedef struct event_t
 {
     periph_t    periph;         /* Yes, it's a peripheral.  Surprise!       */
-
-    event_mask_t*mask_tbl[4];   /* Event mask tables.                       */
-    uint_32     max_event;      /* Highest event number supported.          */
-    uint_32     change_kbd;     /* Keyboard map change request.             */
-    uint_32     cur_kbd;        /* Current keyboard mapping                 */
-    uint_32     prv_kbd;        /* Previous keyboard mapping                */
-
-    double      soon;           /* When to begin processing events again    */
-    double      coalesce_time;  /* How long to delay when processing combos */
-
-    evt_pvt_t   *pvt;           /* Private structure                        */
+    evt_pvt_t  *pvt;            /* Private structure                        */
 } event_t;
 
-/*
- * ============================================================================
- *  EVENT_INIT       -- Initializes the Event subsystem.
- * ============================================================================
- */
-int event_init(event_t *event, int enable_mouse);
+/* ======================================================================== */
+/*  EVENT_INIT       -- Initializes the Event subsystem.                    */
+/* ======================================================================== */
+int event_init
+(
+    event_t *const event,
+    const bool     enable_mouse,
+    const int      initial_event_map
+);
 
-/*
- * ============================================================================
- *  EVENT_TICK       -- Processes currently pending events in the event queue
- * ============================================================================
- */
-uint_32 event_tick(periph_p p, uint_32 len);
-
-enum { DOWN = 1, UP = 0 } ;
-
-/*
- * ============================================================================
- *  EVENT_MAP        -- Maps an event to a particular AND/OR mask set
- *
- *  NOTE:  This implementation currently uses a gawdawful slow linear search
- *  to look up event names.  Eventually, I'll sort the event name list and
- *  use a binary search, which should be many times faster.  I can justify
- *  this slow lookup for now since this event mapping only occurs at startup.
- * ============================================================================
- */
+/* ======================================================================== */
+/*  EVENT_MAP        -- Maps an event to a particular AND/OR mask set       */
+/* ======================================================================== */
 int event_map
 (
-    event_t     *event,         /* Event_t structure being set up.          */
-    const char  *name,          /* Name of event to map.                    */
+    event_t    *event,          /* Event_t structure being set up.          */
+    const char *name,           /* Name of event to map.                    */
     int         map_num,        /* Keyboard mapping number                  */
-    v_uint_32   *word,          /* Word modified by event, (NULL to ignore) */
-    uint_32     and_mask[2],    /* AND masks for event up/down.             */
-    uint_32     or_mask[2]      /* OR masks for event up/down.              */
+    uint32_t   *word,           /* Word modified by event, (NULL to ignore) */
+    uint32_t    and_mask[2],    /* AND masks for event up/down.             */
+    uint32_t    or_mask[2]      /* OR masks for event up/down.              */
 );
 
-/*
- * ============================================================================
- *  EVENT_COMBINE    -- Register a combo event as COMBOxx
- * ============================================================================
- */
+/* ======================================================================== */
+/*  EVENT_COMBINE    -- Register a combo event as COMBOxx                   */
+/* ======================================================================== */
 int event_combine
 (
-    event_t     *event,
-    const char  *name1,
-    const char  *name2,
-    int         combo_num
+    event_t     *const event,
+    const char  *const event_name1,
+    const char  *const event_name2,
+    const int          combo_num
 );
 
+/* ======================================================================== */
+/*  EVENT_SET_COMBO_COALESCE                                                */
+/*  Adjust the coalesce timer for combo matching.                           */
+/* ======================================================================== */
+void event_set_combo_coalesce
+(
+    event_t     *const event,
+    const double       coalesce_time
+);
 
-extern uint_32 event_count;
+typedef enum
+{
+    EV_MAP_NOP = 0,
+    EV_MAP_SET_0, EV_MAP_SET_1, EV_MAP_SET_2, EV_MAP_SET_3, 
+    EV_MAP_NEXT,  EV_MAP_PREV,  EV_MAP_POP,
+    EV_MAP_PSH_0, EV_MAP_PSH_1, EV_MAP_PSH_2, EV_MAP_PSH_3
+} ev_map_change_req;
+
+/* ======================================================================== */
+/*  EVENT_CHANGE_ACTIVE_MAP  -- Change the current input mapping.           */
+/* ======================================================================== */
+void event_change_active_map(event_t *const event, 
+                             const ev_map_change_req map_change_req);
 
 #endif /*EVENT_H*/
 /* ======================================================================== */
@@ -122,12 +91,9 @@ extern uint_32 event_count;
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
-/*                 Copyright (c) 1998-1999, Joseph Zbiciak                  */
+/*                 Copyright (c) 1998-2020, Joseph Zbiciak                  */
 /* ======================================================================== */
-
-
-

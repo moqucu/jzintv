@@ -1,8 +1,7 @@
 /*
  * ============================================================================
- *  Title:    Platform-specific Initialization Functions for SDL.
+ *  Title:    Platform-specific Initialization Functions for SDL1 and SDL2.
  *  Author:   J. Zbiciak
- *  $Id: plat_sdl.c,v 1.3 1999/09/13 02:35:09 im14u2c Exp $
  * ============================================================================
  *  Platform-specific initialization for SDL.
  * ============================================================================
@@ -11,8 +10,10 @@
  */
 
 #include "config.h"
-#include "sdl.h"
+#include "sdl_jzintv.h"
 #include "plat/plat.h"
+#include "plat/plat_lib_config.h"
+
 
 #ifdef DIRECT_INTV2PC
 # include <unistd.h>
@@ -25,6 +26,30 @@
 
 static void plat_quit(void);
 
+bool plat_is_batch_mode(void) { return false; }
+
+#if GET_TIME_STRATEGY == GTS_WIN_PERF_COUNTERS
+double win32_get_time_fallback(void)
+{
+    return SDL_GetTicks() / 1000.0;
+}
+#endif
+
+#if GET_TIME_STRATEGY == GTS_SDL_GETTICKS
+double get_time(void)
+{
+    return SDL_GetTicks() / 1000.0;
+}
+#endif
+
+#if PLAT_DELAY_STRATEGY == PDS_SDL_DELAY
+void plat_delay(unsigned delay)
+{
+    SDL_Delay(delay);
+}
+#endif
+
+
 int plat_init(void)
 {
 #ifdef GP2X
@@ -34,8 +59,9 @@ int plat_init(void)
     /* -------------------------------------------------------------------- */
     /*  Do a quick endian-check to ensure we were compiled correctly.       */
     /* -------------------------------------------------------------------- */
+#ifndef __EMSCRIPTEN__
     {
-        union { uint_8 byte[4]; uint_32 word; } endian;
+        union { uint8_t byte[4]; uint32_t word; } endian;
 
         endian.word = 0x2A3A4A5A;
 
@@ -43,7 +69,7 @@ int plat_init(void)
         if (endian.byte[0] != 0x2A || endian.byte[1] != 0x3A ||
             endian.byte[2] != 0x4A || endian.byte[3] != 0x5A)
         {
-            fprintf(stderr, 
+            fprintf(stderr,
               "jzIntv built for Big Endian, but target gave following "
               "byte order:\n    %.2X %.2X %.2X %.2X\n",
               endian.byte[0], endian.byte[1], endian.byte[2], endian.byte[3]);
@@ -54,7 +80,7 @@ int plat_init(void)
         if (endian.byte[3] != 0x2A || endian.byte[2] != 0x3A ||
             endian.byte[1] != 0x4A || endian.byte[0] != 0x5A)
         {
-            fprintf(stderr, 
+            fprintf(stderr,
               "jzIntv built for Little Endian, but target gave following "
               "byte order:\n    %.2X %.2X %.2X %.2X\n",
               endian.byte[0], endian.byte[1], endian.byte[2], endian.byte[3]);
@@ -62,6 +88,7 @@ int plat_init(void)
         }
 #endif
     }
+#endif
 
 
     /* -------------------------------------------------------------------- */
@@ -70,11 +97,8 @@ int plat_init(void)
     /*  allow us to get DGA access if we are suid-root.                     */
     /* -------------------------------------------------------------------- */
     if (SDL_Init(SDL_INIT_AUDIO | SDL_INIT_VIDEO | SDL_INIT_JOYSTICK |
-#ifdef N900
-       //        SDL_INIT_TIMER |
-#endif
                  SDL_INIT_NOPARACHUTE) != 0)
-    {   
+    {
         fprintf(stderr, "plat_init:  SDL_Init failed!  Reason: '%s'\n",
                 SDL_GetError());
         return -1;
@@ -128,16 +152,25 @@ int plat_init(void)
 #if defined(DIRECT_INTV2PC) && defined(WIN32)
     pads_intv2pc_ports_ok = 7;
 #endif
-    
 
 #ifndef NO_SETUID
     /* -------------------------------------------------------------------- */
     /*  If we have elevated privileges, drop them here, now, immediately.   */
+    /*  Warn if it fails, but otherwise don't worry too much.  I have       */
+    /*  seriously put very little thought into securing jzIntv, and it      */
+    /*  should never be used SUID/SGID anyway.                              */
     /* -------------------------------------------------------------------- */
-    if (getegid() != getgid()) setegid(getgid());
-    if (geteuid() != getuid()) seteuid(getuid());
+    if (getegid() != getgid())
+    {
+        if (setegid(getgid()) != 0)
+            fprintf(stderr, "WARNING: Could not set EGID == GID.\n");
+    }
+    if (geteuid() != getuid()) 
+    {
+        if (seteuid(getuid()) != 0)
+            fprintf(stderr, "WARNING: Could not set EUID == UID.\n");
+    }
 #endif
-
     return 0;
 }
 
@@ -160,9 +193,9 @@ static void plat_quit(void)
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
-/*                 Copyright (c) 1998-1999, Joseph Zbiciak                  */
+/*                 Copyright (c) 1998-2020, Joseph Zbiciak                  */
 /* ======================================================================== */

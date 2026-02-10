@@ -7,32 +7,34 @@
 #ifndef JLPSG_H_
 #define JLPSG_H_
 
-typedef struct jlp_t 
+typedef struct jlp_t
 {
     periph_t    periph;     /* Yup, this is a peripheral.  :-)              */
-    uint_16    *pc;         /* Pointer to CPU Program Counter               */
-    uint_16    *ram;        /* 16-bit RAM                                   */
+    uint16_t   *xreg;       /* Pointer to CPU X-Regs                        */
+    uint16_t   *ram;        /* 16-bit RAM                                   */
     int         sleep;      /* Emulate "busy" time after a slot write.      */
-    uint_16    *sg_img;     /* Save game image                              */
+    uint8_t    *sg_img;     /* Save game image                              */
     FILE       *sg_file;    /* Save-game filename                           */
+    uint16_t    sg_start;   /* Initial flash row                            */
+    uint16_t    sg_end;     /* Final flash row                              */
+    uint32_t    sg_bytes;   /* Total size in bytes                          */
 } jlp_t;
 
 
 /* Approximate numbers for a 256K board and ~20Kw game. */
-#define JLP_SG_START (224)
-#define JLP_SG_END   (1359)
-#define JLP_SG_BYTES ((JLP_SG_END - JLP_SG_START + 1) * 192)
-
-
+#define JLP_SG_OFS   (224)
 
 /* ======================================================================== */
 /*  JLP_INIT   -- Sets up JLP support                                       */
 /* ======================================================================== */
 int jlp_init
 (
-    jlp_t           *jlp,       /*  Structure to initialize.        */
-    const char      *fname,     /*  Save-game file                  */
-    uint_16         *pc         /*  Pointer to CPU program counter  */
+    jlp_t          *jlp,        /*  Structure to initialize.        */
+    const char     *fname,      /*  Save-game file                  */
+    uint16_t       *pc,         /*  Pointer to CPU program counter  */
+    int             jlp_flags,  /*  Accel-enable, Flash-enable      */
+    int             jlp_flash,  /*  Flash image size                */
+    int             randomize   /*  Randomize memory on powerup.    */
 );
 
 
@@ -48,9 +50,9 @@ int jlp_init
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                 Copyright (c) 2009-+Inf, Joseph Zbiciak                  */
 /* ======================================================================== */

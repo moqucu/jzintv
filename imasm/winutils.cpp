@@ -1,6 +1,6 @@
 // Pixels to dialog units
 //TabStopList[n] = 4 * DesiredPixelPosition /
-//                     LOWORD(GetDialogBaseUnits());  
+//                     LOWORD(GetDialogBaseUnits());
 
 
 //-----------------------------------------------------------------------------
@@ -70,7 +70,7 @@ bool SetIniFileName (char *iniFileBuff, const char *iniFileName)
     {
         return 0;
     }
-    
+
     int fileLen = strlen (iniFileName);
     if (iniFileBuff [strlen (iniFileBuff) - 1] != '\\')
     {
@@ -92,105 +92,105 @@ void DisplayCommDlgError(HWND hWnd, int iError)
     switch (iError)
     {
         case CDERR_DIALOGFAILURE:
-            MessageBox( hWnd, 
+            MessageBox( hWnd,
                         "CDERR_DIALOGFAILURE",
                         "Common Dialog Error",
                         MB_ICONINFORMATION);
             break;
 
         case CDERR_FINDRESFAILURE:
-            MessageBox( hWnd, 
+            MessageBox( hWnd,
                         "CDERR_FINDRESFAILURE",
                         "Common Dialog Error",
                         MB_ICONINFORMATION);
             break;
 
         case CDERR_NOHINSTANCE:
-            MessageBox( hWnd, 
+            MessageBox( hWnd,
                         "CDERR_NOHINSTANCE",
                         "Common Dialog Error",
                         MB_ICONINFORMATION);
             break;
 
         case CDERR_INITIALIZATION:
-            MessageBox( hWnd, 
+            MessageBox( hWnd,
                         "CDERR_INITIALIZATION",
                         "Common Dialog Error",
                         MB_ICONINFORMATION);
             break;
 
         case CDERR_NOHOOK:
-            MessageBox( hWnd, 
+            MessageBox( hWnd,
                         "CDERR_NOHOOK",
                         "Common Dialog Error",
                         MB_ICONINFORMATION);
             break;
 
         case CDERR_LOCKRESFAILURE:
-            MessageBox( hWnd, 
+            MessageBox( hWnd,
                         "CDERR_LOCKRESFAILURE",
                         "Common Dialog Error",
                         MB_ICONINFORMATION);
             break;
 
         case CDERR_NOTEMPLATE:
-            MessageBox( hWnd, 
+            MessageBox( hWnd,
                         "CDERR_NOTEMPLATE",
                         "Common Dialog Error",
                         MB_ICONINFORMATION);
             break;
 
         case CDERR_LOADRESFAILURE:
-            MessageBox( hWnd, 
+            MessageBox( hWnd,
                         "CDERR_LOADRESFAILURE",
                         "Common Dialog Error",
                         MB_ICONINFORMATION);
             break;
 
         case CDERR_STRUCTSIZE:
-            MessageBox( hWnd, 
+            MessageBox( hWnd,
                         "CDERR_STRUCTSIZE",
                         "Common Dialog Error",
                         MB_ICONINFORMATION);
             break;
 
         case CDERR_LOADSTRFAILURE:
-            MessageBox( hWnd, 
+            MessageBox( hWnd,
                         "CDERR_LOADSTRFAILURE",
                         "Common Dialog Error",
                         MB_ICONINFORMATION);
             break;
 
         case FNERR_BUFFERTOOSMALL:
-            MessageBox( hWnd, 
+            MessageBox( hWnd,
                         "FNERR_BUFFERTOOSMALL",
                         "Common Dialog Error",
                         MB_ICONINFORMATION);
             break;
 
         case CDERR_MEMALLOCFAILURE:
-            MessageBox( hWnd, 
+            MessageBox( hWnd,
                         "CDERR_MEMALLOCFAILURE",
                         "Common Dialog Error",
                         MB_ICONINFORMATION);
             break;
 
         case FNERR_INVALIDFILENAME:
-            MessageBox( hWnd, 
+            MessageBox( hWnd,
                         "FNERR_INVALIDFILENAME",
                         "Common Dialog Error",
                         MB_ICONINFORMATION);
             break;
 
         case CDERR_MEMLOCKFAILURE:
-            MessageBox( hWnd, 
+            MessageBox( hWnd,
                         "CDERR_MEMLOCKFAILURE",
                         "Common Dialog Error",
                         MB_ICONINFORMATION);
             break;
 
         case FNERR_SUBCLASSFAILURE:
-            MessageBox( hWnd, 
+            MessageBox( hWnd,
                         "FNERR_SUBCLASSFAILURE",
                         "Common Dialog Error",
                         MB_ICONINFORMATION);
@@ -205,8 +205,8 @@ void DisplayCommDlgError(HWND hWnd, int iError)
 void DisplayLastError()
 {
     LPVOID lpMsgBuf;
-    FormatMessage(  FORMAT_MESSAGE_ALLOCATE_BUFFER | 
-                    FORMAT_MESSAGE_FROM_SYSTEM | 
+    FormatMessage(  FORMAT_MESSAGE_ALLOCATE_BUFFER |
+                    FORMAT_MESSAGE_FROM_SYSTEM |
                     FORMAT_MESSAGE_IGNORE_INSERTS,
                     NULL,
                     GetLastError(),
@@ -214,7 +214,7 @@ void DisplayLastError()
                     (LPTSTR) &lpMsgBuf,
                     0,
                     NULL);
-    
+
     // Display the string.
     MessageBox(NULL, (LPCTSTR)lpMsgBuf, "Error", MB_OK | MB_ICONINFORMATION);
 
@@ -237,7 +237,7 @@ void DisplayLastError()
         case WM_NCPAINT:
         {
             DefWindowProc(hWnd, msg, wParam, lParam);
-            
+
             HDC hdc = GetWindowDC(hWnd);
             HDC memDC = CreateCompatibleDC(hdc);
 
@@ -254,5 +254,5 @@ void DisplayLastError()
 
             return 0;
         }
-        
+
 */
