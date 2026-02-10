@@ -3,19 +3,29 @@
 #define USAGE_C_
 #include "cfg.h"
 
+LOCAL const char *jzintv_copyright =
+"Copyright 2018, Joseph Zbiciak"                                            "\n"
+""
+"Portions    Tim Lindner, John Tanner, Rick Reynolds, Pedro Giffuni,"       "\n"
+"copyright:  Joe Fisher, Frank Palazzolo, Kjell Breding, Daniele Moglia,"   "\n"
+"            Marco Turconi, Patrick Nadeau, Andrea Mazzoleni (scale2x/3x/4x),\n"
+"            Markus Oberhumer (minilzo), Oscar Toledo (AVI),"               "\n"
+"            Jean-loup Gailly (zlib), Mark Adler (zlib)"                    "\n"
+;
+
+
 /* ======================================================================== */
 /*  USAGE            -- Just give usage info and exit.                      */
 /* ======================================================================== */
 void usage(void)
 {
-    jzp_init(0,stdout,NULL,NULL); 
+    jzp_init(0,stdout,NULL,NULL);
     jzp_printf(
                                                                             "\n"
 "jzIntv v%d.%d"                                                             "\n"
-"Copyright 2010, Joseph Zbiciak"                                            "\n"
-"Portions copyright:  Tim Lindner, John Tanner, Rick Reynolds,"             "\n"
-"                     Pedro Giffuni, Joe Fisher, Frank Palazzolo,"          "\n"
-"                     Kjell Breding, Daniele Moglia"                        "\n"
+"%s%c"
+                                                                            "\n"
+"%s"
                                                                             "\n"
 "Usage:"                                                                    "\n"
 "    jzintv [flags] gamefile"                                               "\n"
@@ -36,6 +46,13 @@ void usage(void)
 "    ensure the filename extensions are in lower-case.  On all systems,"    "\n"
 "    jzIntv expects to receive file names with lower-case extensions."      "\n"
                                                                             "\n"
+    ,JZINTV_VERSION_MAJOR
+    ,JZINTV_VERSION_MINOR
+    ,svn_revision ? svn_revision : ""
+    ,svn_revision ? '\n' : ' '
+    ,jzintv_copyright
+    );
+    jzp_printf(
 "ROM Image Flags:"                                                          "\n"
 "    -e /path/to/exec.bin          Specifies path to the EXEC ROM image."   "\n"
 "    --execimg=/path/to/exec.bin   By default, jzIntv looks in current dir.  \n"
@@ -52,18 +69,50 @@ void usage(void)
 "    -v#     --voice=#             Intellivoice.  0: Disable, 1: Enable"    "\n"
 "    -W#     --voicewindow=#       Sets averaging window for voice filter." "\n"
 "    -Vname  --voicefiles=name     Saves voice WAV files to name####.wav."  "\n"
+"    -P      --pal                 Start jzIntv in PAL (50Hz) mode."        "\n"
                                                                             "\n"
 "Video and Sound Flags:"                                                    "\n"
+    );
 #ifndef GP2X
-"    -z#     --displaysize=#       Desired display mode:"                   "\n"
-"                                      0:  320x200x8bpp"                    "\n"
-"                                      1:  640x480x8bpp"                    "\n"
-"                                      2:  320x240x16bpp"                   "\n"
+    jzp_printf(
+"    -z<res> --displaysize=<res>   Desired active display size, *before*"   "\n"
+"                                  adding border area."                     "\n"
+"                                  <res> can be a string of the form"       "\n"
+"                                  XDIMxYDIM,DEPTH such as \"320x200,8\""   "\n"
+"                                  or a single digit specifying a built-in" "\n"
+"                                  resolution from the following set."      "\n"
+"                                      0:  320x200,8bpp"                    "\n"
+"                                      1:  640x480,8bpp"                    "\n"
+"                                      2:  320x240,16bpp"                   "\n"
+"                                      3:  1024x768,8bpp"                   "\n"
+"                                      4:  1680x1050,8bpp"                  "\n"
+"                                      5:  800x400,16bpp"                   "\n"
+"                                      6:  1600x1200,32bpp"                 "\n"
+"                                      7:  3280x1200,32bpp"                 "\n"
                                                                             "\n"
+"    -b#     --gfx-border-pct=#    Increase display size by # percent,"     "\n"
+"                                  filling the add'l space w/ border color.\n"
+"                                  e.g. -z0 -b10 produces a 384x240 display\n"
+"                                  with 320x200 active area centered within.\n"
+                                                                            "\n"
+"            --gfx-border-x=#      Directly set horizontal border padding." "\n"
+"            --gfx-border-y=#      Directly set vertical border padding."   "\n"
+                                                                            "\n"
+"            --resolution=<res>    Synonym for --displaysize"               "\n"
 "    -f# -x# --fullscreen=#        Full screen display:"                    "\n"
 "                                      0:  Windowed"                        "\n"
 "                                      1:  Full screen"                     "\n"
+"            --prescale=<ps>       Enable prescaler <ps>.  Use the flag"    "\n"
+"                                  \"--prescale=-1\" to print a list of the\n"
+"                                  supported prescalers."                   "\n"
+    );
 #endif
+    jzp_printf(
+"            --gfx-palette=<file>  Load alternate palette from <file>"      "\n"
+"    -G#     --gramsize=#          Change number of GRAM tiles"             "\n"
+"                                      0:  64 tiles (standard)"             "\n"
+"                                      1:  128 tiles"                       "\n"
+"                                      2:  256 tiles (INTV88)"              "\n"
                                                                             "\n"
 "    -a#     --audiorate=#         Audio sampling rate.  0 disables audio." "\n"
 "            --audio=#             Synonym for --audiorate."                "\n"
@@ -93,7 +142,9 @@ void usage(void)
 "    --js2=\"config string\"         Configures Joystick #2"                "\n"
 "    --js3=\"config string\"         Configures Joystick #3"                "\n"
                                                                             "\n"
+    );
 #ifdef DIRECT_INTV2PC
+    jzp_printf(
 "    The INTV2PC can drive either the Master Component or the ECS' controller\n"
 "    inputs.  The following flags associate INTV2PCs with controllers:"     "\n"
                                                                             "\n"
@@ -102,8 +153,10 @@ void usage(void)
 "            --intv2pc0=#          Synonym for --i2pc0"                     "\n"
 "            --intv2pc1=#          Synonym for --i2pc1"                     "\n"
                                                                             "\n"
+    );
 #endif
 #ifdef CGC_DLL
+    jzp_printf(
 "    The Classic Game Controller can drive either the Master Component or"  "\n"
 "    the ECS' controller inputs.  The following flags associate CGCs with"  "\n"
 "    controllers:"                                                          "\n"
@@ -111,8 +164,10 @@ void usage(void)
 "    --cgc0[=#]                    CGC for Master Component inputs."        "\n"
 "    --cgc1[=#]                    CGC for ECS inputs."                     "\n"
                                                                             "\n"
+    );
 #endif
 #ifdef CGC_THREAD
+    jzp_printf(
 "    The Classic Game Controller can drive either the Master Component or"  "\n"
 "    the ECS' controller inputs.  The following flags associate CGCs with"  "\n"
 "    controllers.  They also specify the path to the CGC's device node:"    "\n"
@@ -120,7 +175,9 @@ void usage(void)
 "    --cgc0=/path/to/cgc           CGC for Master Component inputs."        "\n"
 "    --cgc1=/path/to/cgc           CGC for ECS inputs."                     "\n"
                                                                             "\n"
+    );
 #endif
+    jzp_printf(
 "Intellicart .ROM emulation specific flags:"                                "\n"
 "    -c#     --icartcache=#        Change caching policy for Intellicart"   "\n"
 "                                  .ROM programs:"                          "\n"
@@ -136,6 +193,8 @@ void usage(void)
 "            --script=path         Execute debug commands from 'path'."     "\n"
 "            --rand-mem            Randomize memories on startup"           "\n"
                                                                             "\n"
+    );
+    jzp_printf(
 "Misc Flags:"                                                               "\n"
 "    -r#     --ratecontrol=#       \\_ Speed up by factor #.  Setting #"    "\n"
 "            --macho=#             /  to 0 disables rate control."          "\n"
@@ -147,19 +206,43 @@ void usage(void)
 "            --gui-mode            Tells jzIntv to listen for commands from""\n"
 "                                  a GUI over stdin."                       "\n"
                                                                             "\n"
-"    -J path --jlp-savegame=path   Enable JLP-style save-game support with" "\n"
+"    -J<#>                         Explicitly set JLP accelerator enable."  "\n"
+"                                  0:  Off"                                 "\n"
+"                                  1:  Accel+RAM On, no flash"              "\n"
+"                                  2:  Accel+RAM Off"                       "\n"
+"                                  3:  Accel+RAM On, with flash"            "\n"
+                                                                            "\n"
+"            --jlp-savegame=path   Enable JLP-style save-game support with" "\n"
 "                                  'path' as the save-game file."           "\n"
                                                                             "\n"
 "            --file-io             Enable Emu-Link File-IO support"         "\n"
 "                                  (See examples/fileio/fileio.asm)"        "\n"
                                                                             "\n"
+"            --start-delay=#       Delay jzIntv startup by # seconds."      "\n"
+"                                  # can be floating point (e.g. 1.5)."     "\n"
+                                                                            "\n"
+"            --avirate=#           Scales time by # when recording AVI files.\n"
+"                                  # can be floating point (e.g. 1.5)."     "\n"
+                                                                            "\n"
+"            --ecs-tape=path       Template for ECS tape file names."       "\n"
+"                                  An '#' in the name expands to the 4 char""\n"
+"                                  CSAV/CLOD name preceded by an '_', if"   "\n"
+"                                  provided."                               "\n"
+                                                                            "\n"
+"            --ecs-printer=path    File to append ECS printer output to."   "\n"
+                                                                            "\n"
+"            --cheat='<cheat>'     Adds a cheat code.  Up to 8 cheats can"  "\n"
+"                                  be added.  See doc/jzintv/cheat.txt."    "\n"
+                                                                            "\n"
 "    -l      --license             License information"                     "\n"
 " -h -?      --help                This usage info"                         "\n"
                                                                             "\n"
+    );
+    jzp_printf(
 "Environment:"                                                              "\n"
 "    JZINTV_ROM_PATH               Controls ROM search path.  Components of\n"
 "                                  the ROM search path should be separated" "\n"
-"                                  by \"" PATH_COMPONENT_SEP 
+"                                  by \"" PATH_COMPONENT_SEP
                                        "\" characters.  jzIntv examines"    "\n"
 "                                  dirs specified by --rom-path before"     "\n"
 "                                  dirs specified by JZINTV_ROM_PATH."      "\n"
@@ -180,11 +263,10 @@ void usage(void)
                                                                             "\n"
 #endif
 "Legal note:"                                                               "\n"
-"    Intellivision(TM) is a trademark of Intellivision Productions.  Joe"   "\n"
-"    Zbiciak and jzIntv are not affiliated with Intellivision Productions." "\n"
+"    Intellivision(TM) is a trademark of Intellivision Entertainment.  Neither"
                                                                             "\n"
-    ,JZINTV_VERSION_MAJOR
-    ,JZINTV_VERSION_MINOR
+"    Joe Zbiciak nor jzIntv are affiliated with Intellivision Entertainment.\n"
+                                                                            "\n"
     );
 
     jzp_flush();
@@ -196,14 +278,13 @@ void usage(void)
 /* ======================================================================== */
 void license(void)
 {
-    jzp_init(0,stdout,NULL,NULL); 
+    jzp_init(0,stdout,NULL,NULL);
     jzp_printf(
                                                                             "\n"
 "jzIntv v%d.%d"                                                             "\n"
-"Copyright 2010, Joseph Zbiciak"                                            "\n"
-"Portions copyright:  Tim Lindner, John Tanner, Rick Reynolds,"             "\n"
-"                     Pedro Giffuni, Joe Fisher, Frank Palazzolo,"          "\n"
-"                     Kjell Breding, Daniele Moglia"                        "\n"
+"%s%c"
+                                                                            "\n"
+"%s"
                                                                             "\n"
 "This program is free software; you can redistribute it and/or modify it"   "\n"
 "under the terms of the GNU General Public License as published by the Free\n"
@@ -217,16 +298,19 @@ void license(void)
                                                                             "\n"
 "You should have received a copy of the GNU General Public License along"   "\n"
 "with this program; if not, write to the Free Software Foundation, Inc.,"   "\n"
-"675 Mass Ave, Cambridge, MA 02139, USA."                                   "\n"
+"51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA."               "\n"
                                                                             "\n"
 "Run \"jzintv --help\" for usage information."                              "\n"
                                                                             "\n"
 "Legal note:"                                                               "\n"
-"    Intellivision(TM) is a trademark of Intellivision Productions.  Joe"   "\n"
-"    Zbiciak and jzIntv are not affiliated with Intellivision Productions." "\n"
+"    Intellivision(TM) is a trademark of Intellivision Entertainment.  Joe" "\n"
+"    Zbiciak and jzIntv are not affiliated with Intellivision Entertainment.\n"
                                                                             "\n"
     ,JZINTV_VERSION_MAJOR
     ,JZINTV_VERSION_MINOR
+    ,svn_revision ? svn_revision : ""
+    ,svn_revision ? '\n' : ' '
+    ,jzintv_copyright
     );
 
     jzp_flush();

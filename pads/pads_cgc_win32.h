@@ -2,7 +2,6 @@
  * ============================================================================
  *  Title:    Controller pads via Joe Fisher's Classic Gaming Controller
  *  Author:   J. Zbiciak
- *  $Id$
  * ============================================================================
  *  Some code in this module comes from Joe Fisher's reference code.
  * ============================================================================
@@ -21,14 +20,13 @@
 /* ======================================================================== */
 int pad_cgc_win32_init
 (
-    pad_cgc_t       *pad,           /*  pad_cgc_t structure to initialize   */
-    uint_32         addr,           /*  Base address of pad.                */
+    pad_cgc_t      *pad,            /*  pad_cgc_t structure to initialize   */
+    uint32_t        addr,           /*  Base address of pad.                */
     int             cgc_num         /*  CGC number in system                */
 );
 
 #endif
-#endif 
-
+#endif
 
 /* ======================================================================== */
 /*  This program is free software; you can redistribute it and/or modify    */
@@ -41,9 +39,9 @@ int pad_cgc_win32_init
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                 Copyright (c) 2004-+Inf, Joseph Zbiciak                  */
 /* ======================================================================== */

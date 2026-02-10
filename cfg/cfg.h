@@ -2,10 +2,9 @@
  * ============================================================================
  *  Title:    Configuration Manager
  *  Author:   J. Zbiciak
- *  $Id: cfg.h,v 1.4 2001/02/03 02:34:21 im14u2c Exp $
  * ============================================================================
  *  This module manages the machine configuration.  It does commandline
- *  parsing and processes the configuration elements that were read in 
+ *  parsing and processes the configuration elements that were read in
  *  via the config-file parser.
  *
  *  CFG owns the entire machine -- it is encapsulated in a cfg_t.
@@ -15,8 +14,8 @@
  * ============================================================================
  */
 
-#ifndef _CFG_H_
-#define _CFG_H_
+#ifndef CFG_H_
+#define CFG_H_
 
 #ifndef USAGE_C_
 /*
@@ -30,16 +29,18 @@ typedef struct cfg_t
     /* -------------------------------------------------------------------- */
     /*  Our baby, the Intellivision itself.                                 */
     /* -------------------------------------------------------------------- */
-    periph_bus_p intv;          /* Top level Intellivision object.          */
+    periph_bus_t *intv;         /* Top level Intellivision object.          */
 
     /* -------------------------------------------------------------------- */
     /*  System 'peripherals' -- these aren't actual hardware devices.       */
     /* -------------------------------------------------------------------- */
     gfx_t       gfx;            /* Graphics interface layer.                */
+    palette_t   palette;        /* Our display colors.                      */
     snd_t       snd;            /* Sound interface layer.                   */
     speed_t     speed;          /* Rate controller.                         */
     event_t     event;          /* Event subsystem.                         */
     debug_t     debug;          /* Debugger hooks.                          */
+    cheat_t     cheat;          /* Cheat commands.                          */
 
     /* -------------------------------------------------------------------- */
     /*  Hardware peripherals -- these model actual pieces of the Intv.      */
@@ -63,18 +64,13 @@ typedef struct cfg_t
     mem_t       glt_ram;        /* glitch RAM */
     icart_t     icart;          /* Game program.                            */
     legacy_t    legacy;         /* Legacy BIN+CFG game program              */
-    mem_t       game0;
-    mem_t       game1;
-    mem_t       game2;
-    mem_t       ecs0;
-    mem_t       ecs1;
-    mem_t       ecs2;
-    mem_t       ecs_ram;        /* 8-bit Scratchpad RAM at 0x4000 - 0x47FF  */
+    ecs_t       ecs;            /* Entertainment Computer System (ECS)      */
     jlp_t       jlp;            /* Jean-Luc Project Support                 */
+    t_locutus_wrap locutus;
 
-    uint_16     exec_img[4096 + 256];
-    uint_16     grom_img[2048      ];
-    uint_16     ecs_img [4096 * 3];
+    uint16_t    exec_img[4096 + 4096];
+    uint16_t    grom_img[2048       ];
+    uint16_t    ecs_img [4096 * 3];
 
     /* -------------------------------------------------------------------- */
     /*  User-modifiable flags, etc.                                         */
@@ -87,17 +83,20 @@ typedef struct cfg_t
     int         ivc_window;     /* Window size for Ivoice sliding window.   */
     char       *ivc_tname;      /* Intellivoice sample file name template.  */
     int         gfx_flags;      /* SDL mode flags (fullsc/windowed, etc)    */
-    int         disp_res;       /* Display resolution.                      */
-    uint_32     i2pc0_port;     /* INTV2PC #0 I/O address.                  */
-    uint_32     i2pc1_port;     /* INTV2PC #1 I/O address.                  */
+    uint32_t    i2pc0_port;     /* INTV2PC #0 I/O address.                  */
+    uint32_t    i2pc1_port;     /* INTV2PC #1 I/O address.                  */
     int         cgc0_num;       /* CGC #0's ID number.                      */
     int         cgc1_num;       /* CGC #1's ID number.                      */
     char       *cgc0_dev;       /* CGC #0's device node                     */
     char       *cgc1_dev;       /* CGC #1's device node                     */
     int         debugging;      /* Debugger enabled flag.                   */
     int         gui_mode;       /* Are we running in "GUI mode?"            */
+    int         prescale;       /* Prescaler: 0=none, 1=scale2x, 2=3x, 3=4x */
     int         start_dly;      /* Delay at startup if we need to.          */
+    int         pal_mode;       /* 1 = PAL, 0 = NTSC                        */
+    int         gram_size;      /* 0 = 64 cards, 1 = 128, 2 = 256 (TutorV)  */
     double      rate_ctl;       /* Target rate.  1.0 is "normal speed."     */
+    double      avi_time_scale; /* AVI recording time scaling.              */
 
     char       *fn_exec;        /* File name of EXEC image.                 */
     char       *fn_grom;        /* File name of GROM image.                 */
@@ -107,9 +106,13 @@ typedef struct cfg_t
     /* -------------------------------------------------------------------- */
     /*  State flags, such as the global "exit" flag, etc.                   */
     /* -------------------------------------------------------------------- */
-    v_uint_32   do_exit;        /* Signal that an exit is requested.        */
-    v_uint_32   do_reset;       /* Signal that a RESET is requested.        */
-    v_uint_32   do_pause;       /* Signal that we are paused.               */
+    uint32_t  do_exit;          /* Signal that an exit is requested.        */
+    uint32_t  do_reset;         /* Signal that a RESET is requested.        */
+    uint32_t  do_pause;         /* Signal that we are paused.               */
+    uint32_t  do_dump;          /* Signal that we'd like to save a game     */
+    uint32_t  do_load;          /* Signal that we'd like to load a game     */
+    uint32_t  do_reload;        /* Signal we'd like to reload jzIntv        */
+    uint32_t  chg_evt_map;      /* Change the current input event map.      */
 
     /* -------------------------------------------------------------------- */
     /*  Key bindings                                                        */
@@ -120,6 +123,11 @@ typedef struct cfg_t
     /*  Demo recorder.                                                      */
     /* -------------------------------------------------------------------- */
     demo_t      demo;
+
+    /* -------------------------------------------------------------------- */
+    /*  AVI recorder.                                                       */
+    /* -------------------------------------------------------------------- */
+    avi_writer_t avi;
 
     /* -------------------------------------------------------------------- */
     /*  Other misc details about the game                                   */
@@ -175,9 +183,9 @@ void license(void);
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                 Copyright (c) 1998-2001, Joseph Zbiciak                  */
 /* ======================================================================== */

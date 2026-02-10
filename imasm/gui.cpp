@@ -12,8 +12,8 @@ as published by the Free Software Foundation; either version 2
 of the License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of 
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the 
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
@@ -99,7 +99,7 @@ INT APIENTRY WinMain(   HINSTANCE hInst,
     }
 
     LoadConfigInfo();
-    
+
     if (DoCommandLine(pCmdLine))
     {
         // Register our unique class object
@@ -107,7 +107,7 @@ INT APIENTRY WinMain(   HINSTANCE hInst,
 
         // Perform application initialization:
         HWND hMain = InitInstance(hInst, nCmdShow);
-        
+
         if (hMain != NULL)
         {
             // Get accelerator list
@@ -138,7 +138,7 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
 {
     WNDCLASSEX wcex;
 
-    wcex.cbSize         = sizeof(WNDCLASSEX); 
+    wcex.cbSize         = sizeof(WNDCLASSEX);
     wcex.style          = CS_HREDRAW | CS_VREDRAW;
     wcex.lpfnWndProc    = (WNDPROC)FrameProc;
     wcex.cbClsExtra     = 0;
@@ -167,7 +167,7 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
     wcex.lpszMenuName   = NULL;
     //wcex.hIcon            = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_MAINICON));
     wcex.lpszClassName  = g_szFilePaneClass;
-*/  
+*/
     return RegisterClassEx(&wcex);
 }
 
@@ -205,7 +205,7 @@ HWND InitInstance(HINSTANCE hInstance, int iCmdShow)
 
 //-----------------------------------------------------------------------------
 // Name: DoExitProcessing()
-// Desc: 
+// Desc:
 //-----------------------------------------------------------------------------
 void DoExitProcessing(HWND hWnd)
 {
@@ -214,28 +214,28 @@ void DoExitProcessing(HWND hWnd)
 
 //-----------------------------------------------------------------------------
 // Name: Highlight()
-// Desc: 
+// Desc:
 //-----------------------------------------------------------------------------
 void Highlight(HWND hWnd, COLORREF col, DWORD dwStart, DWORD dwEnd)
 {
     CHARFORMAT cf;
-    
+
     // Select the text we are interested in
     SendMessage(hWnd, EM_SETSEL, (WPARAM)dwStart, (LPARAM)dwEnd);
-    
+
     // Populate a CHARFORMAT structure accordingly
     cf.cbSize   = sizeof(CHARFORMAT);
     cf.dwMask   = CFM_COLOR;
     cf.dwEffects    = 0;
     cf.crTextColor  = col;
-    
+
     // Colorize the text
     SendMessage(hWnd, EM_SETCHARFORMAT, (WPARAM)(SCF_SELECTION), (LPARAM)&cf);
 }
 
 //-----------------------------------------------------------------------------
 // Name: LoadFile()
-// Desc: 
+// Desc:
 //-----------------------------------------------------------------------------
 int LoadFile(HWND hRichEd, char *fName)
 {
@@ -262,18 +262,18 @@ int LoadFile(HWND hRichEd, char *fName)
 
     // Stream data in
     SendMessage(hRichEd, EM_STREAMIN, (WPARAM)SF_TEXT, (LPARAM)&es);
-    
+
     // Turn messages back on
     SendMessage(hRichEd, EM_SETEVENTMASK, (WPARAM)0, (LPARAM)dwOldMask);
-    
+
     CloseHandle(hFile);
-    
+
     return 1;
 }
 
 //-----------------------------------------------------------------------------
 // Name: SaveFile()
-// Desc: 
+// Desc:
 //-----------------------------------------------------------------------------
 int SaveFile(HWND hRichEd, char *fName)
 {
@@ -289,9 +289,9 @@ int SaveFile(HWND hRichEd, char *fName)
     es.dwCookie = (DWORD)hFile;
     es.dwError = 0;
     es.pfnCallback = SaveFileCallback;
-    
+
     SendMessage(hRichEd, EM_STREAMOUT, (WPARAM)SF_TEXT, (LPARAM)&es);
-    
+
     CloseHandle(hFile);
 
     return 1;
@@ -299,7 +299,7 @@ int SaveFile(HWND hRichEd, char *fName)
 
 //-----------------------------------------------------------------------------
 // Name: GetWordColor()
-// Desc: 
+// Desc:
 //-----------------------------------------------------------------------------
 COLORREF GetWordColor(char *szWord)
 {
@@ -328,7 +328,7 @@ COLORREF GetWordColor(char *szWord)
 
 //-----------------------------------------------------------------------------
 // Name: LoadFileCallback()
-// Desc:    
+// Desc:
 //-----------------------------------------------------------------------------
 DWORD CALLBACK LoadFileCallback(DWORD dwCookie, LPBYTE pbBuff, LONG cb, LONG *pcb)
 {
@@ -352,7 +352,7 @@ DWORD CALLBACK LoadFileCallback(DWORD dwCookie, LPBYTE pbBuff, LONG cb, LONG *pc
 
 //-----------------------------------------------------------------------------
 // Name: SaveFileCallback()
-// Desc:    
+// Desc:
 //-----------------------------------------------------------------------------
 DWORD CALLBACK SaveFileCallback(DWORD dwCookie, LPBYTE pbBuff, LONG cb, LONG *pcb)
 {
@@ -376,14 +376,14 @@ DWORD CALLBACK SaveFileCallback(DWORD dwCookie, LPBYTE pbBuff, LONG cb, LONG *pc
 
 //-----------------------------------------------------------------------------
 // Name: HighlightDoc()
-// Desc: 
+// Desc:
 //-----------------------------------------------------------------------------
 void HighlightDoc(HWND hRichEd)
 {
     DWORD dwPos, dwSize;
     TEXTRANGE tr;
     GETTEXTLENGTHEX tl;
-    
+
     DWORD dwStart, dwEnd;
 
     char szBuff[MAX_PATH];
@@ -433,10 +433,10 @@ void HighlightDoc(HWND hRichEd)
             else
             {
                 COLORREF crCol = GetWordColor(szWord);
-            
+
                 // Colorize the text
-                Highlight(hRichEd, crCol, dwPos - (strlen(szWord)+1), dwPos);   
-                
+                Highlight(hRichEd, crCol, dwPos - (strlen(szWord)+1), dwPos);
+
                 iPos = 0;
                 *szWord = NUL;
             }
@@ -454,14 +454,14 @@ void HighlightDoc(HWND hRichEd)
 
 //-----------------------------------------------------------------------------
 // Name: ConfirmSave()
-// Desc: 
+// Desc:
 //-----------------------------------------------------------------------------
 void ConfirmSave(HWND hWnd)
 {
     int iRet;
 
     WndInfo *pWI = (WndInfo *)GetWindowLong(hWnd, WL_INFOPTR);
-    
+
     if (pWI)
     {
         if (pWI->bIsDirty)
@@ -480,7 +480,7 @@ void ConfirmSave(HWND hWnd)
 
 //-----------------------------------------------------------------------------
 // Name: LoadConfigInfo()
-// Desc: 
+// Desc:
 //-----------------------------------------------------------------------------
 void LoadConfigInfo()
 {
@@ -518,19 +518,19 @@ void LoadConfigInfo()
                     t = s;
                     if (t.GetNumTokens() >= 3)
                     {
-                        iRed = atoi(t[0]);  
+                        iRed = atoi(t[0]);
                         iGreen = atoi(t[1]);
                         iBlue = atoi(t[2]);
 
                         crCol = RGB(iRed, iGreen, iBlue);
-                        break;                      
+                        break;
                     }
                     else
                     {
                         bError = true;
                         break;
                     }
-                }               
+                }
             } // while for color
 
             // Now read in the names
@@ -549,9 +549,9 @@ void LoadConfigInfo()
             while (!inFile.eof() && !bError && !bDone)
             {
                 getline(inFile, s);
-                
+
                 Token t(" \t\r\n,");
-                
+
                 iPos = s.find_first_of('}');
 
                 if (iPos != string::npos)
@@ -561,7 +561,7 @@ void LoadConfigInfo()
                 }
 
                 t = s;
-                
+
                 iNum = t.GetNumTokens();
 
                 for (i = 0; i < iNum; i++)
@@ -588,17 +588,17 @@ void LoadConfigInfo()
 
     if (1)
     {
-        g_bAutoUpdate = true;       
+        g_bAutoUpdate = true;
     }
 }
 
 //-----------------------------------------------------------------------------
 // Name: void CreateToolbar()
-// Desc: 
+// Desc:
 //-----------------------------------------------------------------------------
 void CreateToolbar(HWND hWnd)
 {
-    TBBUTTON btn[10];   
+    TBBUTTON btn[10];
 
     g_hToolBar = CreateWindowEx(0,
                                 TOOLBARCLASSNAME,
@@ -618,12 +618,12 @@ void CreateToolbar(HWND hWnd)
     // Add stock bitmaps
     TBADDBITMAP tba;
     tba.hInst = HINST_COMMCTRL;
-    tba.nID = IDB_STD_SMALL_COLOR;  
+    tba.nID = IDB_STD_SMALL_COLOR;
     SendMessage(g_hToolBar, TB_ADDBITMAP, 15, (LPARAM)&tba);
-    
+
     // Add user defined bitmaps
     tba.hInst = g_hInst;
-    tba.nID = IDB_AUTO; 
+    tba.nID = IDB_AUTO;
     SendMessage(g_hToolBar, TB_ADDBITMAP, 4, (LPARAM)&tba);
 
 
@@ -640,7 +640,7 @@ void CreateToolbar(HWND hWnd)
     btn[1].fsStyle = TBSTYLE_SEP;
     btn[1].dwData = 0;
     btn[1].iString = 0;
-    
+
     btn[2].iBitmap = STD_FILEOPEN;
     btn[2].idCommand = IDC_OPEN;
     btn[2].fsState = TBSTATE_ENABLED;
@@ -668,13 +668,13 @@ void CreateToolbar(HWND hWnd)
     btn[5].fsStyle = TBSTYLE_BUTTON;
     btn[5].dwData = 0;
     btn[5].iString = 0;
-    
+
     btn[6].iBitmap = 0;
     btn[6].idCommand = 0;
     btn[6].fsState = TBSTATE_ENABLED;
     btn[6].fsStyle = TBSTYLE_SEP;
     btn[6].dwData = 0;
-    btn[6].iString = 0; 
+    btn[6].iString = 0;
 
     btn[7].iBitmap = 16;
     btn[7].idCommand = IDC_AUTO;
@@ -697,7 +697,7 @@ void CreateToolbar(HWND hWnd)
     btn[9].dwData = 0;
     btn[9].iString = 0;
 
-    SendMessage(g_hToolBar, TB_ADDBUTTONS, 10, (LPARAM)btn);    
+    SendMessage(g_hToolBar, TB_ADDBUTTONS, 10, (LPARAM)btn);
 }
 
 //-----------------------------------------------------------------------------
@@ -713,7 +713,7 @@ int DoCommandLine(char *szBuff)
     int iNum = t.GetNumTokens();
 
     if (iNum == 2)
-    {   
+    {
         ParseFiles(t[0], t[1], NULL);
         return 0;
     }
@@ -727,7 +727,7 @@ int DoCommandLine(char *szBuff)
 
 //-----------------------------------------------------------------------------
 // Name: ParseFiles()
-// Desc: 
+// Desc:
 //-----------------------------------------------------------------------------
 bool ParseFiles(const char *szSrc, const char *szDst, char *szError)
 {
@@ -772,19 +772,19 @@ bool ParseFiles(const char *szSrc, const char *szDst, char *szError)
 
 //-----------------------------------------------------------------------------
 // Name: UpdateStatusBar()
-// Desc: 
+// Desc:
 //-----------------------------------------------------------------------------
 void UpdateStatusBar(HWND hWnd)
 {
     WndInfo *pWI = (WndInfo *)GetWindowLong(hWnd, WL_INFOPTR);
-    
+
     if (pWI)
     {
         int dwSt, dwEnd;
         char szBuff[MAX_PATH];
-        
+
         SendMessage(pWI->hRichEd, EM_GETSEL, (WPARAM)&dwSt, (LPARAM)&dwEnd);
-        
+
         int iLine = SendMessage(pWI->hRichEd, EM_LINEFROMCHAR, dwEnd, 0);
         int iLineIndx = SendMessage(pWI->hRichEd, EM_LINEINDEX, iLine, 0);
 
@@ -808,7 +808,7 @@ void UpdateStatusBar(HWND hWnd)
         else
         {
             SendMessage(g_hStatBar, SB_SETTEXT, 3 | 0, (LPARAM)"OVR");
-        }   
+        }
 
         key = GetKeyState(VK_NUMLOCK);
         if (key & 0x1)
@@ -824,14 +824,14 @@ void UpdateStatusBar(HWND hWnd)
 
 //-----------------------------------------------------------------------------
 // Name: LoadFileIntoNewWindow()
-// Desc: 
+// Desc:
 //-----------------------------------------------------------------------------
 int LoadFileIntoNewWindow(char *szFileName)
 {
     int iRet = 0;
-    
+
     g_hCurChild = NULL;
-    
+
     HandleIDC_NEW(g_hMDIClient);
 
     while (!g_hCurChild);
@@ -856,14 +856,14 @@ int LoadFileIntoNewWindow(char *szFileName)
 
 //-----------------------------------------------------------------------------
 // Name: GetAsmFileName()
-// Desc: 
+// Desc:
 //-----------------------------------------------------------------------------
 int GetAsmFileName(HWND hWnd, char *szFileTitle, char *szFileName)
 {
     OPENFILENAME of;
-    
+
     ZeroMemory(&of, sizeof (OPENFILENAME));
-    
+
     of.lStructSize = sizeof (OPENFILENAME);
     of.hwndOwner = hWnd;
     of.hInstance = g_hInst;
@@ -882,7 +882,7 @@ int GetAsmFileName(HWND hWnd, char *szFileTitle, char *szFileName)
 
 //-----------------------------------------------------------------------------
 // Name: ()
-// Desc: 
+// Desc:
 //-----------------------------------------------------------------------------
 
- 
+

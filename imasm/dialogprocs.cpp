@@ -12,8 +12,8 @@ as published by the Free Software Foundation; either version 2
 of the License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of 
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the 
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
@@ -31,7 +31,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 INT_PTR CALLBACK AboutProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
 {
     switch(msg)
-    {       
+    {
         case WM_INITDIALOG:
         {
             CenterWindow(hDlg);
@@ -52,7 +52,7 @@ INT_PTR CALLBACK AboutProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
             }
             break;
 
-        default: 
+        default:
             return FALSE;
     }
 
@@ -71,7 +71,7 @@ INT_PTR CALLBACK NewProjectProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lPara
     int iLen;
 
     switch(msg)
-    {       
+    {
         case WM_INITDIALOG:
             pIP = (ItemParam *)lParam;
 
@@ -86,7 +86,7 @@ INT_PTR CALLBACK NewProjectProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lPara
             SetWindowText(GetDlgItem(hDlg, IDC_PROJECTPATH), szBuff);
             SetFocus(GetDlgItem(hDlg, IDC_PROJECTNAME));
             return TRUE;
-    
+
         case WM_COMMAND:
             switch(LOWORD(wParam))
             {
@@ -138,7 +138,7 @@ INT_PTR CALLBACK NewProjectProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lPara
             }
             break;
 
-        default: 
+        default:
             return FALSE;
     }
 

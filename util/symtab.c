@@ -23,9 +23,9 @@ static int compare_symbol(symtab_ent_t *a, symtab_ent_t *b)
 
 static int compare_address(symtab_ent_t *a, symtab_ent_t *b)
 {
-    return  (a->address > b->address) ? -1 : 
-            (a->address < b->address) ?  1 : 
-            (a->addrseq > b->addrseq) ? -1 : 
+    return  (a->address > b->address) ? -1 :
+            (a->address < b->address) ?  1 :
+            (a->addrseq > b->addrseq) ? -1 :
             (a->addrseq < b->addrseq) ?  1 : 0;
 }
 
@@ -79,8 +79,8 @@ void symtab_destroy(symtab_t *symtab)
 /* ------------------------------------------------------------------------ */
 /*  SYMTAB_DEFSYM           -- Associate address with symbol.               */
 /* ------------------------------------------------------------------------ */
-const char *symtab_defsym(symtab_t *symtab, const char *symbol, uint_32 addr)
-{   
+const char *symtab_defsym(symtab_t *symtab, const char *symbol, uint32_t addr)
+{
     symtab_ent_t *entry;
     char *sym_copy;
     int err;
@@ -90,10 +90,10 @@ const char *symtab_defsym(symtab_t *symtab, const char *symbol, uint_32 addr)
     /* -------------------------------------------------------------------- */
     entry    = CALLOC(symtab_ent_t, 1);
     sym_copy = strdup(symbol);
-    if (!entry || !sym_copy) 
-    { 
-        fprintf(stderr, "symtab_defsym: Out of memory\n"); 
-        exit(1); 
+    if (!entry || !sym_copy)
+    {
+        fprintf(stderr, "symtab_defsym: Out of memory\n");
+        exit(1);
     }
 
     entry->symbol  = sym_copy;
@@ -113,7 +113,7 @@ const char *symtab_defsym(symtab_t *symtab, const char *symbol, uint_32 addr)
             symtab_ent_t *dupl = NULL;
             void         *duplv = NULL;
 
-            if (AVL_SearchTree(&symtab->by_symbol, 
+            if (AVL_SearchTree(&symtab->by_symbol,
                                (void*)entry, &duplv) != EAVL_NOERR)
             {
                 fprintf(stderr, "symtab_defsym: Internal error\n");
@@ -161,7 +161,8 @@ const char *symtab_defsym(symtab_t *symtab, const char *symbol, uint_32 addr)
 /* ------------------------------------------------------------------------ */
 /*  SYMTAB_GETSYM           -- Get symbol associated with address.          */
 /* ------------------------------------------------------------------------ */
-const char *symtab_getsym(symtab_t *symtab, uint_32 addr, int attrib, int which)
+const char *symtab_getsym(symtab_t *symtab, uint32_t addr,
+                          int attrib, int which)
 {
     symtab_ent_t key, *find = NULL;
     void *findv = NULL;
@@ -209,7 +210,7 @@ const char *symtab_getsym(symtab_t *symtab, uint_32 addr, int attrib, int which)
 /* ------------------------------------------------------------------------ */
 /*  SYMTAB_GETADDR          -- Get address associated with symbol.          */
 /* ------------------------------------------------------------------------ */
-int symtab_getaddr(symtab_t *symtab, const char *symbol, uint_32 *addr)
+int symtab_getaddr(symtab_t *symtab, const char *symbol, uint32_t *addr)
 {
     symtab_ent_t key, *find = NULL;
     void *findv = NULL;
@@ -220,7 +221,7 @@ int symtab_getaddr(symtab_t *symtab, const char *symbol, uint_32 *addr)
     /* -------------------------------------------------------------------- */
     key.symbol = strdup(symbol);
 
-    err  = AVL_SearchTree(&symtab->by_symbol, (void*)&key, &findv); 
+    err  = AVL_SearchTree(&symtab->by_symbol, (void*)&key, &findv);
     find = (symtab_ent_t *)findv;
 
     free(key.symbol);
@@ -249,7 +250,7 @@ int symtab_getaddr(symtab_t *symtab, const char *symbol, uint_32 *addr)
 /* ------------------------------------------------------------------------ */
 /*  SYMTAB_XREF_ADDR        -- Say 'addr' is referenced from 'xref'.        */
 /* ------------------------------------------------------------------------ */
-void     symtab_xref_addr   (symtab_t *symtab, uint_32 addr, uint_32 xref)
+void symtab_xref_addr(symtab_t *symtab, uint32_t addr, uint32_t xref)
 {
     symtab_ent_t key, *find = NULL;
     void *findv = NULL;
@@ -291,8 +292,8 @@ void     symtab_xref_addr   (symtab_t *symtab, uint_32 addr, uint_32 xref)
             if (!find->xrsize)  find->xrsize = 4;
             else                find->xrsize <<= 1;
 
-            find->xref = (uint_32 *)realloc(find->xref, 
-                                            find->xrsize * sizeof(uint_32));
+            find->xref = (uint32_t *)realloc(find->xref,
+                                            find->xrsize * sizeof(uint32_t));
         }
 
         /* ---------------------------------------------------------------- */
@@ -300,13 +301,13 @@ void     symtab_xref_addr   (symtab_t *symtab, uint_32 addr, uint_32 xref)
         /* ---------------------------------------------------------------- */
         find->xref[find->xrefs++] = xref;
     }
-} 
-    
+}
+
 
 /* ------------------------------------------------------------------------ */
 /*  SYMTAB_DREF_ADDR        -- Say that we've directly referenced 'addr'.   */
 /* ------------------------------------------------------------------------ */
-void     symtab_dref_addr   (symtab_t *symtab, uint_32 addr)
+void symtab_dref_addr(symtab_t *symtab, uint32_t addr)
 {
     symtab_ent_t key, *find = NULL;
     void *findv = NULL;
@@ -335,8 +336,8 @@ void     symtab_dref_addr   (symtab_t *symtab, uint_32 addr)
     {
         find->drefs++;
     }
-} 
-    
+}
+
 static int ord_num = 0;
 static symtab_ent_t **ord_list = NULL;
 
@@ -345,7 +346,7 @@ static symtab_ent_t **ord_list = NULL;
 /* ------------------------------------------------------------------------ */
 static int put_in_list(void *sym)
 {
-    ord_list[ord_num++] = (symtab_ent_t*)sym;   
+    ord_list[ord_num++] = (symtab_ent_t*)sym;
     return 0;
 }
 
@@ -384,12 +385,12 @@ static int   disp_xref(void *symv)
     {
         if ((i & 7) == 0)
         {
-            if (i == 0) 
-                fprintf(f, "%c# %14s:%c", 
+            if (i == 0)
+                fprintf(f, "%c# %14s:%c",
                             symtab_cmt_char, sym->symbol,
                             sym->addrseq == 0 && sym->drefs == 0 ? '!' :
                             sym->addrseq != 0                    ? 'a' : ' ');
-            else        
+            else
                 fprintf(f, "\n%c#                 ", symtab_cmt_char);
         }
         fprintf(f, " %.4X.%.1X", ADDR(sym->xref[i]));
@@ -403,7 +404,7 @@ static int   disp_xref(void *symv)
 /* ------------------------------------------------------------------------ */
 /*  DUMP_GENERIC            -- Internal helper used to dump symbol tbls.    */
 /* ------------------------------------------------------------------------ */
-static void dump_generic(symtab_t *symtab, PAVLTree tree, 
+static void dump_generic(symtab_t *symtab, PAVLTree tree,
                          const char * sort, FILE *f)
 {
     int i, j, k, third;
@@ -518,9 +519,9 @@ void symtab_grep_for_symbol(symtab_t *symtab, symtab_grep_callback_t callback,
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                 Copyright (c) 1998-2001, Joseph Zbiciak                  */
 /* ======================================================================== */

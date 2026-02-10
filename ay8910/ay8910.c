@@ -2,7 +2,6 @@
  * ============================================================================
  *  Title:    AY-8910 family Programmable Sound Generator
  *  Author:   J. Zbiciak
- *  $Id: ay8910.c,v 1.20 2001/11/02 02:00:03 im14u2c Exp $
  * ============================================================================
  *  This module implements the AY-8910 sound chip.
  * ============================================================================
@@ -28,7 +27,7 @@
  *
  *     Register pairs:
  *
- *       7   6   5   4   3   2   1   0 | 7   6   5   4   3   2   1   0  
+ *       7   6   5   4   3   2   1   0 | 7   6   5   4   3   2   1   0
  *     +---------------+---------------|-------------------------------+
  *  R4 |    unused     |                Channel A Period               | R0
  *     +---------------+---------------|-------------------------------+
@@ -41,10 +40,10 @@
  *
  *     Single registers:
  *
- *         7       6       5       4       3       2       1       0    
+ *         7       6       5       4       3       2       1       0
  *     +---------------+-----------------------+-----------------------+
- *     | I/O Port Dir  |    Noise Enables      |     Tone Enables      | 
- *  R8 |   0   |   0   |   C   |   B   |   A   |   C   |   B   |   A   | 
+ *     | I/O Port Dir  |    Noise Enables      |     Tone Enables      |
+ *  R8 |   0   |   0   |   C   |   B   |   A   |   C   |   B   |   A   |
  *     +-------+-------+-------+-------+-------+-------+-------+-------+
  *  R9 |            unused     |              Noise Period             |
  *     +-----------------------+-------+-------+-------+-------+-------+
@@ -61,16 +60,16 @@
  * ============================================================================
  *
  *  For accuracy, the AY8910's state is evaluated at its native rate,
- *  3579545 / 32 Hz. (4MHz on PAL)  This corresponds to jzIntv's tick rate 
- *  divided by 8.  Output samples are generated using a sliding-window 
- *  average at the requested sample rate.  
+ *  3579545 / 32 Hz. (4MHz on PAL)  This corresponds to jzIntv's tick rate
+ *  divided by 8.  Output samples are generated using a sliding-window
+ *  average at the requested sample rate.
  *
  *  Sound samples are built up in buffers of length "snd_buf".
  *  Whole buffers are handed off to the SND driver for playback.
  *
  * ============================================================================
  *
- *  Note, some aspects of this model were built with information from 
+ *  Note, some aspects of this model were built with information from
  *  "psg.c" that's in MAME/MESS.  Notably, certain peculiarities of the
  *  PSG, such as its random-number generator and counter-rollover behavior
  *  were gleaned from that source.  The "psg.c" model is credited as follows:
@@ -91,23 +90,23 @@
 #include "serializer/serializer.h"
 #include "ay8910.h"
 
-LOCAL  uint_32 ay8910_calc_sound(ay8910_t *ay8910, uint_64 until);
+LOCAL uint32_t ay8910_calc_sound(ay8910_t *ay8910, uint64_t until);
 
 /*
  * ============================================================================
  *  AY8910_VOL   -- Sound volume levels.
  *
- *                  It appears, from the spec sheet, that the amplitude 
- *                  halves for every two steps, implying a 1/sqrt(2) ratio 
+ *                  It appears, from the spec sheet, that the amplitude
+ *                  halves for every two steps, implying a 1/sqrt(2) ratio
  *                  between steps.  This table contains these steps.
  *
- *                  The volume steps have been scaled to provide the largest 
+ *                  The volume steps have been scaled to provide the largest
  *                  dynamic range when mixing all 3 channels together.
  * ============================================================================
  */
-const sint_32 ay8910_vol[16] =
+const int32_t ay8910_vol[16] =
 {
-    0x0000, 0x0055, 0x0079, 0x00AB, 0x00F1, 0x0155, 0x01E3, 0x02AA, 
+    0x0000, 0x0055, 0x0079, 0x00AB, 0x00F1, 0x0155, 0x01E3, 0x02AA,
     0x03C5, 0x0555, 0x078B, 0x0AAB, 0x0F16, 0x1555, 0x1E2B, 0x2AAA,
     /* 0x3C57, 0x5555, */
 };
@@ -118,15 +117,15 @@ const sint_32 ay8910_vol[16] =
  *  AY8910_READ      -- Read from device.
  * ============================================================================
  */
-uint_32 ay8910_read
+uint32_t ay8910_read
 (
-    periph_p        bus,        /*  Peripheral bus being read.          */
-    periph_p        req,        /*  Peripheral requesting read.         */
-    uint_32         addr,       /*  Address being read.                 */
-    uint_32         data        /*  Current state of data being read.   */
+    periph_t        *bus,       /*  Peripheral bus being read.          */
+    periph_t        *req,       /*  Peripheral requesting read.         */
+    uint32_t        addr,       /*  Address being read.                 */
+    uint32_t        data        /*  Current state of data being read.   */
 )
 {
-    ay8910_t *ay8910 = (ay8910_t *)bus;
+    ay8910_t *const ay8910 = PERIPH_AS(ay8910_t, bus);
 
     UNUSED(req);
     UNUSED(data);
@@ -143,23 +142,23 @@ uint_32 ay8910_read
  */
 LOCAL void ay8910_trace
 (
-    periph_p        bus,        /*  Peripheral bus being written.       */
-    periph_p        req,        /*  Peripheral requesting write.        */
-    uint_32         addr,       /*  Address being written.              */
-    uint_32         data        /*  Data being written.                 */
+    periph_t        *bus,       /*  Peripheral bus being written.       */
+    periph_t        *req,       /*  Peripheral requesting write.        */
+    uint32_t        addr,       /*  Address being written.              */
+    uint32_t        data        /*  Data being written.                 */
 )
 {
-    ay8910_t *ay8910 = (ay8910_t *)bus;
-    uint_64 write_time = req && req->req ? req->req->now + 4 : 0;
+    ay8910_t *const ay8910 = PERIPH_AS(ay8910_t, bus);
+    uint64_t write_time = req && req->req ? req->req->now + 4 : 0;
 
-    fprintf(ay8910->trace, "%.8X%.8X: %.1X %.2X\n", 
-            (uint_32)(0xFFFFFFFF & (write_time >> 32)), 
-            (uint_32)(0xFFFFFFFF & (write_time)),
-            (uint_32)addr & 0xF, (uint_32)data & 0xFF);
+    fprintf(ay8910->trace, "%.8X%.8X: %.1X %.2X\n",
+            (uint32_t)(0xFFFFFFFFu & (write_time >> 32)),
+            (uint32_t)(0xFFFFFFFFu & (write_time)),
+            (uint32_t)addr & 0xF, (uint32_t)data & 0xFF);
 
     ay8910_write(bus, req, addr, data);
 }
-    
+
 
 /*
  * ============================================================================
@@ -168,15 +167,16 @@ LOCAL void ay8910_trace
  */
 void ay8910_write
 (
-    periph_p        bus,        /*  Peripheral bus being written.       */
-    periph_p        req,        /*  Peripheral requesting write.        */
-    uint_32         addr,       /*  Address being written.              */
-    uint_32         data        /*  Data being written.                 */
+    periph_t        *bus,       /*  Peripheral bus being written.       */
+    periph_t        *req,       /*  Peripheral requesting write.        */
+    uint32_t        addr,       /*  Address being written.              */
+    uint32_t        data        /*  Data being written.                 */
 )
 {
-    ay8910_t *ay8910 = (ay8910_t *)bus;
+    ay8910_t *const ay8910 = PERIPH_AS(ay8910_t, bus);
     int old_max, new_max, max_chg;
-    uint_64 write_time = req && req->req ? req->req->now + 4 : ay8910->sound_current;
+    uint64_t write_time = req && req->req ? req->req->now + 4
+                                         : ay8910->sound_current;
     int chan = addr & 3;
 
     addr &= 15;
@@ -199,13 +199,13 @@ void ay8910_write
 
 #if 0
             jzp_printf("short sim: %.8X vs %.8X\n",
-                  (uint_32)write_time, (uint_32)ay8910->sound_current);
+                  (uint32_t)write_time, (uint32_t)ay8910->sound_current);
 #endif
         }
 
     } else if (write_time < ay8910->sound_current)
         jzp_printf("sound ahead: %.8X vs %.8X\n",
-               (uint_32)write_time, (uint_32)ay8910->sound_current);
+                   (uint32_t)write_time, (uint32_t)ay8910->sound_current);
 
     if      (addr >= 4  && addr <= 6 ) data &= 0x0F;
     else if (addr == 9               ) data &= 0x1F;
@@ -223,7 +223,7 @@ void ay8910_write
     /*  Regs R0..R3 hold the 8 LSBs of the channel/envelope period.         */
     /* -------------------------------------------------------------------- */
     if (addr < 3)
-    {   
+    {
         old_max = ay8910->max[chan];
         new_max = (old_max & 0x0F00) | data;
         if (new_max == 0x000) new_max = 0x1000;
@@ -234,7 +234,7 @@ void ay8910_write
         /*jzp_printf("LCH%d: %.4X %.4X\n", addr&3, new_max, ay8910->cnt[addr&3]);*/
     } else
     if (addr == 3)
-    {   
+    {
         old_max = ay8910->max[3];
         new_max = (old_max & 0x1FE00) | (data + data);
         if (new_max == 0x0000) new_max = 0x20000;
@@ -246,7 +246,7 @@ void ay8910_write
     /*  Regs R4..R6 hold the 4 MSBs of the channel period.                  */
     /* -------------------------------------------------------------------- */
     if (addr > 3 && addr < 7)
-    {   
+    {
         old_max = ay8910->max[chan];
         new_max = (old_max & 0x00FF) | ((data << 8) & 0x0F00);
         if (new_max == 0x000) new_max = 0x1000;
@@ -255,10 +255,10 @@ void ay8910_write
 /*      ay8910->cnt[chan] += max_chg;*/
 
 #ifdef PSG_DEBUG
-        jzp_printf("HCH%d: %.4X %.4X\n", addr&3, 
+        jzp_printf("HCH%d: %.4X %.4X\n", addr&3,
                new_max, 0xFFFF&ay8910->cnt[addr&3]);
 #endif
-    } else 
+    } else
     /* -------------------------------------------------------------------- */
     /*  Reg R7 holds the 8 MSBs of the envelope period.                     */
     /* -------------------------------------------------------------------- */
@@ -274,7 +274,7 @@ void ay8910_write
 #ifdef PSG_DEBUG
         jzp_printf("ECNT: %.4X %.4X\n", new_max, ay8910->cnt[3]);
 #endif
-    } else 
+    } else
     /* -------------------------------------------------------------------- */
     /*  Reg R9 holds the 5-bit noise period.                                */
     /* -------------------------------------------------------------------- */
@@ -309,10 +309,10 @@ void ay8910_write
         ay8910->env_vol  = ay8910->env_atak ? ay8910_vol[0] : ay8910_vol[15];
 
 #ifdef PSG_DEBUG
-        jzp_printf("ENVT: %d%d%d%d %.2X %.4X\n", 
+        jzp_printf("ENVT: %d%d%d%d %.2X %.4X\n",
                 !!(data&8), !!(data&4), !!(data&2), data&1, data, old_cnt);
 #endif
-    } else 
+    } else
     /* -------------------------------------------------------------------- */
     /*  Error check envelope-select bits in volume registers.               */
     /* -------------------------------------------------------------------- */
@@ -325,7 +325,7 @@ void ay8910_write
             int per, chan = (addr & 0xF) - 11;
             per = ay8910->reg[chan] | (ay8910->reg[chan+4]<<8);
             fprintf(stderr, "Warning: %.4X written to AY8910[%.1X], per=%.4X %c%c\n",
-                    data & 0xFFFF, addr & 0xF, per, 
+                    data & 0xFFFF, addr & 0xF, per,
                     ay8910->reg[8] & (chan    ) ? '-' : 'T',
                     ay8910->reg[8] & (chan + 3) ? '-' : 'N');
             debug_fault_detected = DEBUG_CRASHING;
@@ -336,6 +336,11 @@ void ay8910_write
 #endif
     }
 
+    /* -------------------------------------------------------------------- */
+    /*  Mark max_chg unused for now until we rationalize how to emulate     */
+    /*  all the various PSG variants out there.                             */
+    /* -------------------------------------------------------------------- */
+    UNUSED(max_chg);
 }
 
 /*
@@ -343,18 +348,23 @@ void ay8910_write
  *  AY8910_TICK      -- Tick the device.
  * ============================================================================
  */
-uint_32 ay8910_tick
+uint32_t ay8910_tick
 (
-    periph_p        bus,        /*  Peripheral bus being ticked.        */
-    uint_32         len
+    periph_t        *bus,       /*  Peripheral bus being ticked.        */
+    uint32_t        len
 )
 {
-    ay8910_t *ay8910 = (ay8910_t *)bus;
-    uint_64  elapsed = ay8910->unaccounted;
+    ay8910_t *const ay8910 = PERIPH_AS(ay8910_t, bus);
+    uint64_t elapsed = ay8910->unaccounted;
+    uint64_t soon    = bus->now + len;
+
+    if (ay8910->cpu_time && soon > *ay8910->cpu_time)
+        soon = *ay8910->cpu_time;
+
     ay8910->unaccounted = 0;
 
-    if (bus->now + len > ay8910->sound_current)
-        elapsed += ay8910_calc_sound(ay8910, bus->now + len);
+    if (soon > ay8910->sound_current)
+        elapsed += ay8910_calc_sound(ay8910, soon);
 
     if (ay8910->sound_current >= bus->now)
         return elapsed;
@@ -369,23 +379,23 @@ LOCAL const int ay8910_eshift[4] = { 31, 2, 1, 0 };
  *  AY8910_CALC_SOUND    -- The device.
  * ============================================================================
  */
-LOCAL uint_32 ay8910_calc_sound(ay8910_t *psg, uint_64 until)
+LOCAL uint32_t ay8910_calc_sound(ay8910_t *psg, uint64_t until)
 {
     /* -------------------------------------------------------------------- */
     /*  This is a rather inefficient implementation that is striving for    */
     /*  sound quality and correctness, not speed.  Speed comes next.        */
     /* -------------------------------------------------------------------- */
-    uint_32     elapsed = 0;
-    uint_64     max_step;
+    uint32_t    elapsed = 0;
+    uint64_t    max_step;
     int         step;
     int         sample;
-    int         hit_a,hit_b,hit_c,hit_e,hit_n;
-    int         chn_a,chn_b,chn_c,chn_n,env_cnt,env_vol;
-    int         bit_a,bit_b,bit_c;
-    int         snd_a,snd_b,snd_c,noi_a,noi_b,noi_c;
-    int         vol_a,vol_b,vol_c,val_a,val_b,val_c;
-    int         esh_a,esh_b,esh_c;
-    uint_32     rng;
+    int         hit_a, hit_b, hit_c, hit_e, hit_n;
+    int         chn_a, chn_b, chn_c, chn_n, env_cnt, env_vol;
+    int         bit_a, bit_b, bit_c;
+    int         snd_a, snd_b, snd_c, noi_a, noi_b, noi_c;
+    int         vol_a, vol_b, vol_c, val_a, val_b, val_c;
+    int         esh_a, esh_b, esh_c;
+    uint32_t    rng;
     int         cnt0, cnt1, cnt2, cntE, cntN;
     int         max0, max1, max2, maxE, maxN;
     int         zero_vol = ay8910_vol[0];
@@ -410,11 +420,18 @@ LOCAL uint_32 ay8910_calc_sound(ay8910_t *psg, uint_64 until)
     /* -------------------------------------------------------------------- */
     /*  Load up some PSG state varables into locals for efficiency.         */
     /* -------------------------------------------------------------------- */
-    cnt0    = psg->cnt[0];          max0 = psg->max[0];
-    cnt1    = psg->cnt[1];          max1 = psg->max[1];
-    cnt2    = psg->cnt[2];          max2 = psg->max[2];
-    cntE    = psg->cnt[3];          maxE = psg->max[3];
-    cntN    = psg->cnt[4];          maxN = psg->max[4];
+    cnt0 = psg->cnt[0];      
+    cnt1 = psg->cnt[1];      
+    cnt2 = psg->cnt[2];      
+    cntE = psg->cnt[3];      
+    cntN = psg->cnt[4];      
+
+    max0 = psg->max[0] * psg->time_scale;       if (!max0) max0 = 1;
+    max1 = psg->max[1] * psg->time_scale;       if (!max1) max1 = 1;
+    max2 = psg->max[2] * psg->time_scale;       if (!max2) max2 = 1;
+    maxE = psg->max[3] * psg->time_scale;       if (!maxE) maxE = 1;
+    maxN = psg->max[4] * psg->time_scale;       if (!maxN) maxN = 1;
+
     env_cnt = psg->cnt[5];
     env_vol = psg->env_vol;
 
@@ -435,6 +452,7 @@ LOCAL uint_32 ay8910_calc_sound(ay8910_t *psg, uint_64 until)
     vol_a = psg->reg[11];       vol_a = vol_a & 0x30 ? -1 : ay8910_vol[vol_a];
     vol_b = psg->reg[12];       vol_b = vol_b & 0x30 ? -1 : ay8910_vol[vol_b];
     vol_c = psg->reg[13];       vol_c = vol_c & 0x30 ? -1 : ay8910_vol[vol_c];
+
 
     /* -------------------------------------------------------------------- */
     /*  Tick the time away.                                                 */
@@ -459,16 +477,16 @@ LOCAL uint_32 ay8910_calc_sound(ay8910_t *psg, uint_64 until)
         /* ---------------------------------------------------------------- */
         hit_a = hit_b = hit_c = hit_e = hit_n = 0;
 
-        if ((cnt0 -= step) <= 0) { hit_a = 1; cnt0 += max0 * psg->time_scale; }
-        if ((cnt1 -= step) <= 0) { hit_b = 1; cnt1 += max1 * psg->time_scale; }
-        if ((cnt2 -= step) <= 0) { hit_c = 1; cnt2 += max2 * psg->time_scale; }
-        if ((cntN -= step) <= 0) { hit_n = 1; cntN += maxN * psg->time_scale; }
-        if ((cntE -= step) <= 0) { hit_e = 1; cntE += maxE * psg->time_scale; }
+        if ((cnt0 -= step) <= 0) { hit_a = 1; cnt0 += max0; }
+        if ((cnt1 -= step) <= 0) { hit_b = 1; cnt1 += max1; }
+        if ((cnt2 -= step) <= 0) { hit_c = 1; cnt2 += max2; }
+        if ((cntN -= step) <= 0) { hit_n = 1; cntN += maxN; }
+        if ((cntE -= step) <= 0) { hit_e = 1; cntE += maxE; }
 
         /* ---------------------------------------------------------------- */
         /*  Handle noise generator.                                         */
         /* ---------------------------------------------------------------- */
-        if (hit_n) 
+        if (hit_n)
         {
             rng = (rng >> 1) ^ (chn_n ? 0x10004 : 0);
             chn_n = rng & 1;
@@ -504,7 +522,7 @@ LOCAL uint_32 ay8910_calc_sound(ay8910_t *psg, uint_64 until)
             {
                 env_idx = psg->env_cont & (psg->env_atak^psg->env_altr) ? 15:0;
                 env_cnt = -1;
-            } 
+            }
             /* ------------------------------------------------------------ */
             /*  If count == 16 && waveform doesn't alternate, reset count.  */
             /* ------------------------------------------------------------ */
@@ -512,7 +530,7 @@ LOCAL uint_32 ay8910_calc_sound(ay8910_t *psg, uint_64 until)
             {
                 env_cnt = 0;
                 env_idx = psg->env_atak ? 0 : 15;
-            } 
+            }
             /* ------------------------------------------------------------ */
             /*  Waveform alternates and count is >= 16, so alternate it.    */
             /* ------------------------------------------------------------ */
@@ -617,7 +635,7 @@ no_buffer:
     psg->cnt[3] = cntE;
     psg->cnt[4] = cntN;
     psg->cnt[5] = env_cnt;
-    
+
     psg->chan[0] = chn_a & 1;
     psg->chan[1] = chn_b & 1;
     psg->chan[2] = chn_c & 1;
@@ -635,15 +653,15 @@ no_buffer:
  */
 LOCAL void ay8910_reset
 (
-    periph_p        bus         /*  Peripheral bus being reset.         */
+    periph_t        *bus        /*  Peripheral bus being reset.         */
 )
 {
-    ay8910_t *ay8910 = (ay8910_t *)bus;
+    ay8910_t *const ay8910 = PERIPH_AS(ay8910_t, bus);
     int i;
 
     for (i = 0; i < 5; i++)
     {
-        ay8910->max[i] = 0;
+        ay8910->max[i] = 1;
         ay8910->cnt[i] = 0;
     }
     ay8910->cnt[5] = 0;
@@ -658,7 +676,7 @@ LOCAL void ay8910_reset
     ay8910->env_vol  = ay8910_vol[0];
 
     for (i = 0; i < 14; i++)
-        ay8910->periph.write((periph_p)ay8910, (periph_p)ay8910, i, 0);
+        ay8910->periph.write(AS_PERIPH(ay8910), AS_PERIPH(ay8910), i, 0);
 }
 
 
@@ -667,21 +685,27 @@ LOCAL void ay8910_reset
  *  AY8910_D_WR      -- Dummy write to PSG
  * ============================================================================
  */
-LOCAL void ay8910_d_wr  
+LOCAL void ay8910_d_wr
 (
-    periph_p        bus,        /*  Peripheral bus being written.       */
-    periph_p        req,        /*  Peripheral requesting write.        */
-    uint_32         addr,       /*  Address being written.              */
-    uint_32         data        /*  Data being written.                 */
+    periph_t        *bus,       /*  Peripheral bus being written.       */
+    periph_t        *req,       /*  Peripheral requesting write.        */
+    uint32_t        addr,       /*  Address being written.              */
+    uint32_t        data        /*  Data being written.                 */
 )
 {
-    ay8910_t *ay8910 = (ay8910_t *)bus;
+    ay8910_t *const ay8910 = PERIPH_AS(ay8910_t, bus);
 
     UNUSED(req);
 
     addr &= 15;
 
-    if (addr < 14) ay8910->reg[addr] = data & 0xFF;
+    if      (addr >= 4  && addr <= 6 ) data &= 0x0F;
+    else if (addr == 9               ) data &= 0x1F;
+    else if (addr == 10              ) data &= 0x0F;
+    else if (addr >= 11 && addr <= 13) data &= 0x3F;
+    else                               data &= 0xFF;
+
+    if (addr < 14) ay8910->reg[addr] = data;
 }
 
 
@@ -691,12 +715,12 @@ LOCAL void ay8910_d_wr
  *  AY8910_SER_INIT      -- Registers the PSG w/ the serializer.
  * ============================================================================
  */
-LOCAL void ay8910_ser_init(periph_p p)
+LOCAL void ay8910_ser_init(periph_t *p)
 {
 #ifdef NO_SERIALIZER
     UNUSED(p);
 #else
-    ay8910_t *psg = (ay8910_t *)p;
+    ay8910_t *const psg = PERIPH_AS(ay8910_t, p);
     ser_hier_t *hier, *phier;
 
     hier = ser_new_hierarchy(NULL, p->name);
@@ -723,12 +747,12 @@ LOCAL void ay8910_ser_init(periph_p p)
  *  AY8910_DTOR          -- Deconstructs the PSG
  * ============================================================================
  */
-LOCAL void ay8910_dtor(periph_p p)
+LOCAL void ay8910_dtor(periph_t *p)
 {
-    ay8910_t *psg = (ay8910_t *)p;
+    ay8910_t *psg = PERIPH_AS(ay8910_t, p);
 
     /* -------------------------------------------------------------------- */
-    /*  Only free what we allocated; Let snd_t free its sound buffers.      */ 
+    /*  Only free what we allocated; Let snd_t free its sound buffers.      */
     /* -------------------------------------------------------------------- */
     CONDFREE(psg->window);
     CONDFREE(psg->trace_filename);
@@ -744,14 +768,15 @@ LOCAL void ay8910_dtor(periph_p p)
  */
 int ay8910_init
 (
-    ay8910_t        *ay8910,    /*  Structure to initialize.        */
-    uint_32         addr,       /*  Base address of ay8910.         */
-    snd_t           *snd,       /*  Sound device to register w/.    */
+    ay8910_t       *ay8910,     /*  Structure to initialize.        */
+    uint32_t        addr,       /*  Base address of ay8910.         */
+    snd_t          *snd,        /*  Sound device to register w/.    */
     int             rate,       /*  Desired sample rate.            */
     int             wind,       /*  Sliding window size.            */
     int             accutick,   /*  Min ticks to simulate           */
     double          time_scale, /*  For --macho                     */
-    int             pal_mode    /*  PAL vs. NTSC                    */
+    int             pal_mode,   /*  PAL vs. NTSC                    */
+    uint64_t       *cpu_time    /*  HACK: don't get ahead of CPU    */
 )
 {
     int i;
@@ -807,7 +832,7 @@ int ay8910_init
     if (wind == -1)
     {
         wind = (sys_clock / rate) >> 3;
-        if (wind < 1) 
+        if (wind < 1)
             wind = 1;
 
         jzp_printf("ay8910:  Automatic sliding-window setting: %d\n", wind);
@@ -817,6 +842,7 @@ int ay8910_init
     /* -------------------------------------------------------------------- */
     /*  Configure our internal variables.                                   */
     /* -------------------------------------------------------------------- */
+    ay8910->cpu_time        = cpu_time;
     ay8910->sys_clock       = sys_clock;
     ay8910->time_scale      = time_scale;
     ay8910->accutick        = accutick;
@@ -835,7 +861,7 @@ int ay8910_init
     /*  Clear out the PSG on powerup.                                       */
     /* -------------------------------------------------------------------- */
     for (i = 0; i < 14; i++)
-        ay8910->periph.write((periph_p)ay8910, (periph_p)ay8910, i, 0);
+        ay8910->periph.write(AS_PERIPH(ay8910), AS_PERIPH(ay8910), i, 0);
 
     /* -------------------------------------------------------------------- */
     /*  If the JZINTV_PSG_TRACE environment variable is set, change our     */
@@ -851,8 +877,8 @@ int ay8910_init
         len = strlen(env);
 
         trace_filename  = CALLOC(char, len + 6);
-        if (!trace_filename) 
-        { 
+        if (!trace_filename)
+        {
             perror("ay8910:  Out of memory opening trace file\n");
             return -1;
         }
@@ -881,7 +907,7 @@ int ay8910_init
         {
             jzp_printf("ay8910:  Writing trace file to '%s'.\n", trace_filename);
         }
-        
+
         ay8910->trace_filename  = trace_filename;
         ay8910->trace           = trace_file;
         ay8910->periph.write    = ay8910_trace;
@@ -891,7 +917,7 @@ int ay8910_init
     /* -------------------------------------------------------------------- */
     /*  Register this as a sound peripheral with the SND driver.            */
     /* -------------------------------------------------------------------- */
-    if (snd_register((periph_p)snd, &ay8910->snd_buf))
+    if (snd_register(AS_PERIPH(snd), &ay8910->snd_buf))
     {
         return -1;
     }
@@ -917,9 +943,9 @@ int ay8910_init
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                 Copyright (c) 1998-2000, Joseph Zbiciak                  */
 /* ======================================================================== */

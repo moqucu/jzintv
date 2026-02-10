@@ -22,11 +22,11 @@ struct string_arena
     char         *arena;
     size_t       remain;
 };
-   
+
 string_arena *arenas = NULL;
 
-#define HASH_SIZE (2039)
-#define HASH_MULT (31)
+#define HASH_SIZE (65535)
+#define HASH_MULT (1023)
 
 typedef struct hash_ent hash_ent;
 
@@ -60,7 +60,7 @@ static string_arena *get_arena(size_t len)
         arena         = (string_arena *)malloc(sizeof(string_arena));
         arena->arena  = (char *)malloc(len);
         arena->remain = len;
-        
+
         if (!arenas)
         {
             arenas = arena;
@@ -87,7 +87,6 @@ static string_arena *get_arena(size_t len)
     return arenas;
 }
 
-
 char *arena_dup(const char *string)
 {
     size_t          len = strlen(string) + 1;
@@ -99,7 +98,6 @@ char *arena_dup(const char *string)
 
     return dest;
 }
-
 
 const char *memoize_string(const char *string)
 {

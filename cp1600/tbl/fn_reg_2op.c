@@ -1,7 +1,7 @@
 /* Auto generated, do not edit */
 
 #include "cp1600/op_tables.h"
-const cp1600_ins_t fn_reg_2op[] =
+cp1600_ins_t *const fn_reg_2op[] =
 {
 /*00000*/    fn_invalid,
 /*00001*/    fn_invalid,

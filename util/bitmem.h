@@ -1,5 +1,5 @@
-#ifndef _BITMEM_H
-#define _BITMEM_H
+#ifndef BITMEM_H_
+#define BITMEM_H_
 
 enum memattr_t
 {
@@ -15,19 +15,19 @@ enum memattr_t
 
 typedef struct bitmem_t
 {
-    uint_32 *data;              /* bitmem memory image.                 */
-    uint_8  *attr;              /* memory attributes, bit granularity.  */
-    uint_32 size;               /* size, in bits.                       */
-    int     org;                /* base address of bit memory.          */
+    uint32_t *data;             /* bitmem memory image.                 */
+    uint8_t  *attr;             /* memory attributes, bit granularity.  */
+    uint32_t  size;             /* size, in bits.                       */
+    int       org;              /* base address of bit memory.          */
 } bitmem_t;
 
 bitmem_t *bitmem_create  (int org, int len);
 void      bitmem_load    (bitmem_t *mem, FILE *f);
-uint_32   bitmem_read_fwd(bitmem_t *mem, uint_32 addr, int len);
-uint_32   bitmem_read_rev(bitmem_t *mem, uint_32 addr, int len);
-void      bitmem_setattr (bitmem_t *mem, uint_32 addr, int len, uint_8 attr);
-void      bitmem_clrattr (bitmem_t *mem, uint_32 addr, int len, uint_8 attr);
-uint_8    bitmem_getattr (bitmem_t *mem, uint_32 addr, int len);
+uint32_t  bitmem_read_fwd(bitmem_t *mem, uint32_t addr, int len);
+uint32_t  bitmem_read_rev(bitmem_t *mem, uint32_t addr, int len);
+void      bitmem_setattr (bitmem_t *mem, uint32_t addr, int len, uint8_t attr);
+void      bitmem_clrattr (bitmem_t *mem, uint32_t addr, int len, uint8_t attr);
+uint8_t   bitmem_getattr (bitmem_t *mem, uint32_t addr, int len);
 
 #define BYTE(b) ((b) << 3)
 
@@ -44,9 +44,9 @@ uint_8    bitmem_getattr (bitmem_t *mem, uint_32 addr, int len);
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                 Copyright (c) 1998-2001, Joseph Zbiciak                  */
 /* ======================================================================== */

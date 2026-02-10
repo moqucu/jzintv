@@ -1,23 +1,6 @@
 /* ======================================================================== */
 /*  Dumps a range of addresses from an ECScable-enabled program.            */
-/* ------------------------------------------------------------------------ */
-/*  This program is free software; you can redistribute it and/or modify    */
-/*  it under the terms of the GNU General Public License as published by    */
-/*  the Free Software Foundation; either version 2 of the License, or       */
-/*  (at your option) any later version.                                     */
-/*                                                                          */
-/*  This program is distributed in the hope that it will be useful,         */
-/*  but WITHOUT ANY WARRANTY; without even the implied warranty of          */
-/*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
-/*  General Public License for more details.                                */
-/*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
-/* ------------------------------------------------------------------------ */
-/*                 Copyright (c) 2001-+Inf, Joseph Zbiciak                  */
 /* ======================================================================== */
-
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -27,18 +10,16 @@
 #include "config.h"
 #include "util/ecscable.h"
 
-
-
 int comp_int(const void *a, const void *b)
 {
     return *((const int*)a) - *((const int*)b);
 }
 
 volatile int please_die = 0;
- 
+
 void die(int x)
 {
-    UNUSED(x); 
+    UNUSED(x);
 
     if (please_die > 2)
     {
@@ -49,7 +30,7 @@ void die(int x)
     fprintf(stderr, "Scheduling exit...\n");
 }
 
-uint_16 data[65536];
+uint16_t data[65536];
 
 int main(int argc, char *argv[])
 {
@@ -60,14 +41,14 @@ int main(int argc, char *argv[])
     if (argc < 4)
     {
 usage:
-        fprintf(stderr, 
+        fprintf(stderr,
                 "usage: ec_dump [-v] [-i] [-p] lo_addr hi_addr file.bin\n"
                 "\n"
                 "    -v   Blank video during dump (eg. for GRAM/GROM dump)\n"
                 "    -i   Dump from Intellicart address space\n"
                 "    -pX  Dump from ECS-style page number X\n"
         );
-        
+
         exit(1);
     }
 
@@ -111,7 +92,7 @@ usage:
         fprintf(stderr, "Couldn't open '%s' for writing\n", argv[3]);
         goto usage;
     }
-     
+
     if (viddis) ec_video(&ec, 0);
     if (page >= 0 && page <= 15)
         for (i = lo & 0xF000; i <= hi; i += 0x1000)
@@ -147,9 +128,9 @@ usage:
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                 Copyright (c) 2001-+Inf, Joseph Zbiciak                  */
 /* ======================================================================== */

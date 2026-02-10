@@ -2,9 +2,9 @@
 ## subMakefile for mouse
 ##############################################################################
 
-mouse/mouse.o: mouse/mouse.c mouse/mouse.h mem/subMakefile periph/periph.h
-mouse/mouse.o: config.h event/event.h event/event_tbl.h 
-mouse/mouse.o: sdl.h
+mouse/mouse_sdl.$(O): mouse/mouse_sdl.c mouse/mouse.h mouse/subMakefile
+mouse/mouse_sdl.$(O): event/event.h $(EVENT_TBL_INC) event/event_plat.h
+mouse/mouse_sdl.$(O): config.h sdl_jzintv.h
 
-OBJS+=mouse/mouse.o
-
+OBJS_SDL1 += mouse/mouse_sdl.$(O)
+OBJS_SDL2 += mouse/mouse_sdl.$(O)

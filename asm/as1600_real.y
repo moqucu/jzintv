@@ -1,4 +1,8 @@
 %{
+/* Clang doesn't like the unreachable code in Bison's generated output. */
+#ifdef __clang__
+#pragma clang diagnostic ignored "-Wunreachable-code"
+#endif
 
 #if 0
 #   define YYDEBUG 1
@@ -24,9 +28,9 @@
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                 Copyright (c) 1998-1999, Joseph Zbiciak                  */
 /* ======================================================================== */
@@ -364,11 +368,13 @@ The CP-1610 supports the following basic opcode formats:
 #include <stdio.h>
 #include <string.h>
 #include "config.h"
-#include "types.h"
+#include "as1600_types.h"
 #include "intermed.h"
+#include "lzoe/lzoe.h"
 #include "file/file.h"
 #include "asm/frasmdat.h"
 #include "asm/fragcon.h"
+#include "asm/intvec.h"
 #include "asm/protos.h"
 #include "asm/as1600.tab.h"
 #include "asm/memo_string.h"
@@ -421,10 +427,26 @@ static char genwdef[] = "[1=].10I$[1=].FF&x[1=].8}.FF&x";
 char ignosyn[] = "[Xinvalid syntax for instruction";
 char ignosel[] = "[Xinvalid operands";
 
+/* ======================================================================== */
+/*  Truth table:                                                            */
+/*                                                                          */
+/*      ifskip      rptskip     expmac  |   Expand macros   Parse line      */
+/*      FALSE       FALSE       any     |   TRUE            TRUE            */
+/*      TRUE        any         FALSE   |   FALSE           FALSE           */
+/*      TRUE        any         TRUE    |   TRUE            FALSE           */
+/*      any         TRUE        FALSE   |   FALSE           FALSE           */
+/*      any         TRUE        TRUE    |   TRUE            FALSE           */
+/*                                                                          */
+/*  Only IF/ENDI modify expmac.  RPT 0 does not modify expmac, and the      */
+/*  default state of expmac is TRUE.  Therefore, by default, macros will    */
+/*  get expanded in RPT 0 / ENDR blocks.  If you need RPT 0 to terminate    */
+/*  macro recursion, include an IF / ENDI around it.  Sorry.                */
+/* ======================================================================== */
+int fraifskip = FALSE, frarptskip = FALSE, fraexpmac = TRUE;
+
 int labelloc;
 static int satsub;
 int ifstkpt = 0;
-int fraifskip = FALSE, frarptskip = FALSE;
 int frarptact = 0,     frarptcnt = -1;
 int struct_locctr = -1;
 
@@ -471,16 +493,27 @@ LOCAL void do_set_equ_(int isequ, int flags,
 LOCAL void do_set_equ_list(int isslice,
                            int isequ,         
                            int flags, 
-                           struct symel *sym, int numexpr, 
-                           int firstidx,      int lastidx,
-                           const char *ncerr, const char *equerr)
+                           struct symel   *const RESTRICT sym, 
+                           const intvec_t *const RESTRICT exprs, 
+                           int firstidx,      
+                           int lastidx,
+                           const char *const RESTRICT ncerr, 
+                           const char *const RESTRICT equerr)
 {
+    static long *exprvals = NULL;
+    static int exprvals_size = 0;
     struct symel *newsym;
     int i, idx, stp;
 
-    for (i = 0; i < numexpr; i++)
+    if (exprvals_size < exprs->len)
     {
-        pevalexpr(0, exprlist[i]);
+        exprvals = REALLOC(exprvals, long, exprs->alloc);
+        exprvals_size = exprs->alloc;
+    }
+
+    for (i = 0; i < exprs->len; i++)
+    {
+        pevalexpr(0, exprs->data[i]);
 
         exprvals[i] = evalr[0].value;
 
@@ -488,11 +521,11 @@ LOCAL void do_set_equ_list(int isslice,
             fraerror(ncerr);
     }
 
-    if (numexpr == 1 && !isslice)
+    if (exprs->len == 1 && !isslice)
     {
         do_set_equ_(isequ, flags, sym, exprvals[0], equerr);
     } 
-    else if (abs(lastidx - firstidx) + 1 != numexpr)
+    else if (abs(lastidx - firstidx) + 1 != exprs->len)
     {
         fraerror("Array slice length doesn't match expression list length");
     } 
@@ -505,11 +538,10 @@ LOCAL void do_set_equ_list(int isslice,
             sym->value = lastidx;
 
         stp = firstidx > lastidx ? -1 : 1;
-
         sym->seg    = SSG_SET;
         sym->flags |= SFLAG_QUIET;
 
-        for (i = 0, idx = firstidx; i < numexpr; i++, idx += stp)
+        for (i = 0, idx = firstidx; i < exprs->len; i++, idx += stp)
         {
             newsym         = symbentryidx(sym->symstr, LABEL, 1, idx);
             newsym->flags |= SFLAG_QUIET | SFLAG_ARRAY;
@@ -545,7 +577,7 @@ LOCAL void usr_message(usrmsg type, const char *msg)
         {
             case USRERR:   fraerror(s); break;
             case USRWARN:  frawarn (s); break;
-            case USRSTAT:  puts(s);     /* continue */
+            case USRSTAT:  puts(s);     FALLTHROUGH_INTENDED;
             case USRCMT:   emit_comment(1, "%s", s); break;
             default:       fraerror("internal error in usr_message");
         }
@@ -554,18 +586,19 @@ LOCAL void usr_message(usrmsg type, const char *msg)
     free(copy);
 }
 
-LOCAL void chardef(char *sourcestr, int numexpr)
+LOCAL void chardef(char *sourcestr, 
+                   const intvec_t *const RESTRICT defs)
 {
     int findrv, numret, *charaddr;
     char *before;
 
     if(chtnpoint != (int *)NULL)
     {
-        for(satsub = 0; satsub < numexpr; satsub++)
+        for(satsub = 0; satsub < defs->len; satsub++)
         {
             before = sourcestr;
 
-            pevalexpr(0, exprlist[satsub]);
+            pevalexpr(0, defs->data[satsub]);
             findrv = chtcfind(chtnpoint, &sourcestr, &charaddr, &numret);
 
             if(findrv == CF_END)
@@ -611,8 +644,15 @@ LOCAL void chardef(char *sourcestr, int numexpr)
         fraerror("no CHARSET statement active");
 }
 
+LOCAL int chkover(int value, int bias)
+{
+    if (value > 0xFFFF + bias || value < 0)
+        fraerror("Address overflow");
 
-#define MAXTEMPSTR (16384)
+    return value;
+}
+
+#define MAXTEMPSTR (65536)
 static char tempstr[MAXTEMPSTR];
 static int  tempstrlen = 0;
 
@@ -624,9 +664,10 @@ static int  tempstrlen = 0;
     char            *strng;
     struct symel    *symb;
     struct slidx    slidx;
+    intvec_t        *intvec;
 }
 
-%token <intv> REGISTER 
+%token <intv> CP1600_REG 
 %token <intv> KOC_BDEF
 %token <intv> KOC_ELSE
 %token <intv> KOC_END
@@ -665,6 +706,11 @@ static int  tempstrlen = 0;
 %token <intv> KOC_CMSG      /* Comment message inserted into listing        */
 %token <intv> KOC_SMSG      /* Status message printed to stdout + listing   */
 %token <intv> KOC_WMSG      /* User warning                                 */
+%token <intv> KOC_CFGVAR    /* Set a .CFG variable                          */
+%token <intv> KOC_SRCFILE   /* Set the current source file and line #       */
+%token <intv> KOC_LISTCOL   /* Control formatting of the listing file.      */
+%token <intv> KOC_ERR_IF_OVERWRITTEN
+%token <intv> KOC_FORCE_OVERWRITE
 
 %token <longv> CONSTANT
 %token EOL
@@ -685,30 +731,40 @@ static int  tempstrlen = 0;
 %token KEOP_SHL
 %token KEOP_SHR
 %token KEOP_SHRU
+%token <intv> KEOP_ROTL
+%token <intv> KEOP_ROTR
 %token KEOP_XOR
 %token KEOP_locctr
+%token <longv> KEOP_TODAY_STR
+%token <longv> KEOP_TODAY_VAL
 %token <longv> KEOP_STRLEN
 %token <longv> KEOP_ASC
+%token <longv> KEOP_CLASSIFY
 %token <symb>  LABEL
 %token <strng> STRING
 %token <longv> QCHAR
 %token <symb>  SYMBOL
 %token <longv> FEATURE
+%token KEOP_EXPMAC   /* _EXPMAC modifier for IF/ENDI.                */
 
 %token KTK_invalid
 
+%nonassoc EXPRLIST
 %right  KEOP_HIGH KEOP_LOW
 %left   KEOP_OR KEOP_XOR
+%nonassoc FEATURE SYMBOL
 %left   KEOP_AND
 %right  KEOP_NOT
 %nonassoc   KEOP_GT KEOP_GE KEOP_LE KEOP_LT KEOP_NE KEOP_EQ
 %left   '+' '-'
-%left   '*' '/' KEOP_MOD KEOP_SHL KEOP_SHR KEOP_SHRU
+%left   '*' '/' KEOP_MOD KEOP_SHL KEOP_SHR KEOP_SHRU KEOP_ROTL KEOP_ROTR
 %right  KEOP_MUN
+%nonassoc ')'
+%right  KEOP_CLASSIFY
 
 
-/* %type <intv> stringlist */
-%type <intv> expr exprlist symslice
+%type <intv> expr maybe_expmac
+%type <intvec> exprlist symslice
 %type <symb> labelcolon symbol label
 %type <slidx> labelslice labelslicecolon
 %type <strng> string
@@ -778,7 +834,7 @@ line    :   labelcolon KOC_END
                     infilestk[nextfstk].line = 0;
                     infilestk[nextfstk].fnm  = memoize_string($2);
                     if( (infilestk[nextfstk].fpt = 
-                        path_fopen(as1600_search_path,$2,"r")) ==(FILE *)NULL )
+                        path_fopen(as1600_search_path,$2,"r")) ==(LZFILE*)NULL)
                     {
                         static char *incl_file = NULL;
                         static int   incl_file_size = 0;
@@ -809,27 +865,34 @@ line    :   labelcolon KOC_END
             }
         |   labelcolon KOC_EQU exprlist
             {
-                do_set_equ_list(FALSE, TRUE, 0, $1, $3, 0, $3 - 1,
+                do_set_equ_list(FALSE, TRUE, 0, $1, $3, 0, $3->len - 1,
                                "noncomputable expression for EQU",
                                "cannot change symbol value with EQU");
+                intvec_delete($3);
             }
         |   labelcolon KOC_QEQU exprlist
             {
-                do_set_equ_list(FALSE, TRUE, SFLAG_QUIET, $1, $3, 0, $3 - 1,
+                do_set_equ_list(FALSE, TRUE, SFLAG_QUIET, $1, $3, 0,
+                                $3->len - 1,
                                "noncomputable expression for QEQU",
                                "cannot change symbol value with QEQU");
+                intvec_delete($3);
             }
         |   labelcolon KOC_SET exprlist
             {
-                do_set_equ_list(FALSE, FALSE, 0, $1, $3, 0, $3 - 1,
+                do_set_equ_list(FALSE, FALSE, 0, $1, $3, 0, 
+                               $3->len - 1,
                                "noncomputable expression for SET",
                                "cannot change symbol value with SET");
+                intvec_delete($3);
             }
         |   labelcolon KOC_QSET exprlist
             {
-                do_set_equ_list(FALSE, FALSE, SFLAG_QUIET, $1, $3, 0, $3 - 1,
+                do_set_equ_list(FALSE, FALSE, SFLAG_QUIET, $1, $3, 0,
+                                $3->len - 1,
                                "noncomputable expression for QSET",
                                "cannot change symbol value with QSET");
+                intvec_delete($3);
             }
         |   labelslicecolon KOC_EQU exprlist
             {
@@ -837,6 +900,7 @@ line    :   labelcolon KOC_END
                                 $1.sym, $3, $1.first, $1.last,
                                "noncomputable expression for EQU",
                                "cannot change symbol value with EQU");
+                intvec_delete($3);
             }
         |   labelslicecolon KOC_QEQU exprlist
             {
@@ -844,6 +908,7 @@ line    :   labelcolon KOC_END
                                 $1.sym, $3, $1.first, $1.last,
                                "noncomputable expression for QEQU",
                                "cannot change symbol value with QEQU");
+                intvec_delete($3);
             }
         |   labelslicecolon KOC_SET exprlist
             {
@@ -851,6 +916,7 @@ line    :   labelcolon KOC_END
                                 $1.sym, $3, $1.first, $1.last,
                                "noncomputable expression for SET",
                                "cannot change symbol value with SET");
+                intvec_delete($3);
             }
         |   labelslicecolon KOC_QSET exprlist
             {
@@ -858,6 +924,7 @@ line    :   labelcolon KOC_END
                                 $1.sym, $3, $1.first, $1.last,
                                "noncomputable expression for QSET",
                                "cannot change symbol value with QSET");
+                intvec_delete($3);
             }
         |   KOC_RPT expr
             {
@@ -936,11 +1003,11 @@ line    :   labelcolon KOC_END
                 else
                     fraerror( "multiple definition of label");
             }
-        |   KOC_IF expr 
+        |   KOC_IF maybe_expmac expr
             {
                 if((++ifstkpt) < IFSTKDEPTH)
                 {
-                    pevalexpr(0, $2);
+                    pevalexpr(0, $3);
                     if(evalr[0].seg == SSG_ABS)
                     {
                         if(evalr[0].value != 0)
@@ -961,6 +1028,8 @@ line    :   labelcolon KOC_END
                         elseifstk[ifstkpt] = If_Active;
                         endifstk[ifstkpt] = If_Active;
                     }
+                    expmacstk[ifstkpt] = fraexpmac;
+                    fraexpmac = $2;
                 }
                 else
                 {
@@ -968,7 +1037,7 @@ line    :   labelcolon KOC_END
                 }
             }
                         
-        |   KOC_IF 
+        |   KOC_IF maybe_expmac
             {
                 if(fraifskip) 
                 {
@@ -976,6 +1045,8 @@ line    :   labelcolon KOC_END
                     {
                             elseifstk[ifstkpt] = If_Skip;
                             endifstk[ifstkpt] = If_Skip;
+                            expmacstk[ifstkpt] = fraexpmac;
+                            fraexpmac = $2;
                     }
                     else
                     {
@@ -1009,6 +1080,7 @@ line    :   labelcolon KOC_END
 
         |   KOC_ENDI 
             {
+                fraexpmac = expmacstk[ifstkpt];
                 switch(endifstk[ifstkpt])
                 {
                 case If_Active:
@@ -1031,8 +1103,9 @@ line    :   labelcolon KOC_END
                 pevalexpr(0, $3);
                 if(evalr[0].seg == SSG_ABS)
                 {
-                    locctr   = 2 * (labelloc = evalr[0].value);
+                    locctr   = 2 * chkover(labelloc = evalr[0].value, 0);
                     currseg  = 0;
+                    currpag  = -1;
                     currmode = memoize_string("+R");
                     if($1->seg == SSG_UNDEF)
                     {
@@ -1054,8 +1127,9 @@ line    :   labelcolon KOC_END
                 pevalexpr(0, $2);
                 if(evalr[0].seg == SSG_ABS)
                 {
-                    locctr   = 2 * (labelloc = evalr[0].value);
+                    locctr   = 2 * chkover(labelloc = evalr[0].value, 0);
                     currseg  = 0;
+                    currpag  = -1;
                     currmode = memoize_string("+R");
                     emit_set_equ(evalr[0].value);
                 }
@@ -1071,8 +1145,9 @@ line    :   labelcolon KOC_END
                 pevalexpr(1, $5);
                 if(evalr[0].seg == SSG_ABS && evalr[1].seg == SSG_ABS)
                 {
-                    locctr   = 2 * (labelloc = evalr[0].value);
-                    currseg  = (evalr[1].value - labelloc);
+                    locctr   = 2 * chkover(labelloc = evalr[0].value, 0);
+                    currseg  = chkover(evalr[1].value, 0) - labelloc;
+                    currpag  = -1;
                     currmode = memoize_string(currseg ? "" : "+R");
                     if($1->seg == SSG_UNDEF)
                     {
@@ -1095,8 +1170,9 @@ line    :   labelcolon KOC_END
                 pevalexpr(1, $4);
                 if(evalr[0].seg == SSG_ABS && evalr[1].seg == SSG_ABS)
                 {
-                    locctr   = 2 * (labelloc = evalr[0].value);
-                    currseg  = (evalr[1].value - labelloc);
+                    locctr   = 2 * chkover(labelloc = evalr[0].value, 0);
+                    currseg  = chkover(evalr[1].value, 0) - labelloc;
+                    currpag  = -1;
                     currmode = memoize_string(currseg ? "" : "+R");
                     emit_set_equ(evalr[0].value);
                 }
@@ -1114,8 +1190,9 @@ line    :   labelcolon KOC_END
                 {
                     char *s = $7;
 
-                    locctr   = 2 * (labelloc = evalr[0].value);
-                    currseg  = (evalr[1].value - labelloc);
+                    locctr   = 2 * chkover(labelloc = evalr[0].value, 0);
+                    currseg  = chkover(evalr[1].value, 0) - labelloc;
+                    currpag  = -1;
                     currmode = memoize_string(s);
 
                     if($1->seg == SSG_UNDEF)
@@ -1141,15 +1218,99 @@ line    :   labelcolon KOC_END
                 {
                     char *s = $6;
 
-                    locctr   = 2 * (labelloc = evalr[0].value);
-                    currseg  = (evalr[1].value - labelloc);
+                    locctr   = 2 * chkover(labelloc = evalr[0].value, 0);
+                    currseg  = chkover(evalr[1].value, 0) - labelloc;
+                    currpag  = -1;
                     currmode = memoize_string(s);
                     emit_set_equ(evalr[0].value);
                 }
                 else
                 {
-                    fraerror(
-                     "noncomputable expression for ORG");
+                    fraerror("noncomputable expression for ORG");
+                }
+            }
+        |   labelcolon KOC_ORG expr ':' expr
+            {
+                pevalexpr(0, $3);
+                pevalexpr(1, $5);
+                if(evalr[0].seg == SSG_ABS && evalr[1].seg == SSG_ABS)
+                {
+                    locctr   = 2 * chkover(labelloc = evalr[0].value, 0);
+                    currseg  = 0;
+                    currpag  = evalr[1].value;
+                    currmode = memoize_string("=R");
+                    if($1->seg == SSG_UNDEF)
+                    {
+                        $1->seg   = SSG_ABS;
+                        $1->value = labelloc;
+                    }
+                    else
+                        fraerror( "multiple definition of label");
+
+                    emit_set_equ(evalr[0].value);
+                }
+                else
+                {
+                    fraerror( "noncomputable expression for ORG");
+                }
+            }
+        |   KOC_ORG expr ':' expr
+            {
+                pevalexpr(0, $2);
+                pevalexpr(1, $4);
+                if(evalr[0].seg == SSG_ABS && evalr[1].seg == SSG_ABS)
+                {
+                    locctr   = 2 * chkover(labelloc = evalr[0].value, 0);
+                    currseg  = 0;
+                    currpag  = evalr[1].value;
+                    currmode = memoize_string("=R");
+                    emit_set_equ(evalr[0].value);
+                }
+                else
+                {
+                    fraerror("noncomputable expression for ORG");
+                }
+            }
+        |   labelcolon KOC_ORG expr ':' expr ',' STRING
+            {
+                pevalexpr(0, $3);
+                pevalexpr(1, $5);
+                if(evalr[0].seg == SSG_ABS && evalr[1].seg == SSG_ABS)
+                {
+                    locctr   = 2 * chkover(labelloc = evalr[0].value, 0);
+                    currseg  = 0;
+                    currpag  = evalr[1].value;
+                    currmode = memoize_string($7);
+                    if($1->seg == SSG_UNDEF)
+                    {
+                        $1->seg   = SSG_ABS;
+                        $1->value = labelloc;
+                    }
+                    else
+                        fraerror( "multiple definition of label");
+
+                    emit_set_equ(evalr[0].value);
+                }
+                else
+                {
+                    fraerror( "noncomputable expression for ORG");
+                }
+            }
+        |   KOC_ORG expr ':' expr ',' STRING
+            {
+                pevalexpr(0, $2);
+                pevalexpr(1, $4);
+                if(evalr[0].seg == SSG_ABS && evalr[1].seg == SSG_ABS)
+                {
+                    locctr   = 2 * chkover(labelloc = evalr[0].value, 0);
+                    currseg  = 0;
+                    currpag  = evalr[1].value;
+                    currmode = memoize_string($6);
+                    emit_set_equ(evalr[0].value);
+                }
+                else
+                {
+                    fraerror("noncomputable expression for ORG");
                 }
             }
         |   KOC_MEMATTR expr ',' expr ',' STRING
@@ -1159,14 +1320,115 @@ line    :   labelcolon KOC_END
                 if(evalr[0].seg == SSG_ABS && evalr[1].seg == SSG_ABS)
                 {
                     const char *s = memoize_string($6);
+                    chkover(evalr[0].value, 0);
+                    chkover(evalr[1].value, 0);
+                    emit_location(0, -1, labelloc, TYPE_HOLE, s);
                     emit_mark_with_mode(evalr[0].value, evalr[1].value, s);
+                    emit_location(currseg, currpag, labelloc, TYPE_HOLE, 
+                                  currmode);
                 }
                 else
                 {
                     fraerror("noncomputable expression for MEMATTR");
                 }
             }
+        |   KOC_CFGVAR string KEOP_EQ string
+            {
+                const char *var   = memoize_string($2);
+                const char *value = memoize_string($4);
+                emit_cfgvar_str(var, value);
+            }
+        |   KOC_CFGVAR string KEOP_EQ expr
+            {
+                pevalexpr(0, $4);
+                if(evalr[0].seg == SSG_ABS)
+                {
+                    const char *var = memoize_string($2);
+                    emit_cfgvar_int(var, evalr[0].value);
+                }
+                else
+                {
+                    fraerror("noncomputable expression for CFGVAR");
+                }
+            }
+        |   KOC_SRCFILE string ',' expr
+            {
+                /* set the current source file override and line number */
+                pevalexpr(0, $4);
+                if ( evalr[0].seg == SSG_ABS )
+                {
+                    if ( strlen( $2 ) == 0 || evalr[0].value < 1 )
+                    {
+                        emit_srcfile_override( NULL, 0 ); 
+                    } else
+                    {
+                        emit_srcfile_override( memoize_string( $2 ), 
+                                               evalr[0].value );
+                    }
+                }
+                else
+                {
+                    fraerror("noncomputable expression for SRCFILE");
+                }
+            }
+        |   KOC_LISTCOL expr ',' expr ',' expr
+            {
+                pevalexpr(0, $2);   /* Hex per line w/ source */
+                pevalexpr(1, $4);   /* Hex per line w/out source */
+                pevalexpr(2, $6);   /* Starting column of source */
+                if ( evalr[0].seg != SSG_ABS || evalr[1].seg != SSG_ABS ||
+                     evalr[2].seg != SSG_ABS )
+                {
+                    fraerror("noncomputable expression for LISTCOL");
+                } else
+                {
+                    const int new_hex_source = evalr[0].value;
+                    const int new_hex_no_src = evalr[1].value;
+                    const int new_source_ofs = evalr[2].value;
+                    const int new_source_ofs_min = 7 + 5*new_hex_source;
 
+                    if (new_hex_source < 1 || new_hex_source > 256 ||
+                        new_hex_no_src < 1 || new_hex_no_src > 256 || 
+                        new_source_ofs < 1 || new_source_ofs > 2048)
+                    {
+                        fraerror("value out of range value for LISTCOL");
+                    } else
+                    {
+                        if (new_source_ofs < new_source_ofs_min)
+                        {
+                            fraerror("source column too small compared to "
+                                     "hex-per-source-line for LISTCOL");
+                        } else
+                        {
+                            emit_listing_column(new_hex_source,
+                                                new_hex_no_src,
+                                                new_source_ofs);
+                        }
+                    }
+                }
+            }
+        |   KOC_ERR_IF_OVERWRITTEN expr
+            {
+                pevalexpr(0, $2);
+                if ( evalr[0].seg != SSG_ABS )
+                {
+                    fraerror("noncomputable expression for ERR_IF_OVERWITTEN");
+                } else
+                {
+                    emit_err_if_overwritten(evalr[0].value != 0);
+                }
+            }
+        |   KOC_FORCE_OVERWRITE expr
+            {
+                pevalexpr(0, $2);
+                if ( evalr[0].seg != SSG_ABS )
+                {
+                    fraerror("noncomputable expression for FORCE_OVERWRITE");
+                } else
+                {
+                    emit_force_overwrite(evalr[0].value != 0);
+                }
+            }
         |   labelcolon KOC_CHSET
             {
                 if($1->seg == SSG_UNDEF)
@@ -1216,18 +1478,20 @@ line    :   labelcolon KOC_END
         |   KOC_CHDEF string ',' exprlist
             {
                 chardef($2, $4);
+                intvec_delete($4);
             }
         |   KOC_CHDEF QCHAR ',' exprlist
             {
                 char st[2] = { $2, 0 };
                 chardef(st, $4);
+                intvec_delete($4);
             }
         |   labelcolon 
             {
                 if($1->seg == SSG_UNDEF)
                 {
                     $1->seg = SSG_ABS;
-                    $1->value = labelloc;
+                    $1->value = chkover(labelloc, 0);
                     emit_set_equ(labelloc);
 
                 }
@@ -1237,6 +1501,10 @@ line    :   labelcolon KOC_END
         |   labeledline
         ;
 
+maybe_expmac:   KEOP_EXPMAC { $$ = 1; }
+            |               { $$ = 0; }
+            ;
+
 labeledline :   labelcolon genline
             {
                 if (sdbd)
@@ -1245,7 +1513,7 @@ labeledline :   labelcolon genline
                 if($1->seg == SSG_UNDEF)
                 {
                     $1->seg   = SSG_ABS;
-                    $1->value = labelloc;
+                    $1->value = chkover(labelloc, 0);
                 }
                 else
                     fraerror("multiple definition of label");
@@ -1269,58 +1537,68 @@ labeledline :   labelcolon genline
             }
         ;
 
-genline :   KOC_BDEF    exprlist 
+genline :   KOC_BDEF exprlist 
             {
-                emit_location(currseg, labelloc, TYPE_DATA, currmode);
+                emit_location(currseg, currpag, labelloc, TYPE_DATA, currmode);
                 evalr[2].seg   = SSG_ABS;
                 evalr[2].value = 8;
-                for( satsub = 0; satsub < $2; satsub++)
+                for( satsub = 0; satsub < $2->len; satsub++)
                 {
-                    pevalexpr(1, exprlist[satsub]);
+                    pevalexpr(1, $2->data[satsub]);
                     locctr += geninstr(genbdef);
                 }
+                chkover( locctr >> 1 , 1);
+                intvec_delete($2);
             }
         |   KOC_DDEF exprlist
             {
-                emit_location(currseg, labelloc, TYPE_DATA, currmode);
+                emit_location(currseg, currpag, labelloc, TYPE_DATA, currmode);
                 evalr[2].seg   = SSG_ABS;
                 evalr[2].value = romw;
-                for( satsub = 0; satsub < $2; satsub++)
+                for( satsub = 0; satsub < $2->len; satsub++)
                 {
-                    pevalexpr(1, exprlist[satsub]);
+                    pevalexpr(1, $2->data[satsub]);
                     locctr += geninstr(genbdef);
                 }
+                chkover( locctr >> 1 , 1);
+                intvec_delete($2);
             }
 
         |   KOC_SDEF exprlist 
             {
-                emit_location(currseg, labelloc, TYPE_STRING, currmode);
+                emit_location(currseg, currpag, labelloc, TYPE_STRING, currmode);
                 evalr[2].seg   = SSG_ABS;
                 evalr[2].value = romw;
-                for( satsub = 0; satsub < $2; satsub++)
+                for( satsub = 0; satsub < $2->len; satsub++)
                 {
-                    pevalexpr(1, exprlist[satsub]);
+                    pevalexpr(1, $2->data[satsub]);
                     locctr += geninstr(genbdef);
                 }
+                chkover( locctr >> 1 , 1);
+                intvec_delete($2);
             }
         |   KOC_WDEF exprlist 
             {
-                emit_location(currseg, labelloc, TYPE_DBDATA|TYPE_DATA, currmode);
-                for( satsub = 0; satsub < $2; satsub++)
+                emit_location(currseg, currpag, labelloc,
+                              TYPE_DBDATA|TYPE_DATA, currmode);
+                for( satsub = 0; satsub < $2->len; satsub++)
                 {
-                    pevalexpr(1, exprlist[satsub]);
+                    pevalexpr(1, $2->data[satsub]);
                     locctr += geninstr(genwdef);
                 }
+                chkover( locctr >> 1 , 1);
+                intvec_delete($2);
             }   
         |   KOC_RESM expr 
             {
                 pevalexpr(0, $2);
                 if(evalr[0].seg == SSG_ABS)
                 {
-                    locctr = 2 * (labelloc + evalr[0].value);
+                    locctr = 2 * chkover(labelloc + evalr[0].value, 1);
                     emit_set_equ(labelloc);
-                    emit_location(currseg, labelloc, TYPE_HOLE, currmode);
-                    emit_reserve(labelloc + evalr[0].value);
+                    emit_location(currseg, currpag, labelloc, TYPE_HOLE, 
+                                  currmode);
+                    emit_reserve(labelloc + evalr[0].value - 1);
                 }
                 else
                 {
@@ -1331,15 +1609,16 @@ genline :   KOC_BDEF    exprlist
 
 labelcolon: label
         |   label ':'
+        ;
 
 labelslicecolon: labelslice
              |   labelslice ':'
-
+            ;
 
 exprlist :  exprlist ',' expr
             {
-                exprlist[nextexprs++] = $3;
-                $$ = nextexprs;
+                intvec_push($1, $3);
+                $$ = $1;
             }
         |   exprlist ',' string
             {
@@ -1349,62 +1628,47 @@ exprlist :  exprlist ',' expr
                 while (*s)
                 {
                     accval = chtran(&s);
-                    exprlist[nextexprs++] = 
-                        exprnode(PCCASE_CONS,0,IGP_CONSTANT,0,accval,SYMNULL);
+                    intvec_push($1, 
+                        exprnode(PCCASE_CONS,0,IGP_CONSTANT,0,accval,SYMNULL));
                 }
-                $$ = nextexprs;
+                $$ = $1;
             }
-        |   expr
+        |   expr %prec EXPRLIST
             {
-                nextexprs = 0;
-                exprlist[nextexprs++] = $1;
-                $$ = nextexprs;
+                intvec_t *const RESTRICT iv = intvec_new();
+                intvec_push(iv, $1);
+                $$ = iv;
             }
         |   string
             {
+                intvec_t *const RESTRICT iv = intvec_new();
                 char *s = $1;
                 int  accval = 0;
 
-                nextexprs = 0;
                 while (*s)
                 {
                     accval = chtran(&s);
-                    exprlist[nextexprs++] = 
-                        exprnode(PCCASE_CONS,0,IGP_CONSTANT,0,accval,SYMNULL);
+                    intvec_push(iv,
+                        exprnode(PCCASE_CONS,0,IGP_CONSTANT,0,accval,SYMNULL));
                 }
-                $$ = nextexprs;
+                $$ = iv;
+            }
+        |   KEOP_TODAY_VAL '(' string ')'
+            {
+                const struct tm *t = $1 ? &asm_time_gmt : &asm_time_local;
+                $$ = unpack_time_exprs(t, &asm_time_gmt, $3);
             }
         |   exprlist ',' symslice
             {
-                $$ = $3;
+                intvec_concat($1, $3);
+                intvec_delete($3);
+                $$ = $1;
             }
-            
         |   symslice
-        ;
-
-
-        /*
-string  :   string ',' string_
             {
-                char *s = &tempstr[tempstrlen];
-                int l1 = strlen($1);
-                int l2 = strlen($3);
-
-                if (tempstrlen + l1 + l2 + 1 > MAXTEMPSTR)
-                {
-                    fraerror("Temporary string buffer overflow");
-                    $$ = "";
-                } else
-                {
-                    $$ = s;
-                    strcpy(s, $1);
-                    strcpy(s + l1, $3);
-                    tempstrlen += l1 + l2 + 1;
-                }
+                $$ = $1;
             }
-        |   string_
         ;
-        */
 
 string  :   STRING
         |   '$' '(' exprlist ')'
@@ -1413,10 +1677,11 @@ string  :   STRING
 
                 if (chtcpoint != NULL)
                 {
-                    frawarn("Stringifying expression list while character translation active");
+                    frawarn("Stringifying expression list while character "
+                            "translation active");
                 }
 
-                tempstrlen += $3 + 1;
+                tempstrlen += $3->len + 1;
 
                 if (tempstrlen > MAXTEMPSTR)
                 {
@@ -1426,9 +1691,9 @@ string  :   STRING
                 {
                     int i;
                     $$ = s;
-                    for (i = 0; i < $3; i++)
+                    for (i = 0; i < $3->len; i++)
                     {
-                        pevalexpr(0, exprlist[i]);
+                        pevalexpr(0, $3->data[i]);
 
                         if (evalr[0].seg == SSG_ABS)
                             *s++ = evalr[0].value;
@@ -1437,7 +1702,7 @@ string  :   STRING
                     }
                     *s = 0;
                 }
-                nextexprs = 0;
+                intvec_delete($3);
             }
         |   '$' '#' '(' expr ')'
             {   
@@ -1520,22 +1785,17 @@ string  :   STRING
                     tempstrlen += 5;
                 }
             }
-        ;
-
-/*
-stringlist :    stringlist ',' STRING
+        |   KEOP_TODAY_STR '(' string ')'
             {
-                stringlist[nextstrs++] = $3;
-                $$ = nextstrs;
-            }
-        |   STRING
-            {
-                nextstrs = 0;
-                stringlist[nextstrs++] = $1;
-                $$ = nextstrs;
+                const struct tm *t = $1 ? &asm_time_gmt : &asm_time_local;
+                char *const bufbeg = &tempstr[tempstrlen];
+                const int avail = MAXTEMPSTR - tempstrlen;
+                const int len = format_time_string(t, &asm_time_gmt,
+                                                   $3, bufbeg, avail);
+                tempstrlen += len;
+                $$ = bufbeg;
             }
         ;
-*/
 
 /* ======================================================================== */
 /*  PROC/ENDP pseudo-ops                                                    */
@@ -1558,7 +1818,7 @@ genline : labelcolon KOC_PROC
                         int   old_proc_len = proc_len;
                         proc_stk[proc_stk_depth++] = proc;
                         proc_len = strlen(proc) + strlen($1->symstr) + 1;
-                        proc     = malloc(proc_len + 1);
+                        proc     = (char *)malloc(proc_len + 1);
                         strcpy(proc, old_proc);
                         proc[old_proc_len] = '.';
                         strcpy(proc + old_proc_len + 1, $1->symstr);
@@ -1613,7 +1873,7 @@ genline : labelcolon KOC_STRUCT expr
                     proc_len = strlen(proc);
                     struct_locctr = locctr;
 
-                    locctr = 2 * (labelloc = evalr[0].value);
+                    locctr = 2 * chkover(labelloc = evalr[0].value, 0);
 
                     $1->seg = SSG_ABS;
                     $1->value = labelloc;
@@ -1641,7 +1901,7 @@ genline : KOC_ENDS
 /* ======================================================================== */
 genline : KOC_ROMW expr
             {
-                emit_location(currseg, labelloc, TYPE_HOLE, currmode);
+                emit_location(currseg, currpag, labelloc, TYPE_HOLE, currmode);
                 pevalexpr(0, $2);
                 if(evalr[0].seg == SSG_ABS)
                 {
@@ -1666,7 +1926,7 @@ genline : KOC_ROMW expr
             }
         | KOC_ROMW expr ',' expr
             {
-                emit_location(currseg, labelloc, TYPE_HOLE, currmode);
+                emit_location(currseg, currpag, labelloc, TYPE_HOLE, currmode);
                 pevalexpr(0, $2);
                 pevalexpr(1, $4);
                 if(evalr[0].seg == SSG_ABS)
@@ -1706,8 +1966,9 @@ genline : KOC_SDBD
                 if (sdbd)
                     frawarn("Two SDBDs in a row.");
 
-                emit_location(currseg, labelloc, TYPE_CODE, currmode);
+                emit_location(currseg, currpag, labelloc, TYPE_CODE, currmode);
                 locctr += geninstr(findgen($1, ST_IMP, 0));
+                chkover(locctr >> 1, 1);
                 is_sdbd = SDBD;
             }
         ;
@@ -1722,13 +1983,14 @@ genline : KOC_relbr expr
 
                 SDBD_CHK
 
-                emit_location(currseg, labelloc, TYPE_CODE, currmode);
+                emit_location(currseg, currpag, labelloc, TYPE_CODE, currmode);
                 pevalexpr(1, $2);
 
                 evalr[3].seg   = SSG_ABS;
                 evalr[3].value = romw;
 
                 locctr += geninstr(findgen($1, ST_EXP, sdbd));
+                chkover(locctr >> 1, 1);
             }
         ;
 genline : KOC_relbr_x expr ',' expr
@@ -1738,7 +2000,7 @@ genline : KOC_relbr_x expr ',' expr
 
                 SDBD_CHK
 
-                emit_location(currseg, labelloc, TYPE_CODE, currmode);
+                emit_location(currseg, currpag, labelloc, TYPE_CODE, currmode);
                 pevalexpr(1, $2);
                 pevalexpr(4, $4);
 
@@ -1749,6 +2011,7 @@ genline : KOC_relbr_x expr ',' expr
                 evalr[3].value = romw;
 
                 locctr += geninstr(findgen($1, ST_EXPEXP, sdbd));
+                chkover(locctr >> 1, 1);
             }
         ;
 
@@ -1759,8 +2022,9 @@ genline : KOC_relbr_x expr ',' expr
 genline : KOC_opcode 
             {
                 SDBD_CHK
-                emit_location(currseg, labelloc, TYPE_CODE, currmode);
+                emit_location(currseg, currpag, labelloc, TYPE_CODE, currmode);
                 locctr += geninstr(findgen($1, ST_IMP, sdbd));
+                chkover(locctr >> 1, 1);
             }
         ;
 
@@ -1770,9 +2034,10 @@ genline : KOC_opcode
 genline : KOC_opcode  expr
             {
                 SDBD_CHK
-                emit_location(currseg, labelloc, TYPE_CODE, currmode);
+                emit_location(currseg, currpag, labelloc, TYPE_CODE, currmode);
                 pevalexpr(1, $2);
                 locctr += geninstr(findgen($1, ST_EXP, sdbd));
+                chkover(locctr >> 1, 1);
             }
         ;
 
@@ -1780,54 +2045,57 @@ genline : KOC_opcode  expr
 /*  Register, Direct instructions (MVO)                                     */
 /*  Register, 2 instructions (shifts)                                       */
 /* ======================================================================== */
-genline : KOC_opcode  REGISTER ',' expr
+genline : KOC_opcode  CP1600_REG ',' expr
             {
                 SDBD_CHK
-                emit_location(currseg, labelloc, TYPE_CODE, currmode);
+                emit_location(currseg, currpag, labelloc, TYPE_CODE, currmode);
                 evalr[1].value = $2;
                 pevalexpr(2, $4);
                 evalr[3].seg    = SSG_ABS;
                 evalr[3].value  = romw;
                 locctr += geninstr(findgen($1, ST_REGEXP, reg_type[$2]|sdbd));
+                chkover(locctr >> 1, 1);
             }
         ;
 
 /* ======================================================================== */
 /*  Register, Immediate --> MVOI                                            */
 /* ======================================================================== */
-genline : KOC_opcode  REGISTER ',' '#' expr
+genline : KOC_opcode  CP1600_REG ',' '#' expr
             {
                 SDBD_CHK
-                emit_location(currseg, labelloc, TYPE_CODE, currmode);
+                emit_location(currseg, currpag, labelloc, TYPE_CODE, currmode);
                 evalr[1].value  = $2;
                 evalr[3].seg    = SSG_ABS;
                 evalr[3].value  = romw;
                 pevalexpr(2, $5);
                 locctr += geninstr(findgen($1, ST_REGCEX, reg_type[$2]|sdbd));
+                chkover(locctr >> 1, 1);
             }
         ;
 
 /* ======================================================================== */
 /*  Direct, Register instructions                                           */
 /* ======================================================================== */
-genline : KOC_opcode  expr ',' REGISTER
+genline : KOC_opcode  expr ',' CP1600_REG
             {
                 SDBD_CHK
-                emit_location(currseg, labelloc, TYPE_CODE, currmode);
+                emit_location(currseg, currpag, labelloc, TYPE_CODE, currmode);
                 pevalexpr(1, $2);
                 evalr[2].value = $4;
                 evalr[3].seg   = SSG_ABS;
                 evalr[3].value = romw;
                 locctr += geninstr(findgen($1, ST_EXPREG, reg_type[$4]|sdbd));
+                chkover(locctr >> 1, 1);
             }
         ;
 
 /* ======================================================================== */
 /*  Immediate, Register instructions                                        */
 /* ======================================================================== */
-genline : KOC_opcode  '#' expr ',' REGISTER
+genline : KOC_opcode  '#' expr ',' CP1600_REG
             {
-                emit_location(currseg, labelloc, TYPE_CODE, currmode);
+                emit_location(currseg, currpag, labelloc, TYPE_CODE, currmode);
                 pevalexpr(1, $3);
                 evalr[2].value = $5;
 
@@ -1854,43 +2122,47 @@ genline : KOC_opcode  '#' expr ',' REGISTER
                 }
 
                 locctr += geninstr(findgen($1, ST_CEXREG, reg_type[$5]|sdbd));
+                chkover(locctr >> 1, 1);
             }
         ;
 
 /* ======================================================================== */
 /*  Single-register instructions.                                           */
 /* ======================================================================== */
-genline : KOC_opcode  REGISTER
+genline : KOC_opcode  CP1600_REG
             {
                 SDBD_CHK
-                emit_location(currseg, labelloc, TYPE_CODE, currmode);
+                emit_location(currseg, currpag, labelloc, TYPE_CODE, currmode);
                 evalr[1].value = $2;
                 locctr += geninstr(findgen($1, ST_REG, reg_type[$2]|sdbd));
+                chkover(locctr >> 1, 1);
             }
         ;
 
 /* ======================================================================== */
 /*  Register, Register instructions.                                        */
 /* ======================================================================== */
-genline : KOC_opcode  REGISTER ',' REGISTER
+genline : KOC_opcode  CP1600_REG ',' CP1600_REG
             {
                 SDBD_CHK
-                emit_location(currseg, labelloc, TYPE_CODE, currmode);
+                emit_location(currseg, currpag, labelloc, TYPE_CODE, currmode);
                 evalr[1].value = $2;
                 evalr[2].value = $4;
                 locctr += geninstr(findgen($1, ST_REGREG, reg_type[$2]|sdbd));
+                chkover(locctr >> 1, 1);
             }
         ;
 
 /* ======================================================================== */
 /*  Register, Register instructions, indirect via first register.           */
 /* ======================================================================== */
-genline : KOC_opcode_i  REGISTER ',' REGISTER
+genline : KOC_opcode_i  CP1600_REG ',' CP1600_REG
             {
-                emit_location(currseg, labelloc, TYPE_CODE, currmode);
+                emit_location(currseg, currpag, labelloc, TYPE_CODE, currmode);
                 evalr[1].value = $2;
                 evalr[2].value = $4;
                 locctr += geninstr(findgen($1, ST_REGREG, reg_type[$2]|sdbd));
+                chkover(locctr >> 1, 1);
             }
         ;
 
@@ -1950,6 +2222,17 @@ expr    :   '+' expr %prec KEOP_MUN
             {
                 $$ = exprnode(PCCASE_BIN,$1,IFC_SHRU,$3,0L, SYMNULL);
             }
+        |   expr KEOP_ROTL expr
+            {
+                const int ifc = $2 == 16 ? IFC_ROTL16 : IFC_ROTL32;
+                $$ = exprnode(PCCASE_BIN,$1,ifc,$3,0L, SYMNULL);
+            }
+        |   expr KEOP_ROTR expr
+            {
+                const int ifc = $2 == 16 ? IFC_ROTL16 : IFC_ROTL32;
+                const int neg = exprnode(PCCASE_UN,$3,IFC_NEG,0,0L, SYMNULL);
+                $$ = exprnode(PCCASE_BIN,$1,ifc,neg,0L, SYMNULL);
+            }
         |   expr KEOP_GT expr
             {
                 $$ = exprnode(PCCASE_BIN,$1,IFC_GT,$3,0L, SYMNULL);
@@ -1990,7 +2273,7 @@ expr    :   '+' expr %prec KEOP_MUN
             {
                 $$ = exprnode(PCCASE_DEF,0,IGP_DEFINED,0,0L,$2);
             }
-        |   symbol
+        |   symbol %prec SYMBOL
             {
                 $$ = exprnode(PCCASE_SYMB,0,IFC_SYMB,0,0L,$1);
             }
@@ -2016,6 +2299,36 @@ expr    :   '+' expr %prec KEOP_MUN
                 int  accval = chtran(&s);
                 $$ = exprnode(PCCASE_CONS,0,IGP_CONSTANT,0,accval,SYMNULL);
             }
+        |   KEOP_CLASSIFY '(' ')' %prec KEOP_CLASSIFY
+            {
+                $$ = exprnode(PCCASE_CONS,0,IGP_CONSTANT,0,CLASS_EMPTY,SYMNULL);
+            }
+        |   KEOP_CLASSIFY '(' CP1600_REG ')' %prec KEOP_CLASSIFY
+            {
+                $$ = exprnode(PCCASE_CONS,0,IGP_CONSTANT,0, $3, SYMNULL);
+            }
+        |   KEOP_CLASSIFY '(' FEATURE ')' %prec KEOP_CLASSIFY
+            {
+                $$ = exprnode(PCCASE_CONS,0,IGP_CONSTANT,0,CLASS_FEATURE,
+                             SYMNULL);
+            }
+        |   KEOP_CLASSIFY '(' keyword ')' %prec KEOP_CLASSIFY
+            {
+                $$ = exprnode(PCCASE_CONS,0,IGP_CONSTANT,0,CLASS_RESV,SYMNULL);
+            }
+        |   KEOP_CLASSIFY '(' string ')' %prec KEOP_CLASSIFY
+            {
+                $$ = exprnode(PCCASE_CONS,0,IGP_CONSTANT,0,CLASS_STRING,
+                              SYMNULL);
+            }
+        |   KEOP_CLASSIFY '(' symbol ')' %prec KEOP_CLASSIFY
+            {
+                $$ = exprnode(PCCASE_CLASSSYM,0,IFC_CLASSIFY,0,0L,$3);
+            }
+        |   KEOP_CLASSIFY '(' expr ')' %prec KEOP_CLASSIFY
+            {
+                $$ = exprnode(PCCASE_UN,$3,IFC_CLASSIFY,0,0L, SYMNULL);
+            }
         |   KEOP_STRLEN '(' string ')'
             {
                 char *s = $3;
@@ -2027,6 +2340,7 @@ expr    :   '+' expr %prec KEOP_MUN
                     accval = chtran(&s);
                     length++;
                 }
+                (void)accval;
                 $$ = exprnode(PCCASE_CONS,0,IGP_CONSTANT,0,length++,SYMNULL);
             }
         |   KEOP_STRLEN '(' QCHAR ')'
@@ -2074,13 +2388,25 @@ expr    :   '+' expr %prec KEOP_MUN
                     fraerror("noncomputable expression for index to ASC");
                 }
             }
-        |   '(' expr ')'
+        |   '(' expr ')' { $$ = $2; }
+        |   '(' exprlist ')' '[' expr ']' %prec '('
             {
-                $$ = $2;
+                pevalexpr(0, $5);
+                if (evalr[0].seg == SSG_ABS)
+                {
+                    const int idx = evalr[0].value;
+                    if (idx < $2->len)
+                        $$ = $2->data[idx];
+                    else
+                        $$ = exprnode(PCCASE_CONS,0,IGP_CONSTANT,0,0,SYMNULL);
+                }
+                else
+                {
+                    fraerror("noncomputable expression for expr-list index");
+                }
+                intvec_delete($2);
             }
         ;
-
-
 
 /* ======================================================================== */
 /*  Array-indexed labels and symbols                                        */
@@ -2130,12 +2456,14 @@ symbol:     SYMBOL
 
 symslice:   symbol '[' expr ',' expr ']'
             {
+                intvec_t *const RESTRICT iv = intvec_new();
                 pevalexpr(0, $3);
                 pevalexpr(1, $5);
 
                 if (evalr[0].seg != SSG_ABS || evalr[1].seg != SSG_ABS)
                 {
                     fraerror("noncomputable expression for symbol slice index");
+                    $$ = iv;
                 } else
                 {
                     int i, s;
@@ -2145,22 +2473,64 @@ symslice:   symbol '[' expr ',' expr ']'
                     for (i = evalr[0].value; i != evalr[1].value + s; i += s)
                     {
                         struct symel *sym;
-                        exprlist[nextexprs++] = 
+                        intvec_push(iv,
                             exprnode(PCCASE_SYMB,0,IFC_SYMB,0,0L,
-                                sym = symbentryidx($1->symstr, LABEL, 1, i));
+                                sym = symbentryidx($1->symstr, LABEL, 1, i)));
 
                         sym->flags |= SFLAG_ARRAY | SFLAG_QUIET;
                     }
-                    $$ = nextexprs;
+                    $$ = iv;
+                }
+            }
+        |   '(' exprlist ')' '[' expr ',' expr ']' %prec '('
+            {
+                pevalexpr(0, $5);
+                pevalexpr(1, $7);
+                if (evalr[0].seg != SSG_ABS || evalr[1].seg != SSG_ABS)
+                {
+                    fraerror(
+                        "noncomputable expression for expr-list slice index");
+                    intvec_resize($2, 0);
+                    $$ = $2;
+                } else if (evalr[0].value >= $2->len || 
+                           evalr[1].value >= $2->len)
+                {
+                    fraerror("out of range index for expr-list slice");
+                    intvec_resize($2, 0);
+                    $$ = $2;
+                } else
+                {
+                    const int rev = evalr[0].value > evalr[1].value;
+                    const int lo = rev ? evalr[1].value : evalr[0].value;
+                    const int hi = rev ? evalr[0].value : evalr[1].value;
+                    const int cnt = hi - lo + 1;
+                    int *const data = $2->data;
+
+                    memmove(&data[0], &data[lo], sizeof(data[0]) * cnt);
+
+                    if (rev)
+                    {
+                        int i, j;
+                        for (i = 0, j = cnt - 1; i < j; i++, j--)
+                        {
+                            const int tmp = $2->data[i];
+                            $2->data[i] = $2->data[j];
+                            $2->data[j] = tmp;
+                        }
+                    }
+                    $2->len = cnt;
+                    $$ = $2;
                 }
             }
         |   symslice '[' expr ']'
             {
                 fraerror("array slice allowed on last index only");
+                $$ = intvec_new();
             }
         |   symslice '[' expr ',' expr ']'
             {
                 fraerror("array slice allowed on last index only");
+                $$ = intvec_new();
             }
         ;                    
 
@@ -2190,6 +2560,30 @@ labelslice: label '[' expr ',' expr ']'
             }
         ;                    
 
+/* Keyword catch-all for CLASSIFY operator */
+keyword :   KEOP_AND
+        |   KEOP_DEFINED
+        |   KEOP_EQ
+        |   KEOP_GE
+        |   KEOP_GT
+        |   KEOP_HIGH
+        |   KEOP_LE
+        |   KEOP_LOW
+        |   KEOP_LT
+        |   KEOP_MOD
+        |   KEOP_MUN
+        |   KEOP_NE
+        |   KEOP_NOT
+        |   KEOP_OR
+        |   KEOP_SHL
+        |   KEOP_SHR
+        |   KEOP_SHRU
+        |   KEOP_XOR
+        |   KEOP_locctr
+        |   KEOP_STRLEN
+        |   KEOP_ASC
+        |   KEOP_CLASSIFY
+        ;
 %%
 
 int lexintercept(void)
@@ -2240,6 +2634,7 @@ int lexintercept(void)
             case KOC_IF:
             case KOC_ELSE:
             case KOC_ENDI:
+            case KEOP_EXPMAC:
             case EOL:
                 return rv;
             default:
@@ -2259,63 +2654,80 @@ int lexintercept(void)
 
 void setreserved(void)
 {
-
-    reservedsym("and",      KEOP_AND,       0);
-    reservedsym("defined",  KEOP_DEFINED,   0);
-    reservedsym("ge",       KEOP_GE,        0);
-    reservedsym("high",     KEOP_HIGH,      0);
-    reservedsym("le",       KEOP_LE,        0);
-    reservedsym("low",      KEOP_LOW,       0);
-    reservedsym("mod",      KEOP_MOD,       0);
-    reservedsym("ne",       KEOP_NE,        0);
-    reservedsym("not",      KEOP_NOT,       0);
-    reservedsym("or",       KEOP_OR,        0);
-    reservedsym("shl",      KEOP_SHL,       0);
-    reservedsym("shr",      KEOP_SHR,       0);
-    reservedsym("shru",     KEOP_SHRU,      0);
-    reservedsym("xor",      KEOP_XOR,       0);
-    reservedsym("AND",      KEOP_AND,       0);
-    reservedsym("DEFINED",  KEOP_DEFINED,   0);
-    reservedsym("GE",       KEOP_GE,        0);
-    reservedsym("HIGH",     KEOP_HIGH,      0);
-    reservedsym("LE",       KEOP_LE,        0);
-    reservedsym("LOW",      KEOP_LOW,       0);
-    reservedsym("MOD",      KEOP_MOD,       0);
-    reservedsym("NE",       KEOP_NE,        0);
-    reservedsym("NOT",      KEOP_NOT,       0);
-    reservedsym("OR",       KEOP_OR,        0);
-    reservedsym("SHL",      KEOP_SHL,       0);
-    reservedsym("SHR",      KEOP_SHR,       0);
-    reservedsym("SHRU",     KEOP_SHRU,      0);
-    reservedsym("XOR",      KEOP_XOR,       0);
-    reservedsym("STRLEN",   KEOP_STRLEN,    0);
-    reservedsym("ASC",      KEOP_ASC,       0);
+    reservedsym("and",           KEOP_AND,       0);
+    reservedsym("defined",       KEOP_DEFINED,   0);
+    reservedsym("ge",            KEOP_GE,        0);
+    reservedsym("high",          KEOP_HIGH,      0);
+    reservedsym("le",            KEOP_LE,        0);
+    reservedsym("low",           KEOP_LOW,       0);
+    reservedsym("mod",           KEOP_MOD,       0);
+    reservedsym("ne",            KEOP_NE,        0);
+    reservedsym("not",           KEOP_NOT,       0);
+    reservedsym("or",            KEOP_OR,        0);
+    reservedsym("shl",           KEOP_SHL,       0);
+    reservedsym("shr",           KEOP_SHR,       0);
+    reservedsym("shru",          KEOP_SHRU,      0);
+    reservedsym("xor",           KEOP_XOR,       0);
+    reservedsym("AND",           KEOP_AND,       0);
+    reservedsym("DEFINED",       KEOP_DEFINED,   0);
+    reservedsym("GE",            KEOP_GE,        0);
+    reservedsym("HIGH",          KEOP_HIGH,      0);
+    reservedsym("LE",            KEOP_LE,        0);
+    reservedsym("LOW",           KEOP_LOW,       0);
+    reservedsym("MOD",           KEOP_MOD,       0);
+    reservedsym("NE",            KEOP_NE,        0);
+    reservedsym("NOT",           KEOP_NOT,       0);
+    reservedsym("OR",            KEOP_OR,        0);
+    reservedsym("SHL",           KEOP_SHL,       0);
+    reservedsym("SHR",           KEOP_SHR,       0);
+    reservedsym("SHRU",          KEOP_SHRU,      0);
+    reservedsym("_ROTL16",       KEOP_ROTL,      16);
+    reservedsym("_ROTL32",       KEOP_ROTL,      32);
+    reservedsym("_ROTR16",       KEOP_ROTR,      16);
+    reservedsym("_ROTR32",       KEOP_ROTR,      32);
+    reservedsym("XOR",           KEOP_XOR,       0);
+    reservedsym("STRLEN",        KEOP_STRLEN,    0);
+    reservedsym("ASC",           KEOP_ASC,       0);
+    reservedsym("CLASSIFY",      KEOP_CLASSIFY,  0);
+    reservedsym("TODAY_STR_LOC", KEOP_TODAY_STR, 0);
+    reservedsym("TODAY_STR_GMT", KEOP_TODAY_STR, 1);
+    reservedsym("TODAY_VAL_LOC", KEOP_TODAY_VAL, 0);
+    reservedsym("TODAY_VAL_GMT", KEOP_TODAY_VAL, 1);
+    reservedsym("_EXPMAC",       KEOP_EXPMAC,    1);
 
     /* machine specific token definitions */
-    reservedsym("r0",       REGISTER,       0);
-    reservedsym("r1",       REGISTER,       1);
-    reservedsym("r2",       REGISTER,       2);
-    reservedsym("r3",       REGISTER,       3);
-    reservedsym("r4",       REGISTER,       4);
-    reservedsym("r5",       REGISTER,       5);
-    reservedsym("r6",       REGISTER,       6);
-    reservedsym("r7",       REGISTER,       7);
-    reservedsym("sp",       REGISTER,       6);
-    reservedsym("pc",       REGISTER,       7);
-    reservedsym("R0",       REGISTER,       0);
-    reservedsym("R1",       REGISTER,       1);
-    reservedsym("R2",       REGISTER,       2);
-    reservedsym("R3",       REGISTER,       3);
-    reservedsym("R4",       REGISTER,       4);
-    reservedsym("R5",       REGISTER,       5);
-    reservedsym("R6",       REGISTER,       6);
-    reservedsym("R7",       REGISTER,       7);
-    reservedsym("SP",       REGISTER,       6);
-    reservedsym("PC",       REGISTER,       7);
+    reservedsym("r0",       CP1600_REG,     0);
+    reservedsym("r1",       CP1600_REG,     1);
+    reservedsym("r2",       CP1600_REG,     2);
+    reservedsym("r3",       CP1600_REG,     3);
+    reservedsym("r4",       CP1600_REG,     4);
+    reservedsym("r5",       CP1600_REG,     5);
+    reservedsym("r6",       CP1600_REG,     6);
+    reservedsym("r7",       CP1600_REG,     7);
+    reservedsym("sp",       CP1600_REG,     6);
+    reservedsym("pc",       CP1600_REG,     7);
+    reservedsym("R0",       CP1600_REG,     0);
+    reservedsym("R1",       CP1600_REG,     1);
+    reservedsym("R2",       CP1600_REG,     2);
+    reservedsym("R3",       CP1600_REG,     3);
+    reservedsym("R4",       CP1600_REG,     4);
+    reservedsym("R5",       CP1600_REG,     5);
+    reservedsym("R6",       CP1600_REG,     6);
+    reservedsym("R7",       CP1600_REG,     7);
+    reservedsym("SP",       CP1600_REG,     6);
+    reservedsym("PC",       CP1600_REG,     7);
 
-    reservedsym("__FEATURE.MACRO", FEATURE, 99);
-    reservedsym("MACRO",           FEATURE, 99);
-    reservedsym("ENDM",            FEATURE, 99);
+    reservedsym("__FEATURE.MACRO",     FEATURE, 99);
+    reservedsym("__FEATURE.CFGVAR",    FEATURE, 99);
+    reservedsym("__FEATURE.SRCFILE",   FEATURE, 99);
+    reservedsym("__FEATURE.CLASSIFY",  FEATURE, 99);
+    reservedsym("__FEATURE.TODAY",     FEATURE, 99);
+    reservedsym("__FEATURE.ROTATE",    FEATURE, 99);
+    reservedsym("__FEATURE.EXPMAC",    FEATURE, 99);
+    reservedsym("__FEATURE.LISTCOL",   FEATURE, 99);
+    reservedsym("__FEATURE.OVERWRITE", FEATURE, 99);
+    reservedsym("MACRO",               FEATURE, 99);
+    reservedsym("ENDM",                FEATURE, 99);
 }
 
 int cpumatch(char *str)
@@ -2500,7 +2912,7 @@ struct opsym optab[] =
     {   "ASC",      KEOP_ASC,       0,  0   },  /* ASCII val of char in str */
 
     {   "LISTING",  KOC_LIST,       0,  0   },  /* Assembler listing control */
-    {   "QEQU",     KOC_QSET,       0,  0   },  /* EQU and mark as "quiet" */
+    {   "QEQU",     KOC_QEQU,       0,  0   },  /* EQU and mark as "quiet" */
     {   "QSET",     KOC_QSET,       0,  0   },  /* SET and mark as "quiet" */
 
     {   "MACRO",    KOC_MACERR,     0,  0   },  /* We shouldn't see MACRO   */
@@ -2511,7 +2923,15 @@ struct opsym optab[] =
     {   "CMSG",     KOC_CMSG,       0,  0   },  /* Comment message in listing */
     {   "SMSG",     KOC_SMSG,       0,  0   },  /* Status message to stdout */
     {   "WMSG",     KOC_WMSG,       0,  0   },  /* Warning message */ 
+    
+    {   "CFGVAR",   KOC_CFGVAR,     0,  0   },  /* Configuration variable */
 
+    {   "SRCFILE",  KOC_SRCFILE,    0,  0   },  /* HLL source file / line */
+    {   "LISTCOL",  KOC_LISTCOL,    0,  0   },  /* Listing formatting */
+    {   "ERR_IF_OVERWRITTEN", 
+          KOC_ERR_IF_OVERWRITTEN,   0,  0   },  /* ROM overwrite control */
+    {   "FORCE_OVERWRITE",     
+          KOC_FORCE_OVERWRITE,      0,  0   },  /* ROM overwrite control */
     {   "",         0,              0,  0   }
 };
 

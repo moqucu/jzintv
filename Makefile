@@ -1,117 +1,173 @@
 ##############################################################################
 ## Source-level Makefile for jzintv
 ##
-## The whole make process is driven from the top-level Makefile.  In contrast
-## to the (poor) advice given in the Make documentation, I do _not_ call make
-## recursively to build the source of this project.
+## Before editing this file, consider overriding details with .mak files
+## in the buildcfg/ directory.  See buildcfg/README.txt for details.
 ##############################################################################
 
 ##############################################################################
 ## Project directory structure
 ##############################################################################
-B=../bin
-L=../lib
-R=../rom
+B = ../bin
+L = ../lib
+R = ../rom
+
+##############################################################################
+## Include local customizations, if any.
+##############################################################################
+-include buildcfg/*.mak
 
 ##############################################################################
 ## Project-wide build flags
 ##############################################################################
-P           = export PATH;
 
-SDL_CFLAGS := $(shell sdl-config --cflags)
-SDL_LFLAGS := $(shell sdl-config --libs) 
+# Set our target architecture(s).  Since MacOS supports fat binaries, this
+# can list multiple architectures.
+# ARCH ?= -arch x86_64
 
-# Set "X" to be the executable extension
-X =        
+# Set "X" to be the executable extension, and "O" to be the object extension.
+X =
+O = o
 
-# Set "RM" to be the remove/delete command
-RM = rm -f 
+# Set "RM" to be the remove/delete command, if not overridden.
+RM ?= rm -f
 
- WARN    = -Wall -W -Wshadow -Wpointer-arith 				\
-	       -Wbad-function-cast -Wcast-qual -Wc++-compat		\
-		   -Wmissing-declarations -Wmissing-prototypes 		\
-		   -Wstrict-prototypes
- WARNXX  = -Wall -W -Wshadow -Wpointer-arith -Wcast-qual 
+# Set to 0 or comment out to disable GNU Readline support.
+# Set to 1 to enable it.
+# Note! It must really be GNU Readline, and not the Editline wrapper that
+# comes with XCode. Edit RL_CFLAGS, RL_LFLAGS below to match where you've
+# installed it.
+# GNU_READLINE ?= 1
 
+# Changed to use SDL frameworks .-- Fri. Aug. 6 JJT
+# Now SDL2 -- 28-OCT-2017 JZ
+#
+# The instructions for installing the SDL2 framework suggest that it be placed
+# in your ~/Library/Frameworks directory. Override this variable if this is
+# not the case.
+SDL2_FRAMEWORK ?= /opt/homebrew/Cellar/sdl2/2.28.5
 
-#WARN    = -W -Wall -ansi -Wbad-function-cast -Wcast-align \
-		   -Wcast-qual -Wchar-subscripts -Winline \
-		   -Wmissing-prototypes -Wnested-externs -Wpointer-arith \
-		   -Wshadow -Wstrict-prototypes -Wwrite-strings \
-	   -Dlinux
+# Flags for using the so-called "portable syntax" for including SDL2 headers
+# (such as #include "SDL.h")
+# SDL2_PORT_SYN_FLAGS := -I$(SDL2_FRAMEWORK)/Headers/
+SDL2_PORT_SYN_FLAGS := -I$(SDL2_FRAMEWORK)/include -D_THREAD_SAFE
 
-#WARNXX  = -W -Wall -ansi -Wcast-align \
- 		   -Wcast-qual -Wchar-subscripts -Winline \
- 		   -Wpointer-arith -Wredundant-decls -Wshadow -Wwrite-strings \
- 	   -Dlinux
+# Note: -F$(SDL2_FRAMEWORK)/.. ensures that gcc can find the SDL2 framework even
+# if SDL2_FRAMEWORK had to be overrriden.  See above.
+#
+# TODO:  Eliminate -DUSE_SDL2, at least in this form.
+SDL2_CFLAGS := -DUSE_SDL2 $(SDL2_PORT_SYN_FLAGS)
+#SDL2_LFLAGS := -F$(SDL2_FRAMEWORK)/.. -framework SDL2 \
+#               -framework AppKit -framework Foundation -lobjc
+SDL2_LFLAGS := -L/opt/homebrew/Cellar/sdl2/2.28.5/lib -lSDL2
 
+# Override these in a .mak file.  See buildcfg/00-compiler*.txt for examples.
+LTO ?= -flto
+ifeq ($(CC),cc)
+    CC = clang -std=gnu99
+endif
+ifeq ($(CXX),c++)
+    CXX = clang++ -std=gnu++14
+    CXXFLAGS += -fvisibility=hidden
+endif
 
- CC  = $(P) gcc -std=c99
- CXX = $(P) g++
-#CC  = $(P) gcc-3.4
-#CC  = $(P) /usr/local/bin/gcc -V4.1.1
-#CXX = $(P) /usr/local/bin/g++ 
-#CC  = $(P) icc
-#CC  = $(P) /usr/bin/gcc
-#CXX = $(P) /usr/bin/g++
+# This is used only to compile gfx/gfx_sdl2_osx.m.
+CC_MFILE ?= clang $(ARCH)
 
-#DEF_FLAGS += -DDIRECT_INTV2PC
-#DEF_FLAGS += -DNEED_INOUT
- DEF_FLAGS += -Dlinux
+# This must be 10.9 or higher with current XCode / Clang 11.
+# This number can go as low as to 10.6 with GCC.
+MACOS_VERSION_MIN ?= 13.0
 
-#OPT_FLAGS = -ggdb3
-#OPT_FLAGS = -O
-#OPT_FLAGS = -O2 -ggdb3
- OPT_FLAGS = -O6 -fomit-frame-pointer -fprefetch-loop-arrays -msse #-DBENCHMARK_STIC
-#OPT_FLAGS = -O2 -pg -ggdb -DLOCAL=
-#OPT_FLAGS = -tpp6 -axMiKW -ip -vec_report3 -opt_report -ansi_alias -restrict -DHAVE_RESTRICT -align -O3 -Ob1 # -ipo # intel icc flags
+# Default optimization flags, if none specified in a buildcfg/*.mak file.
+OPT_FLAGS ?= -O3
 
-CFLAGS   = $(OPT_FLAGS) $(WARN)   -I. -I.. $(DEF_FLAGS) $(EXTRA)
-CXXFLAGS = $(OPT_FLAGS) $(WARNXX) -I. -I.. $(DEF_FLAGS) $(EXTRA)
-#LFLAGS   = /usr/local/lib/libgcc_s.so -L../lib 
-LFLAGS   = -L../lib
+CFLAGS   += $(ARCH) -mmacosx-version-min=$(MACOS_VERSION_MIN)
+CFLAGS   += -I. -I.. $(EXTRA)
+CFLAGS   += -I/Library/Developer/CommandLineTools/SDKs/MacOSX14.2.sdk/System/Library/Frameworks/QuartzCore.framework/Versions/A/Headers
 
+CXXFLAGS += $(ARCH) -mmacosx-version-min=$(MACOS_VERSION_MIN)
+CXXFLAGS += -I. -I.. $(EXTRA)
 
-OBJS=jzintv.o
-PROG=$(B)/jzintv
-TOCLEAN=$(B)/jzintv core
+# LFLAGS   += -L/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/lib
+LFLAGS   += -L/Library/Developer/CommandLineTools/SDKs/MacOSX14.2.sdk/usr/lib
 
-#PROGS=$(PROG)
+OBJS       = jzintv.$(O)
+PROG_SDL2  = $(B)/jzintv$(X)
+PROG_NULL  = $(B)/jzintv_batch$(X)
+TOCLEAN   += $(PROG_SDL2) $(PROG_NULL) core
+TOCLEAN   += libjzintv_common.a libjzintv_sdl2.a libjzintv_null.a
+TOCLEAN   += jzintv_fromcommon$(X)
+OBJS_SDL2 += pads/pads_cgc_linux.$(O)
 
-CFLAGS += $(SDL_CFLAGS) 
-#LFLAGS += $(SDL_LFLAGS)
+CFLAGS   += $(SDL2_CFLAGS)
+CXXFLAGS += $(SDL2_CFLAGS)
+
+# Forcibly override static linkage, which is not supported on Mac.
+SLFLAGS = $(LFLAGS)
+
+# CFLAGS_MFILE is a more limited CFLAGS set for building the .m file.
+# It omits the sanitizer, optimizer and LTO flags.
+CFLAGS_MFILE := $(CFLAGS) $(WARN_M)
+
+# Add sanitizer and LTO flags to main CFLAGS / CXXFLAGS.
+CFLAGS   += $(SANI) $(LTO) $(OPT_FLAGS) $(WARN)
+CXXFLAGS += $(SANI) $(LTO) $(OPT_FLAGS) $(WARNXX)
+
+ifeq ($(GNU_READLINE),1)
+# Assuming you've built Readline yourself, point to the right header dir
+# and library to explicitly link.
+RL_CFLAGS = -DUSE_GNU_READLINE -I/usr/local/include
+RL_LFLAGS = /usr/local/lib/libreadline.a -ltermcap
+endif
 
 ##############################################################################
 ## Generic build-rules
 ##############################################################################
 
-all: $(OBJS) $(PROG)
-
-$(PROG): $(OBJS)
-	$(CC) -o $(PROG) $(OBJS) $(CFLAGS) $(LFLAGS) $(SDL_LFLAGS)
-
-clean:
-	$(RM) $(OBJS) 
-	$(RM) $(TOCLEAN)
-
-%.o: %.c
-	$(CC) -o $@ $(CFLAGS) -c $<
-
-%.s: %.c
-	$(CC) -fverbose-asm -S -o $@ $(CFLAGS) -c $<
-
-##############################################################################
-## Linux-specific stuff
-##############################################################################
-
-pads/pads_intv2pc.o:
-	$(CC) -O6 -o pads/pads_intv2pc.o $(CFLAGS) -c pads/pads_intv2pc.c
-
-OBJS += pads/pads_cgc_linux.o
-OBJS += pads/pads_intv2pc.o
+all: build
 
 ##############################################################################
 ## Makefile.common includes all the subMakefiles and such
 ##############################################################################
 include Makefile.common
+
+$(PROG_SDL2): $(OBJS) $(OBJS_SDL2) gfx/gfx_sdl2_osx.$(O)
+	$(CXX) -o $(PROG_SDL2) $(OBJS) $(OBJS_SDL2) gfx/gfx_sdl2_osx.$(O) $(CFLAGS) $(LFLAGS) $(SDL2_LFLAGS) $(RL_LFLAGS)
+
+$(PROG_NULL): $(OBJS) $(OBJS_NULL)
+	$(CXX) -o $(PROG_NULL) $(OBJS) $(OBJS_NULL) $(CFLAGS) $(LFLAGS) $(RL_LFLAGS)
+
+#Library for use with the OS X GUI project.
+libjzintv_common.a : $(OBJS)
+	libtool -o libjzintv_common.a $(OBJS)
+
+libjzintv_sdl2.a : $(OBJS_SDL2)
+	libtool -o libjzintv_sdl2.a $(OBJS_SDL2)
+
+libjzintv_null.a : $(OBJS_NULL)
+	libtool -o libjzintv_null.a $(OBJS_NULL)
+
+#Test program for libjzintv_common.a . If everything is OK, this program should
+#behave exactly like jzintv.
+jzintv_fromcommon : libjzintv_common.a libjzintv_sdl2.a
+	$(CC) -o jzintv_fromcommon $(CFLAGS) $(LFLAGS) $(SDL2_LFLAGS) -L. -ljzintv_common -ljzintv_sdl
+
+clean:
+	$(RM) $(OBJS)
+	$(RM) $(OBJS_SDL2)
+	$(RM) $(OBJS_NULL)
+	$(RM) $(TOCLEAN)
+
+%.$(O): %.c
+	$(CC) -o $@ $(CFLAGS) -c $<
+
+%.$(O): %.cpp
+	$(CXX) -o $@  $(CXXFLAGS) -c $<
+
+## Special workaround for SDL2 on OSX.
+gfx/gfx_sdl2.$(O): gfx/gfx_sdl2_osx.h
+
+gfx/gfx_sdl2_osx.$(O): gfx/gfx_sdl2_osx.m gfx/gfx_sdl2_osx.h
+	$(CC_MFILE) -o $@ $(CFLAGS_MFILE) -fno-objc-arc -c $<
+
 build: jzIntv SDK-1600

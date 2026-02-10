@@ -30,11 +30,11 @@ typedef struct ser_hier_t ser_hier_t;
 struct ser_list_t
 {
     struct ser_list_t *next;
-    const char  *name;
-    void        *object;
+    const char *name;
+    void       *object;
     ser_type_t  type;
     int         length;
-    uint_32     flags;
+    uint32_t    flags;
 };
 
 
@@ -45,7 +45,7 @@ struct ser_hier_t
     ser_hier_t  *hier_list;
     const char  *name;
     ser_list_t  *obj_list;
-    uint_32     flags;
+    uint32_t     flags;
 };
 
 #define SER_INIT    (0x0001)
@@ -66,7 +66,7 @@ void ser_register
     void        *object,    /*  Pointer to the object itself.               */
     ser_type_t  type,       /*  8/16/32 bit, scalar, string, array,etc.     */
     int         length,     /*  Length of object if an array.               */
-    uint_32     flags       /*  mandatory/optional/informative/init         */
+    uint32_t    flags       /*  mandatory/optional/informative/init         */
 );
 
 /* ======================================================================== */
@@ -81,12 +81,12 @@ ser_hier_t *ser_new_hierarchy
 /* ======================================================================== */
 /*  SER_GET_INT                                                             */
 /* ======================================================================== */
-uint_64 ser_get_int(void *object, ser_type_t type, void **next);
+uint64_t ser_get_int(void *object, ser_type_t type, void **next);
 
 /* ======================================================================== */
 /*  SER_INT_TO_STR                                                          */
 /* ======================================================================== */
-char *ser_int_to_str(uint_64 value, ser_type_t type, uint_32 flags, int fix);
+char *ser_int_to_str(uint64_t value, ser_type_t type, uint32_t flags, int fix);
 
 
 /* ======================================================================== */
@@ -94,8 +94,8 @@ char *ser_int_to_str(uint_64 value, ser_type_t type, uint_32 flags, int fix);
 /* ======================================================================== */
 void ser_print_array
 (
-    FILE        *f,
-    ser_list_t  *obj,
+    FILE       *f,
+    ser_list_t *obj,
     int         indent
 );
 
@@ -104,8 +104,8 @@ void ser_print_array
 /* ======================================================================== */
 void ser_print_int
 (
-    FILE        *f,
-    ser_list_t  *obj,
+    FILE       *f,
+    ser_list_t *obj,
     int         indent
 );
 
@@ -114,8 +114,8 @@ void ser_print_int
 /* ======================================================================== */
 void ser_print_string
 (
-    FILE        *f,
-    ser_list_t  *obj,
+    FILE       *f,
+    ser_list_t *obj,
     int         indent
 );
 
@@ -138,9 +138,9 @@ void ser_print_hierarchy(FILE *f, ser_hier_t *node, int init, int indent);
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                 Copyright (c) 1998-1999, Joseph Zbiciak                  */
 /* ======================================================================== */

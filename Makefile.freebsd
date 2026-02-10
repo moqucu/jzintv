@@ -18,18 +18,19 @@ R=../rom
 ##############################################################################
 P           = export PATH;
 
-SDL_CFLAGS := $(shell sdl-config --cflags)
-SDL_LFLAGS := $(shell sdl-config --libs) 
+SDL1_CFLAGS := $(shell sdl-config --cflags)
+SDL1_LFLAGS := $(shell sdl-config --libs) 
 
-# Set "X" to be the executable extension
-X =        
+# Set "X" to be the executable extension, and "O" to be the object extension.
+X = 
+O = o
 
 # Set "RM" to be the remove/delete command
 RM = rm -f 
 
- WARN    = -Wall -W -Wshadow -Wpointer-arith \
-	       -Wbad-function-cast -Wcast-qual 
- WARNXX  = -Wall -W -Wshadow -Wpointer-arith -Wcast-qual 
+WARN    = -Wall -W -Wshadow -Wpointer-arith \
+          -Wbad-function-cast -Wcast-qual 
+WARNXX  = -Wall -W -Wshadow -Wpointer-arith -Wcast-qual 
 
  CC  ?= $(P) cc
  CXX ?= $(P) c++
@@ -54,30 +55,28 @@ CXXFLAGS ?= $(OPT_FLAGS) $(WARNXX) -I. -I.. $(DEF_FLAGS) $(EXTRA)
 #LFLAGS   = /usr/local/lib/libgcc_s.so -L../lib 
 LFLAGS   = -L../lib 
 
+OBJS      = jzintv.$(O)
+PROG_SDL1 = $(B)/jzintv
+TOCLEAN   = $(B)/jzintv core
 
-OBJS=jzintv.o
-PROG=$(B)/jzintv
-TOCLEAN=$(B)/jzintv core
-
-PROGS=$(PROG)
-
-CFLAGS += $(SDL_CFLAGS) 
-LFLAGS += $(SDL_LFLAGS)
+CFLAGS += $(SDL1_CFLAGS) 
+LFLAGS += $(SDL1_LFLAGS)
 
 ##############################################################################
 ## Generic build-rules
 ##############################################################################
 
-all: $(OBJS) $(PROG)
+all: build
 
-$(PROG): $(OBJS)
-	$(CC) -o $(PROG) $(OBJS) $(CFLAGS) $(LFLAGS)
+$(PROG_SDL1): $(OBJS) $(OBJS_SDL1)
+	$(CC) -o $(PROG_SDL1) $(OBJS) $(OBJS_SDL1) $(CFLAGS) $(LFLAGS)
 
 clean:
-	$(RM) $(OBJS) 
+	$(RM) $(OBJS)
+	$(RM) $(OBJS_SDL1)
 	$(RM) $(TOCLEAN)
 
-%.o: %.c
+%.$(O): %.c
 	$(CC) -o $@ $(CFLAGS) -c $<
 
 ##############################################################################
@@ -85,4 +84,3 @@ clean:
 ##############################################################################
 include Makefile.common
 build: jzIntv SDK-1600
-

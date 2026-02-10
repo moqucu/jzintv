@@ -14,9 +14,9 @@
 #ifndef LZW_ENC_H_
 #define LZW_ENC_H_ 1
 
-int lzw_encode (const uint_8 *i_buf, uint_8 *o_buf, int i_len, int max_o_len);
-int lzw_encode2(const uint_8 *i_buf, const uint_8 *i_buf_alt,
-                      uint_8 *o_buf, int i_len, int max_o_len);
+int lzw_encode (const uint8_t *i_buf, uint8_t *o_buf, int i_len, int max_o_len);
+int lzw_encode2(const uint8_t *i_buf, const uint8_t *i_buf_alt,
+                      uint8_t *o_buf, int i_len, int max_o_len);
 
 #endif
 /* ======================================================================== */
@@ -30,9 +30,9 @@ int lzw_encode2(const uint_8 *i_buf, const uint_8 *i_buf_alt,
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                   Copyright (c) 2005, Joseph Zbiciak                     */
 /* ======================================================================== */

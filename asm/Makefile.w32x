@@ -56,11 +56,11 @@ frapsub.o:  fraebin.h fraeuni.h fragcon.h frasmdat.h
 frasmain.o: fraebin.h fraeuni.h fragcon.h frasmdat.h
 fryylex.o:  fraebin.h fraeuni.h fragcon.h frasmdat.h
 
-as1600.o:   getopt.h as1600.y as1600.c as1600.h
-fraosub.o:  getopt.h as1600.y as1600.c as1600.h
-frapsub.o:  getopt.h as1600.y as1600.c as1600.h
-frasmain.o: getopt.h as1600.y as1600.c as1600.h
-fryylex.o:  getopt.h as1600.y as1600.c as1600.h
+as1600.o:   as1600.y as1600.c as1600.h
+fraosub.o:  as1600.y as1600.c as1600.h
+frapsub.o:  as1600.y as1600.c as1600.h
+frasmain.o: as1600.y as1600.c as1600.h
+fryylex.o:  as1600.y as1600.c as1600.h
 
 as1600.c: as1600.y
 	bison -o as1600.c --defines as1600.y

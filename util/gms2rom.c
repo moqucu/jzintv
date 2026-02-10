@@ -1,22 +1,5 @@
-
 /* ======================================================================== */
 /*  Takes a .GMS file from INTVPC, and makes a playable .ROM from it.       */
-/* ------------------------------------------------------------------------ */
-/*  This program is free software; you can redistribute it and/or modify    */
-/*  it under the terms of the GNU General Public License as published by    */
-/*  the Free Software Foundation; either version 2 of the License, or       */
-/*  (at your option) any later version.                                     */
-/*                                                                          */
-/*  This program is distributed in the hope that it will be useful,         */
-/*  but WITHOUT ANY WARRANTY; without even the implied warranty of          */
-/*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
-/*  General Public License for more details.                                */
-/*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
-/* ------------------------------------------------------------------------ */
-/*                 Copyright (c) 1998-2001, Joseph Zbiciak                  */
 /* ======================================================================== */
 
 #include <stdio.h>
@@ -35,7 +18,7 @@ const char *rom_errors[] =
     "Bad ROM Header",
     "CRC-16 Error in ROM Segments",
     "Bad ROM Segment Address Range",
-    "Bad ROM Fine-Address Range",   
+    "Bad ROM Fine-Address Range",
     "CRC-16 Error in Enable Tables",
     "Unknown Error"
 };
@@ -44,8 +27,8 @@ const char *rom_errors[] =
 /*  Our Intellicart and GMS images.                                         */
 /* ======================================================================== */
 icartrom_t the_icart;
-uint_8  *rom_img;
-uint_8  *gms_img;
+uint8_t  *rom_img;
+uint8_t  *gms_img;
 
 
 /* ======================================================================== */
@@ -143,7 +126,7 @@ uint_8  *gms_img;
 typedef struct gmsl_range_t
 {
     int      ofs_lo, ofs_hi;   /* File offset in GMS file.                */
-    uint_16  dst_addr;         /* Address range in Intellicart addr space */
+    uint16_t dst_addr;         /* Address range in Intellicart addr space */
     short    pack;             /* Whether to pack the data.               */
     int      flags;            /* Intellicart flags.                      */
 } gmsl_range_t;
@@ -173,7 +156,7 @@ gmsl_range_t gmsl_game_ranges[] =
 /*  The GMS Loader code which executes on the Inty.  This unpacks the RAM   */
 /*  and CPU register information that came from the GMS file.               */
 /* ======================================================================== */
-uint_16 gms_loader[] =
+uint16_t gms_loader[] =
 {
                              /*   GMSPROGRAM  PROC                          */
     0x02B8, 0xC80A,          /*               MVII    #GMSMAIN,   R0        */
@@ -335,11 +318,11 @@ uint_16 gms_loader[] =
 /*  COPY_OVER_FIXED -- Scan the gmsl_fixed_ranges array and copy the        */
 /*                     ranges from the GMS file to the Intellicart.         */
 /* ======================================================================== */
-LOCAL int copy_over_fixed(uint_8 *img, int gms_len, icartrom_t *ic)
+LOCAL int copy_over_fixed(uint8_t *img, int gms_len, icartrom_t *ic)
 {
     int i, pack, err;
     int lo, hi, j, len;
-    uint_16 addr, data;
+    uint16_t addr, data;
 
     /* -------------------------------------------------------------------- */
     /*  Copy data over from each of the ranges.                             */
@@ -360,7 +343,7 @@ LOCAL int copy_over_fixed(uint_8 *img, int gms_len, icartrom_t *ic)
             fprintf(stderr, "ERROR:  Short GMS file\n");
             return -1;
         }
-        
+
         /* ---------------------------------------------------------------- */
         /*  Odd ranges not allowed on packed ranges.                        */
         /* ---------------------------------------------------------------- */
@@ -373,9 +356,9 @@ LOCAL int copy_over_fixed(uint_8 *img, int gms_len, icartrom_t *ic)
         /* ---------------------------------------------------------------- */
         /*  Mark the segment as a "preload" segment in the Intellicart.     */
         /*  We don't use ADDSEG to copy the data over, since it's not yet   */
-        /*  packed in uint_16's.                                            */ 
+        /*  packed in uint16_t's.                                            */
         /* ---------------------------------------------------------------- */
-        if ((err = icartrom_addseg(ic, NULL, addr, len >> 1, 
+        if ((err = icartrom_addseg(ic, NULL, addr, len >> 1,
                    ICARTROM_PRELOAD | gmsl_fixed_ranges[i].flags, 0)) != 0)
         {
             fprintf(stderr, "Error '%s' setting icartrom range\n",
@@ -406,11 +389,11 @@ LOCAL int copy_over_fixed(uint_8 *img, int gms_len, icartrom_t *ic)
 /* ======================================================================== */
 /*  COPY_OVER_GAME -- Scans for game ranges and copies them to the icart    */
 /* ======================================================================== */
-LOCAL int copy_over_game(uint_8 *img, int gms_len, icartrom_t *ic)
+LOCAL int copy_over_game(uint8_t *img, int gms_len, icartrom_t *ic)
 {
-    int i, pack;
-    int lo, hi, rhi, j, len;
-    uint_16 addr, addr_lo;
+    int i;
+    int lo, hi, rhi, j;
+    uint16_t addr, addr_lo;
 
     /* -------------------------------------------------------------------- */
     /*  Copy data over from each of the ranges.                             */
@@ -420,15 +403,13 @@ LOCAL int copy_over_game(uint_8 *img, int gms_len, icartrom_t *ic)
         lo   = gmsl_game_ranges[i].ofs_lo;
         hi   = gmsl_game_ranges[i].ofs_hi;
         addr = gmsl_game_ranges[i].dst_addr;
-        pack = gmsl_game_ranges[i].pack != 0;
-        len  = hi - lo + 1;
 
         /* ---------------------------------------------------------------- */
         /*  Make sure we stay inside the file we read.                      */
         /* ---------------------------------------------------------------- */
         if (lo > gms_len || hi > gms_len)
             return -1;
-        
+
         /* ---------------------------------------------------------------- */
         /*  Process the lo-hi range in 256-word increments.  If we see      */
         /*  any bytes other than $FF, we process this range.                */
@@ -484,8 +465,9 @@ LOCAL int copy_over_game(uint_8 *img, int gms_len, icartrom_t *ic)
 int main(int argc, char *argv[])
 {
     FILE *f;
-    int err, len;
-    uint_32 rom_size;
+    int err;
+    long len;
+    uint32_t rom_size;
     char *ifn, *ofn, *s;
 
     /* -------------------------------------------------------------------- */
@@ -517,7 +499,7 @@ int main(int argc, char *argv[])
         {
             s = ofn + strlen(ifn);
         }
-    
+
         strcpy(s, ".rom");
     }
 
@@ -526,7 +508,7 @@ int main(int argc, char *argv[])
     /*  Determine the GMS filesize and load it in.                          */
     /* -------------------------------------------------------------------- */
     f = fopen(ifn, "rb");
-    
+
     if (!f)
     {
         perror("fopen()");
@@ -542,13 +524,18 @@ int main(int argc, char *argv[])
     }
     rewind(f);
 
-    if ((gms_img = (uint_8 *)malloc(len)) == NULL)
+    if ((gms_img = (uint8_t *)malloc(len)) == NULL)
     {
-        fprintf(stderr, "Out of memory\n");
+        fprintf(stderr, "Out of memory. Buy more.\n");
         exit(1);
     }
 
-    fread(gms_img, 1, len, f);
+    if (fread(gms_img, 1, len, f) != (size_t)len)
+    {
+        perror("fread()");
+        fprintf(stderr, "Error reading GMS file!\n");
+        exit(1);
+    }
     fclose(f);
 
     if (len < 0x2003A)
@@ -561,8 +548,8 @@ int main(int argc, char *argv[])
     /*  Now initialize the_icart and prepare to put game-state in it.       */
     /* -------------------------------------------------------------------- */
     icartrom_init(&the_icart);
-    if ((err = icartrom_addseg(&the_icart, gms_loader, GMSL_PROGRAM, 
-                               sizeof(gms_loader) / sizeof(uint_16),
+    if ((err = icartrom_addseg(&the_icart, gms_loader, GMSL_PROGRAM,
+                               sizeof(gms_loader) / sizeof(uint16_t),
                                ICARTROM_PRELOAD | ICARTROM_READ, 0)) != 0)
     {
         fprintf(stderr, "Unable to initialize the_icart: %s\n",
@@ -619,14 +606,14 @@ int main(int argc, char *argv[])
         fprintf(stderr, "Error copying game ranges to Intellicart\n");
         exit(1);
     }
-    
+
     /* -------------------------------------------------------------------- */
     /*  Set up our bank-switch window.                                      */
     /* -------------------------------------------------------------------- */
     if ((err = icartrom_addseg(&the_icart, NULL, GMSL_WINDOW, GMSL_WINDSIZE,
                         ICARTROM_WRITE|ICARTROM_READ|ICARTROM_BANKSW, 0)) != 0)
     {
-        fprintf(stderr, "Error '%s' setting up bankswitch window\n", 
+        fprintf(stderr, "Error '%s' setting up bankswitch window\n",
                 rom_errors[err]);
         exit(1);
     }
@@ -636,7 +623,7 @@ int main(int argc, char *argv[])
     if ((err = icartrom_addseg(&the_icart, NULL, GMSL_SCRATCH, GMSL_SCRSIZE,
                           ICARTROM_WRITE | ICARTROM_READ, 0)) != 0)
     {
-        fprintf(stderr, "Error '%s' setting up bankswitch window\n", 
+        fprintf(stderr, "Error '%s' setting up bankswitch window\n",
                 rom_errors[err]);
         exit(1);
     }
@@ -656,7 +643,7 @@ int main(int argc, char *argv[])
     if ((err = icartrom_addseg(&the_icart, NULL, 0x7000, 3,
                               ICARTROM_PRELOAD | ICARTROM_READ, 0)) != 0)
     {
-        fprintf(stderr, "Error '%s' patching in JD GMSL_PROGRAM\n", 
+        fprintf(stderr, "Error '%s' patching in JD GMSL_PROGRAM\n",
                 rom_errors[err]);
         exit(1);
     }
@@ -693,9 +680,9 @@ int main(int argc, char *argv[])
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                 Copyright (c) 1998-2001, Joseph Zbiciak                  */
 /* ======================================================================== */

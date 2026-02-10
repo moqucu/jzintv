@@ -41,15 +41,15 @@ LOCAL int   fd_map[MAX_ELFI_FD];     /* map Intellivision fd to system fd */
 LOCAL char *elfi_fname = NULL;
 LOCAL char *elfi_fname_end;
 
-LOCAL int elfi_open   (cp1600_t *, int *);
-LOCAL int elfi_close  (cp1600_t *, int *);
-LOCAL int elfi_read   (cp1600_t *, int *);
-LOCAL int elfi_read16 (cp1600_t *, int *);
-LOCAL int elfi_write  (cp1600_t *, int *);
-LOCAL int elfi_write16(cp1600_t *, int *);
-LOCAL int elfi_lseek  (cp1600_t *, int *);
-LOCAL int elfi_unlink (cp1600_t *, int *);
-LOCAL int elfi_rename (cp1600_t *, int *);
+LOCAL int elfi_open   (cp1600_t *, int *, void *);
+LOCAL int elfi_close  (cp1600_t *, int *, void *);
+LOCAL int elfi_read   (cp1600_t *, int *, void *);
+LOCAL int elfi_read16 (cp1600_t *, int *, void *);
+LOCAL int elfi_write  (cp1600_t *, int *, void *);
+LOCAL int elfi_write16(cp1600_t *, int *, void *);
+LOCAL int elfi_lseek  (cp1600_t *, int *, void *);
+LOCAL int elfi_unlink (cp1600_t *, int *, void *);
+LOCAL int elfi_rename (cp1600_t *, int *, void *);
 
 /* ======================================================================== */
 /*  ELFI_INIT   Register all the Emu-Link APIs.                             */
@@ -74,17 +74,17 @@ int elfi_init(const char *elfi_prefix)
     for (i = 0; i < MAX_ELFI_FD; i++)
         fd_map[i] = 0;
 
-    if (emu_link_register(elfi_open,    10) == 0 &&
-        emu_link_register(elfi_close,   11) == 0 &&
-        emu_link_register(elfi_read,    12) == 0 &&
-        emu_link_register(elfi_read16,  13) == 0 &&
-        emu_link_register(elfi_write,   14) == 0 &&
-        emu_link_register(elfi_write16, 15) == 0 &&
-        emu_link_register(elfi_lseek,   16) == 0 &&
-        emu_link_register(elfi_unlink,  17) == 0 &&
-        emu_link_register(elfi_rename,  18) == 0)
+    if (emu_link_register(elfi_open,    10, NULL) == 0 &&
+        emu_link_register(elfi_close,   11, NULL) == 0 &&
+        emu_link_register(elfi_read,    12, NULL) == 0 &&
+        emu_link_register(elfi_read16,  13, NULL) == 0 &&
+        emu_link_register(elfi_write,   14, NULL) == 0 &&
+        emu_link_register(elfi_write16, 15, NULL) == 0 &&
+        emu_link_register(elfi_lseek,   16, NULL) == 0 &&
+        emu_link_register(elfi_unlink,  17, NULL) == 0 &&
+        emu_link_register(elfi_rename,  18, NULL) == 0)
     {
-        jzp_printf("elfi:  Emu-Link File I/O enabled and directed to %s\n", 
+        jzp_printf("elfi:  Emu-Link File I/O enabled and directed to %s\n",
                     elfi_prefix);
         return 0;
     }
@@ -113,10 +113,10 @@ void elfi_dtor(void)
 /* ======================================================================== */
 /*  GET_FNAME   Convert the filename to a string and make sure it's sane.   */
 /* ======================================================================== */
-LOCAL int get_fname(cp1600_t *cp, uint_32 addr)
+LOCAL int get_fname(cp1600_t *cp, uint32_t addr)
 {
     int i;
-    uint_16 ch;
+    uint16_t ch = 0;
 
     /* -------------------------------------------------------------------- */
     /*  Disallow everything but alphanumerics, '-', '_' and '.'.            */
@@ -124,7 +124,7 @@ LOCAL int get_fname(cp1600_t *cp, uint_32 addr)
     for (i = 0; i < MAX_ELFI_FNAME; i++)
     {
         if (addr + i > 0xFFFF)  /* don't wrap end-of-memory */
-            return -1;  
+            return -1;
 
         elfi_fname_end[i] = ch = CP1600_RD(cp, addr + i);
 
@@ -157,7 +157,7 @@ LOCAL int get_fname(cp1600_t *cp, uint_32 addr)
                                 if (ifd >= MAX_ELFI_FD) FAIL;           \
                                 if ((fd = fd_map[ifd] - 1) < 0) FAIL;   \
                             } while (0);
-        
+
 
 /* ======================================================================== */
 /*  ELFI_OPEN       Open a new file on behalf of the Intellivision.         */
@@ -181,10 +181,11 @@ LOCAL int get_fname(cp1600_t *cp, uint_32 addr)
 /*      R2  File descriptor on success                                      */
 /*                                                                          */
 /* ======================================================================== */
-LOCAL int elfi_open   (cp1600_t *cp, int *fail)
+LOCAL int elfi_open   (cp1600_t *cp, int *fail, void *opaque)
 {
     int flags, iflags;
     int fd, ifd;
+    UNUSED(opaque);
 
     /* -------------------------------------------------------------------- */
     /*  Allocate an Intellivision file descriptor slot.                     */
@@ -204,7 +205,7 @@ LOCAL int elfi_open   (cp1600_t *cp, int *fail)
     /*  Remap the target's flags to the host OS.                            */
     /* -------------------------------------------------------------------- */
     iflags = cp->r[3];
-    if (iflags & (-1 << 6)) FAIL;
+    if (iflags & (-(1u << 6))) FAIL;
     if ((iflags & ELFI_O_RDWR) == 0) FAIL;
 
     flags = ((iflags & ELFI_O_RDWR)    == ELFI_O_RDWR   ? O_RDWR   : 0)
@@ -247,9 +248,10 @@ LOCAL int elfi_open   (cp1600_t *cp, int *fail)
 /*      C   Clear on success, set on failure                                */
 /*      R0  errno on failure                                                */
 /* ======================================================================== */
-LOCAL int elfi_close  (cp1600_t *cp, int *fail)
+LOCAL int elfi_close  (cp1600_t *cp, int *fail, void *opaque)
 {
     int fd;
+    UNUSED(opaque);
 
     IFD_TO_FD;
 
@@ -288,10 +290,11 @@ LOCAL int elfi_close  (cp1600_t *cp, int *fail)
 /*      @R3 Data read                                                       */
 /*                                                                          */
 /* ======================================================================== */
-LOCAL int elfi_read   (cp1600_t *cp, int *fail)
+LOCAL int elfi_read   (cp1600_t *cp, int *fail, void *opaque)
 {
     int fd, bytes, addr, total = 0, r;
-    uint_8 b;
+    uint8_t b;
+    UNUSED(opaque);
 
     /* -------------------------------------------------------------------- */
     /*  Get arguments.                                                      */
@@ -317,11 +320,12 @@ LOCAL int elfi_read   (cp1600_t *cp, int *fail)
     SUCCESS;
 }
 
-LOCAL int elfi_read16 (cp1600_t *cp, int *fail)
+LOCAL int elfi_read16 (cp1600_t *cp, int *fail, void *opaque)
 {
     int fd, words, addr, total = 0, r0, r1;
-    uint_8 b0, b1;
-    uint_16 wo;
+    uint8_t b0, b1;
+    uint16_t wo;
+    UNUSED(opaque);
 
     /* -------------------------------------------------------------------- */
     /*  Get arguments.                                                      */
@@ -339,7 +343,7 @@ LOCAL int elfi_read16 (cp1600_t *cp, int *fail)
         if ((r0 = read(fd, &b0, 1)) == 1 &&
             (r1 = read(fd, &b1, 1)) == 1)
         {
-            wo = ((uint_16)b0 << 8) | b1;
+            wo = ((uint16_t)b0 << 8) | b1;
             CP1600_WR(cp, (addr + total++) & 0xFFFF, wo);
         }
         else if (r0 == 0) break;
@@ -375,10 +379,11 @@ LOCAL int elfi_read16 (cp1600_t *cp, int *fail)
 /*      R1  Number of bytes/words written                                   */
 /*                                                                          */
 /* ======================================================================== */
-LOCAL int elfi_write  (cp1600_t *cp, int *fail)
+LOCAL int elfi_write  (cp1600_t *cp, int *fail, void *opaque)
 {
     int fd, bytes, addr, total = 0, w;
-    uint_8 b;
+    uint8_t b;
+    UNUSED(opaque);
 
     /* -------------------------------------------------------------------- */
     /*  Get arguments.                                                      */
@@ -407,11 +412,12 @@ LOCAL int elfi_write  (cp1600_t *cp, int *fail)
     SUCCESS;
 }
 
-LOCAL int elfi_write16(cp1600_t *cp, int *fail) 
+LOCAL int elfi_write16(cp1600_t *cp, int *fail, void *opaque)
 {
     int fd, words, addr, total = 0, w;
-    uint_8  b[2];
-    uint_16 wo;
+    uint8_t  b[2];
+    uint16_t wo;
+    UNUSED(opaque);
 
     /* -------------------------------------------------------------------- */
     /*  Get arguments.                                                      */
@@ -462,9 +468,10 @@ LOCAL int elfi_write16(cp1600_t *cp, int *fail)
 /*      R2  Upper 16 bits of new file offset                                */
 /*                                                                          */
 /* ======================================================================== */
-LOCAL int elfi_lseek  (cp1600_t *cp, int *fail) 
+LOCAL int elfi_lseek  (cp1600_t *cp, int *fail, void *opaque)
 {
     int fd, ofs, whence, fpos;
+    UNUSED(opaque);
 
     /* -------------------------------------------------------------------- */
     /*  Get arguments.                                                      */
@@ -508,8 +515,9 @@ LOCAL int elfi_lseek  (cp1600_t *cp, int *fail)
 /*      C   Clear on success, set on failure                                */
 /*      R0  errno on failure                                                */
 /* ======================================================================== */
-LOCAL int elfi_unlink (cp1600_t *cp, int *fail)
+LOCAL int elfi_unlink (cp1600_t *cp, int *fail, void *opaque)
 {
+    UNUSED(opaque);
     if (get_fname(cp, cp->r[2])) FAIL;
     if (unlink(elfi_fname) != 0) FAIL;
 
@@ -532,9 +540,10 @@ LOCAL int elfi_unlink (cp1600_t *cp, int *fail)
 /*      C   Clear on success, set on failure                                */
 /*      R0  errno on failure                                                */
 /* ======================================================================== */
-LOCAL int elfi_rename (cp1600_t *cp, int *fail)
+LOCAL int elfi_rename (cp1600_t *cp, int *fail, void *opaque)
 {
     char *old_fname;
+    UNUSED(opaque);
 
     if (get_fname(cp, cp->r[2]))            FAIL;
     if (!(old_fname = strdup(elfi_fname)))  FAIL;
@@ -556,9 +565,9 @@ LOCAL int elfi_rename (cp1600_t *cp, int *fail)
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                 Copyright (c) 2011-+Inf, Joseph Zbiciak                  */
 /* ======================================================================== */

@@ -1,15 +1,14 @@
 /* ======================================================================== */
 /*  Title:    Intellicart Emulation                                         */
 /*  Author:   J. Zbiciak                                                    */
-/*  $Id: icart.h,v 1.2 2001/02/02 04:16:49 im14u2c Exp $  */
 /* ------------------------------------------------------------------------ */
 /*  This module implements Intellicart Emulation.  We use this emulation    */
 /*  to emulate ALL Intellivision cartridges because it's much more          */
 /*  convenient that way.                                                    */
 /* ======================================================================== */
 
-#ifndef _ICART_H
-#define _ICART_H
+#ifndef ICART_H_
+#define ICART_H_
 #include "icart/icartrom.h"
 
 /* ======================================================================== */
@@ -17,13 +16,13 @@
 /* ======================================================================== */
 typedef struct icart_t
 {
+    periph_t    base;
     periph_t    r,   w,   rw;
     periph_t    rn,  wn,  rwn;
     periph_t    rb,  wb,  rwb;
     periph_t    rnb, wnb, rwnb;
-    periph_t    bs;
-    cp1600_t    *cpu;
-    uint_32     bs_tbl[32];
+    cp1600_t   *cpu;
+    uint32_t    bs_tbl[32];
     icartrom_t  rom;
     int         cache_bs;
 } icart_t;
@@ -84,18 +83,23 @@ typedef struct icart_t
 #define IC_CACHE_NONE  (0)
 
 #define IC_CACHE_DFLT  (IC_CACHE_NOBS)
+
 /* ======================================================================== */
 /*  ICART_RD_F       -- Read flat 16-bit Intellicart memory.                */
 /*  ICART_RD_FN      -- Read flat 8-bit Intellicart memory.                 */
 /*  ICART_RD_B       -- Read bank-switched 16-bit Intellicart memory.       */
 /*  ICART_RD_BN      -- Read bank-switched 8-bit Intellicart memory.        */
 /* ======================================================================== */
-
-uint_32 icart_rd_NULL(periph_t*per, periph_t *ign, uint_32 addr, uint_32 data);
-uint_32 icart_rd_f  (periph_t *per, periph_t *ign, uint_32 addr, uint_32 data);
-uint_32 icart_rd_fn (periph_t *per, periph_t *ign, uint_32 addr, uint_32 data);
-uint_32 icart_rd_b  (periph_t *per, periph_t *ign, uint_32 addr, uint_32 data);
-uint_32 icart_rd_bn (periph_t *per, periph_t *ign, uint_32 addr, uint_32 data);
+uint32_t icart_rd_NULL(periph_t *const per, periph_t *const ign,
+                       const uint32_t addr, const uint32_t data);
+uint32_t icart_rd_f   (periph_t *const per, periph_t *const ign,
+                       const uint32_t addr, const uint32_t data);
+uint32_t icart_rd_fn  (periph_t *const per, periph_t *const ign,
+                       const uint32_t addr, const uint32_t data);
+uint32_t icart_rd_b   (periph_t *const per, periph_t *const ign,
+                       const uint32_t addr, const uint32_t data);
+uint32_t icart_rd_bn  (periph_t *const per, periph_t *const ign,
+                       const uint32_t addr, const uint32_t data);
 
 /* ======================================================================== */
 /*  ICART_WR_F       -- Write flat 16-bit Intellicart memory.               */
@@ -103,28 +107,34 @@ uint_32 icart_rd_bn (periph_t *per, periph_t *ign, uint_32 addr, uint_32 data);
 /*  ICART_WR_B       -- Write bank-switched 16-bit Intellicart memory.      */
 /*  ICART_WR_BN      -- Write bank-switched 8-bit Intellicart memory.       */
 /* ======================================================================== */
-
-void    icart_wr_NULL(periph_t*per, periph_t *ign, uint_32 addr, uint_32 data);
-void    icart_wr_f  (periph_t *per, periph_t *ign, uint_32 addr, uint_32 data);
-void    icart_wr_fn (periph_t *per, periph_t *ign, uint_32 addr, uint_32 data);
-void    icart_wr_b  (periph_t *per, periph_t *ign, uint_32 addr, uint_32 data);
-void    icart_wr_bn (periph_t *per, periph_t *ign, uint_32 addr, uint_32 data);
+void icart_wr_NULL(periph_t *const per, periph_t *const ign,
+                   const uint32_t addr, const uint32_t data);
+void icart_wr_f   (periph_t *const per, periph_t *const ign,
+                   const uint32_t addr, const uint32_t data);
+void icart_wr_fn  (periph_t *const per, periph_t *const ign,
+                   const uint32_t addr, const uint32_t data);
+void icart_wr_b   (periph_t *const per, periph_t *const ign,
+                   const uint32_t addr, const uint32_t data);
+void icart_wr_bn  (periph_t *const per, periph_t *const ign,
+                   const uint32_t addr, const uint32_t data);
 
 /* ======================================================================== */
 /*  ICART_RD_BS      -- Read from bankswitch registers.                     */
 /*  ICART_WR_BS      -- Write to bankswitch registers.                      */
 /* ======================================================================== */
-uint_32 icart_rd_bs (periph_t *per, periph_t *ign, uint_32 addr, uint_32 data);
-void    icart_wr_bs (periph_t *per, periph_t *ign, uint_32 addr, uint_32 data);
+uint32_t icart_rd_bs(periph_t *const per, periph_t *const ign,
+                     const uint32_t addr, const uint32_t data);
+void icart_wr_bs(periph_t *const per, periph_t *const ign,
+                 const uint32_t addr, const uint32_t data);
 
 /* ======================================================================== */
 /*  ICART_INIT       -- Initialize an Intellicart from a ROM image.         */
 /* ======================================================================== */
 int icart_init
 (
-    icart_t     *ic,
-    FILE        *rom,
-    long        *tag_ofs
+    icart_t *const ic,
+    LZFILE  *const rom,
+    int      const randomize
 );
 
 /* ======================================================================== */
@@ -133,14 +143,13 @@ int icart_init
 /* ======================================================================== */
 int icart_register
 (
-    icart_t     *ic,
-    periph_bus_p bus,
-    cp1600_t    *cpu,
-    uint_32     cache_flags
+    icart_t      *const ic,
+    periph_bus_t *const bus,
+    cp1600_t     *const cpu,
+    uint32_t      const cache_flags
 );
 
 #endif
-
 /* ======================================================================== */
 /*  This program is free software; you can redistribute it and/or modify    */
 /*  it under the terms of the GNU General Public License as published by    */
@@ -152,9 +161,9 @@ int icart_register
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                 Copyright (c) 2001-+Inf, Joseph Zbiciak                  */
 /* ======================================================================== */

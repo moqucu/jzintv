@@ -1,8 +1,8 @@
 
 /* FILE: avl.h */
 /* definitions for AVL tree routines... */
-#ifndef _AVL_H
-#define _AVL_H
+#ifndef AVL_H_
+#define AVL_H_
 
 /*
     Types defined: (defined in avl.h)
@@ -24,8 +24,8 @@
 
     Exported functions:
 
-        int AVL_AddNode(PAVLTree tree, PRec rec) 
-                --> Adds a node containing 'rec' to tree pointed to by 
+        int AVL_AddNode(PAVLTree tree, PRec rec)
+                --> Adds a node containing 'rec' to tree pointed to by
                     '*root'.  Returns non-zero on error.
 
         int AVL_DelNode(PAVLTree tree, PRec rec)
@@ -34,7 +34,7 @@
 
         int AVL_SearchTree(PAVLTree tree, PRec rec, PPAVLNode node)
                 --> Searches tree '*tree' for node matching 'rec' by key
-                    using the current key comparison function, and places 
+                    using the current key comparison function, and places
                     result in '*node'.  Returns non-zero on error.
 
         int AVL_SearchWholeTree
@@ -126,9 +126,9 @@ void    AVL_DumpTreeInfo(PAVLTree tree, PAVLActFxn act);
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                 Copyright (c) 1998-2001, Joseph Zbiciak                  */
 /* ======================================================================== */

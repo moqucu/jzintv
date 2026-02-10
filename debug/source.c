@@ -3,6 +3,7 @@
 /* ======================================================================== */
 
 #include "config.h"
+#include "lzoe/lzoe.h"
 #include "file/file.h"
 #include "source.h"
 #include "debug/debug_tag.h"
@@ -28,7 +29,7 @@ path_t           *as1600_search_path;
 int               listing_handle;
 
 #define FL_PREFER_LISTING (1)
-#define SOURCEOFFSET      (24)      /* same meaning as in assembler */
+#define SOURCEOFFSET      (32)      /* same meaning as in assembler */
 
 void        set_source_map_mode(smap_mode mode);
 
@@ -37,7 +38,7 @@ void        set_source_map_mode(smap_mode mode);
 /* ======================================================================== */
 LOCAL int get_file_handle(const char *name)
 {
-    FILE *f;
+    LZFILE *f;
     int i;
 
     /* -------------------------------------------------------------------- */
@@ -80,13 +81,13 @@ LOCAL int get_file_handle(const char *name)
     if (!source_file[source_files].text)
     {
         jzp_printf("failed\n"); jzp_flush();
-        free((void *)source_file[source_files].name);
+        CONDFREE(source_file[source_files].name);
         return 0;
     }
 
     jzp_printf("%d lines.\n", source_file[source_files].text->lines);
     jzp_flush();
-    fclose(f);
+    lzoe_fclose(f);
 
     return ++source_files;
 }
@@ -108,20 +109,20 @@ LOCAL int get_file_handle(const char *name)
 /* ======================================================================== */
 void process_source_map(const char *fname)
 {
-    FILE *f;
+    LZFILE *f;
     char buf[2048], *s;
     char *cwd = NULL;
     int  curr = 0;
-    uint_32 lo, hi, flags, src_line, list_line, addr, dflags;
+    uint32_t lo, hi, flags, src_line, list_line, addr, dflags;
 
-    if ((f = fopen(fname, "r")) == NULL)
+    if ((f = lzoe_fopen(fname, "r")) == NULL)
     {
         perror("fopen()");
         fprintf(stderr, "Could not open '%s' for reading.\n", fname);
         return;
     }
 
-    while (fgets(buf, sizeof(buf), f) != NULL)
+    while (lzoe_fgets(buf, sizeof(buf), f) != NULL)
     {
         if ((s = strchr(buf, '\012')) != NULL) *s = 0;
         if ((s = strchr(buf, '\015')) != NULL) *s = 0;
@@ -159,8 +160,8 @@ void process_source_map(const char *fname)
         /* ---------------------------------------------------------------- */
         /*  Ranges....                                                      */
         /* ---------------------------------------------------------------- */
-        if (sscanf(buf, "%x %x %x %d %d", &lo, &hi, &flags, 
-                                          &src_line, &list_line) != 5  
+        if (sscanf(buf, "%x %x %x %d %d", &lo, &hi, &flags,
+                                          &src_line, &list_line) != 5
             || lo > hi || lo > 0xFFFF)
         {
             fprintf(stderr, "Unhandled line in source map:\n>> %s\n", buf);
@@ -212,7 +213,8 @@ void process_source_map(const char *fname)
         }
     }
 
-    fclose(f);
+    CONDFREE(cwd);
+    lzoe_fclose(f);
 
     /* -------------------------------------------------------------------- */
     /*  Now step over the listing file, if there was one, and trim off      */
@@ -220,7 +222,7 @@ void process_source_map(const char *fname)
     /* -------------------------------------------------------------------- */
     if (listing_handle > 0)
     {
-        uint_32 i, j, k;
+        uint32_t i, j, k;
 
         text_file *text = source_file[listing_handle - 1].text;
 
@@ -247,7 +249,7 @@ void process_source_map(const char *fname)
 /*                          exists.  Pull from source or listing based on   */
 /*                          the current mode.                               */
 /* ======================================================================== */
-const char *source_for_addr(uint_32 addr)
+const char *source_for_addr(uint32_t addr)
 {
     int file  = smap_tbl[addr].file - 1;
     int sline = smap_tbl[addr].line - 1;
@@ -280,7 +282,7 @@ const char *source_for_addr(uint_32 addr)
 /* ======================================================================== */
 /*  FILE_LINE_FOR_ADDR   -- Get the file and line associated with an addr.  */
 /* ======================================================================== */
-int file_line_for_addr(uint_32 addr, int *line)
+int file_line_for_addr(uint32_t addr, int *line)
 {
     int sfile = smap_tbl[addr].file - 1;
     int sline = smap_tbl[addr].line - 1;
@@ -295,7 +297,7 @@ int file_line_for_addr(uint_32 addr, int *line)
 
     if (smode == SMAP_SMART)
     {
-        if (sline < 0 || 
+        if (sline < 0 ||
             (lline >= 0 && (smap_tbl[addr].flag & FL_PREFER_LISTING) != 0))
         {
             *line = lline;

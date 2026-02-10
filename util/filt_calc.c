@@ -8,15 +8,15 @@ int iq_rom[128] =
 {
     0,      9,      12,     25,     33,     41,     49,     57,
     65,     73,     81,     89,     97,     105,    113,    121,
-    129,    137,    145,    153,    161,    169,    177,    185,    
+    129,    137,    145,    153,    161,    169,    177,    185,
     193,    201,    209,    217,    225,    233,    241,    249,
     257,    265,    273,    281,    289,    297,    301,    305,
     309,    313,    317,    321,    325,    329,    333,    337,
-    341,    345,    349,    353,    357,    361,    365,    369,    
+    341,    345,    349,    353,    357,    361,    365,    369,
     373,    377,    381,    385,    389,    393,    397,    401,
     405,    409,    413,    417,    421,    425,    427,    429,
-    431,    433,    435,    437,    439,    441,    443,    445,    
-    447,    449,    451,    453,    455,    457,    459,    461,    
+    431,    433,    435,    437,    439,    441,    443,    445,
+    447,    449,    451,    453,    455,    457,    459,    461,
     463,    465,    467,    469,    471,    473,    475,    477,
     479,    481,    482,    483,    484,    485,    486,    487,
     488,    489,    490,    491,    492,    493,    494,    495,
@@ -24,13 +24,13 @@ int iq_rom[128] =
     504,    505,    506,    507,    508,    509,    510,    511
 };
 
-typedef struct cplx 
-{ 
+typedef struct cplx
+{
     double r, i;
     double a, m;
 } cplx;
 
-int calc_poles(double Ft, double Bt, cplx *pole, double Fs, 
+int calc_poles(double Ft, double Bt, cplx *pole, double Fs,
                double *Fk, double *BW)
 {
     double discrim;
@@ -91,7 +91,7 @@ void show_poles(cplx *pole, int num_poles)
     int num_inside, ws;
 
     for (p = 0; p < num_poles; p++)
-        printf("%2d: [%10f,%10f]   %s\n", 
+        printf("%2d: [%10f,%10f]   %s\n",
                 p + 1, pole[p].r, pole[p].i,
                 pole[p].m >= 1.0 ? "Unstable" : "Stable");
 
@@ -156,7 +156,7 @@ double bitdecode(char *str)
 #ifdef BITREV
     for (s = str; *s; s++, len++)
     {
-        if (*s == '1') val |= 1 << len;
+        if (*s == '1') val |= 1u << len;
         else if (*s != '0')
         {
             fprintf(stderr, "Format error in '%s'\n", str);
@@ -208,7 +208,7 @@ void calc_impulse_resp(double Ft, double Bt, double *s, int cnt)
 {
     double z0, z1, samp;
     int i;
-    
+
     s[0] = samp = 1.0;
     z0 = z1 = 0.0;
     for (i = 1; i < cnt; i++)
@@ -237,7 +237,7 @@ void show_impulse_resp(double *s, int cnt)
             if (x == 0)
             {
                 uy = ly = my = floor(s[x]   * 10.0 + 0.5);
-            } else  if (s[x] > s[x-1]) 
+            } else  if (s[x] > s[x-1])
             {
                 ly = floor(s[x-1] * 10.0 + 0.5);
                 uy = floor(s[x]   * 10.0 + 0.5);
@@ -294,7 +294,7 @@ main(int argc, char *argv[])
 
     is_cplx = calc_poles(Ft, Bt, pole, Fs, Fk, BW);
     if (is_cplx) printf("Fk: %10.3fHz  BW: %10.3fHz\n", Fk[0], BW[0]);
-    else         
+    else
     {
         printf("Fk: %10.3fHz  BW: %10.3fHz\n",Fk[0],BW[0]);
         printf("Fk: %10.3fHz  BW: %10.3fHz\n",Fk[1],BW[1]);
@@ -318,9 +318,9 @@ main(int argc, char *argv[])
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                 Copyright (c) 1998-2001, Joseph Zbiciak                  */
 /* ======================================================================== */

@@ -17,7 +17,7 @@ typedef enum
 {
     SMAP_SMART,     /* detect multi-line macros and pull from listing */
     SMAP_SOURCE,
-    SMAP_LISTING 
+    SMAP_LISTING
 } smap_mode;
 
 void        set_source_map_mode(smap_mode mode);
@@ -42,12 +42,12 @@ void process_source_map(const char *fname);
 /*                          exists.  Pull from source or listing based on   */
 /*                          the current mode.                               */
 /* ======================================================================== */
-const char *source_for_addr(uint_32 addr);
+const char *source_for_addr(uint32_t addr);
 
 /* ======================================================================== */
 /*  FILE_LINE_FOR_ADDR   -- Get the file and line associated with an addr.  */
 /* ======================================================================== */
-int file_line_for_addr(uint_32 addr, int *line);
+int file_line_for_addr(uint32_t addr, int *line);
 
 /* ======================================================================== */
 /*  SOURCE_FOR_FILE_LINE -- Get the source line associated with the file    */

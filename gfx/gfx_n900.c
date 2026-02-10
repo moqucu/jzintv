@@ -13,8 +13,8 @@
  *  GFX_PVT_T        -- Private internal state to gfx_t structure.
  *  GFX_STIC_PALETTE -- The STIC palette.
  * ============================================================================
- *  The graphics subsystem provides an abstraction layer between the 
- *  emulator and the graphics library being used.  Theoretically, this 
+ *  The graphics subsystem provides an abstraction layer between the
+ *  emulator and the graphics library being used.  Theoretically, this
  *  should allow easy porting to other graphics libraries.
  *
  *  This is a modified version of gfx.c for N900.  This may get merged back
@@ -22,7 +22,7 @@
  * ============================================================================
  */
 
-#include "sdl.h"
+#include "sdl_jzintv.h"
 #include <SDL_haa.h>
 #include "config.h"
 #include "periph/periph.h"
@@ -31,7 +31,6 @@
 #include "file/file.h"
 #include "mvi/mvi.h"
 #include "gif/gif_enc.h"
-
 
 /*
  * ============================================================================
@@ -52,18 +51,18 @@ typedef struct gfx_pvt_t
     int         movie_init;         /*  Is movie structure initialized? */
     mvi_t       *movie;             /*  Pointer to mvi_t to reduce deps */
 
-    gfx_scale_spec_t    scaler; 
+    gfx_scale_spec_t    scaler;
 } gfx_pvt_t;
 
-LOCAL void gfx_dtor(periph_p p);
-LOCAL void gfx_tick_generic(gfx_t *gfx);
+LOCAL void gfx_dtor(periph_t *const p);
+LOCAL void gfx_tick(gfx_t *const gfx);
 
 /*
  * ============================================================================
  *  GFX_STIC_PALETTE -- The STIC palette.
  * ============================================================================
  */
-LOCAL uint_8 gfx_stic_palette[32][3] = 
+LOCAL uint8_t gfx_stic_palette[32][3] =
 {
     /* -------------------------------------------------------------------- */
     /*  I generated these colors by directly eyeballing my television       */
@@ -117,11 +116,11 @@ LOCAL uint_8 gfx_stic_palette[32][3] =
 
 
 /*  01234567890123
-**  ###  ####  ### 
+**  ###  ####  ###
 **  #  # #    #
 **  ###  ###  #
 **  #  # #    #
-**  #  # ####  ### 
+**  #  # ####  ###
 */
 
 LOCAL const char* gfx_rec_bmp[5] =
@@ -150,13 +149,13 @@ LOCAL void gfx_sdl_abort(void)
 /* ======================================================================== */
 LOCAL void gfx_set_scaler_palette
 (
-    SDL_Surface         *scr, 
+    SDL_Surface         *scr,
     gfx_scale_spec_t    *scaler,
     SDL_Color           pal[32]
 )
 {
     int i;
-    uint_32 t;
+    uint32_t t;
 
     for (i = 0; i < 32; i++)
     {
@@ -176,10 +175,10 @@ LOCAL int gfx_setup_sdl_surface
 )
 {
     int i;
-    int desire_x   = gfx->pvt->scaler.actual_x; 
+    int desire_x   = gfx->pvt->scaler.actual_x;
     int desire_y   = gfx->pvt->scaler.actual_y;
     int desire_bpp = 16;
-    uint_32 sdl_flags = 0;
+    uint32_t sdl_flags = 0;
     SDL_Surface *scr, *scr_real;
     HAA_Actor *actor;
 
@@ -213,7 +212,7 @@ LOCAL int gfx_setup_sdl_surface
 
     actor = HAA_CreateActor(SDL_SWSURFACE, desire_x, desire_y, 16);
 
-    if (actor && actor->surface) 
+    if (actor && actor->surface)
     {
         gfx->pvt->actor = actor;
         gfx->pvt->scr   = actor->surface;
@@ -293,7 +292,7 @@ int gfx_init(gfx_t *gfx, int desire_x, int desire_y, int desire_bpp, int flags,
     /* -------------------------------------------------------------------- */
     /*  Allocate memory for the gfx_t.                                      */
     /* -------------------------------------------------------------------- */
-    gfx->vid = CALLOC(uint_8,    160 * 200);
+    gfx->vid = CALLOC(uint8_t,   160 * 200);
     gfx->pvt = CALLOC(gfx_pvt_t, 1);
 
     if (!gfx->vid && !gfx->pvt)
@@ -301,24 +300,20 @@ int gfx_init(gfx_t *gfx, int desire_x, int desire_y, int desire_bpp, int flags,
         fprintf(stderr, "gfx panic:  Could not allocate memory.\n");
         return -1;
     }
-    
+
     /* -------------------------------------------------------------------- */
     /*  Select the appropriate tick function based on our display res.      */
     /*  For now, only support 320x200x8bpp or 640x480x8bpp.                 */
     /* -------------------------------------------------------------------- */
-    if (gfx->tick_core == NULL)
-    {
-        if (desire_bpp == 24)
-            desire_bpp = 32;
+    if (desire_bpp == 24)
+        desire_bpp = 32;
 
-        gfx->tick_core = gfx_tick_generic;
-        if (gfx_scale_init_spec(&(gfx->pvt->scaler), 160, 200, 
-                                 desire_x, desire_y, desire_bpp))
-        {
-            fprintf(stderr, 
-                    "Could not configure scaler for %d x %d @ %d bpp\n",
-                    desire_x, desire_y, desire_bpp);
-        }
+    if (gfx_scale_init_spec(&(gfx->pvt->scaler), 160, 200,
+                             desire_x, desire_y, desire_bpp))
+    {
+        fprintf(stderr,
+                "Could not configure scaler for %d x %d @ %d bpp\n",
+                desire_x, desire_y, desire_bpp);
     }
 
     /* -------------------------------------------------------------------- */
@@ -369,7 +364,7 @@ int gfx_init(gfx_t *gfx, int desire_x, int desire_y, int desire_bpp, int flags,
     gfx->periph.write       = NULL;
     gfx->periph.peek        = NULL;
     gfx->periph.poke        = NULL;
-    gfx->periph.tick        = gfx_tick_common;
+    gfx->periph.tick        = NULL;
     gfx->periph.min_tick    = 14934;
     gfx->periph.max_tick    = 14934;
     gfx->periph.addr_base   = 0;
@@ -382,9 +377,9 @@ int gfx_init(gfx_t *gfx, int desire_x, int desire_y, int desire_bpp, int flags,
 /* ======================================================================== */
 /*  GFX_DTOR     -- Tear down the gfx_t                                     */
 /* ======================================================================== */
-LOCAL void gfx_dtor(periph_p p)
+LOCAL void gfx_dtor(periph_t *const p)
 {
-    gfx_t *gfx = (gfx_t *)p;
+    gfx_t *const gfx = PERIPH_AS(gfx_t, p);
 
     if (gfx->pvt &&
         gfx->pvt->movie)
@@ -404,7 +399,7 @@ LOCAL void gfx_dtor(periph_p p)
 /* ======================================================================== */
 void gfx_toggle_windowed(gfx_t *gfx, int quiet)
 {
-    if (!quiet) 
+    if (!quiet)
         jzp_printf("\n");
 
     gfx->toggle = 0;
@@ -414,7 +409,7 @@ void gfx_toggle_windowed(gfx_t *gfx, int quiet)
     {
         int tmp;
 
-        plat_delay(1000);  /* Let monitor come up to speed w/ new res. */
+        gfx->req_pause = true; /* Let monitor come up to speed w/ new res. */
         gfx->b_dirty = 2;
         gfx->dirty   = 1;
 
@@ -455,11 +450,10 @@ LOCAL int bm_cnt = 0;
 #endif
 
 /* ======================================================================== */
-/*  GFX_TICK_COMMON  -- Services a gfx_t tick                               */
+/*  GFX_STIC_TICK    -- Services a gfx_t tick                               */
 /* ======================================================================== */
-uint_32 gfx_tick_common(periph_p gfx_periph, uint_32 len)
+void gfx_stic_tick(gfx_t *const gfx)
 {
-    gfx_t   *gfx = (gfx_t*) gfx_periph;
 #ifdef BENCHMARK_GFX
     double start, end, diff;
 
@@ -482,7 +476,6 @@ uint_32 gfx_tick_common(periph_p gfx_periph, uint_32 len)
     if (gfx->toggle)
         gfx_toggle_windowed(gfx, 0);
 
-
     /* -------------------------------------------------------------------- */
     /*  Drop a frame if we need to.                                         */
     /* -------------------------------------------------------------------- */
@@ -490,7 +483,7 @@ uint_32 gfx_tick_common(periph_p gfx_periph, uint_32 len)
     {
         gfx->drop_frame--;
         if (gfx->dirty) gfx->dropped_frames++;
-        return len;
+        return;
     }
 
     /* -------------------------------------------------------------------- */
@@ -498,7 +491,7 @@ uint_32 gfx_tick_common(periph_p gfx_periph, uint_32 len)
     /* -------------------------------------------------------------------- */
     if (!gfx->scrshot && (!gfx->dirty || gfx->hidden))
     {
-        return len;
+        return;
     }
 
     /* -------------------------------------------------------------------- */
@@ -517,8 +510,7 @@ uint_32 gfx_tick_common(periph_p gfx_periph, uint_32 len)
     /* -------------------------------------------------------------------- */
     /*  Draw the frame to the screen surface.                               */
     /* -------------------------------------------------------------------- */
-    gfx->tick_core(gfx);
-
+    gfx_tick(gfx);
 
     /* -------------------------------------------------------------------- */
     /*  Actually update the display.                                        */
@@ -538,15 +530,15 @@ uint_32 gfx_tick_common(periph_p gfx_periph, uint_32 len)
         if (gfx->pvt->scaler.bpp == 8)
         {
             SDL_SetColors(gfx->pvt->scr,
-                          gfx->pvt->vid_enable ? gfx->pvt->pal_on 
+                          gfx->pvt->vid_enable ? gfx->pvt->pal_on
                                                : gfx->pvt->pal_off, 0, 16);
-        } else 
+        } else
         {
             gfx_set_scaler_palette( gfx->pvt->scr,
                                    &gfx->pvt->scaler,
                                     gfx->pvt->vid_enable ? gfx->pvt->pal_on
                                                          : gfx->pvt->pal_off);
- 
+
         }
     }
 
@@ -576,122 +568,22 @@ uint_32 gfx_tick_common(periph_p gfx_periph, uint_32 len)
         bm_max = bm_tot = 0;
         bm_cnt = 0;
         bm_min = 1e30;
-    }    
+    }
 #endif
-
-    return len;
 }
 
-#if 0
 /* ======================================================================== */
-/*  GFX_TICK_640X480 -- Services a gfx_t tick (in 640x480 mode)             */
+/*  GFX_TICK         -- Services a gfx_t tick in any graphics format        */
 /* ======================================================================== */
-void gfx_tick_640x480(gfx_t *gfx)
+LOCAL void gfx_tick(gfx_t *const gfx)
 {
-    uint_32 *scr0, *scr1, pix, *tmp;
-    uint_8  *vid;
-    int j;
-    int i;
-    int r_step;
-#ifdef BENCHMARK_GFX
-    double start, end;
-
-    start = get_time();
-#endif
-
-    gfx->tot_frames++;
-
-    /* -------------------------------------------------------------------- */
-    /*  Draw the frame to the screen surface.                               */
-    /* -------------------------------------------------------------------- */
-    if (gfx->b_dirty > 0)
-    {
-        static SDL_Rect top = { 0, 0, 640, 40 }, bot = { 0, 440, 640, 40 } ;
-
-        top.x = gfx->pvt->ofs_x;
-        top.y = gfx->pvt->ofs_y;
-        bot.x = gfx->pvt->ofs_x;
-        bot.y = gfx->pvt->ofs_y + 440;
-
-        gfx->b_dirty--;
-        SDL_FillRect(gfx->pvt->scr, &top, gfx->b_color);
-        SDL_FillRect(gfx->pvt->scr, &bot, gfx->b_color);
-    }
-
-    if (SDL_MUSTLOCK(gfx->pvt->scr))
-        SDL_LockSurface(gfx->pvt->scr);
-
-    scr0 = gfx->pvt->ofs_x/sizeof(uint_32) + (uint_32 *) gfx->pvt->scr->pixels;
-    vid  = (uint_8  *) gfx->vid;
-
-    r_step = (2*gfx->pvt->scr->pitch - 640) / sizeof(uint_32);
-    if (gfx->pvt->scr->pitch % sizeof(uint_32))
-    {
-        if (SDL_MUSTLOCK(gfx->pvt->scr))
-            SDL_UnlockSurface(gfx->pvt->scr);
-        jzp_printf("error: can't blit to pitch %% 4 != 0\n");
-        exit(1);
-    }
-    scr0 += (gfx->pvt->ofs_y + 40) * (gfx->pvt->scr->pitch) / sizeof(uint_32);
-    scr1 = scr0 + (gfx->pvt->scr->pitch) / sizeof(uint_32);
-
-    tmp  = scr0;
-
-    for (j = 0; j < 200; j++)
-    {
-        for (i = 0; i < 160; i++)
-        {
-            pix = *vid++ * 0x01010101;
-            *scr0++ = *scr1++ = pix;
-        }
-        scr0 += r_step;
-        scr1 += r_step;
-    }
-
-    /* Put the word "REC" in the lower right if a movie's on */
-    if ((gfx->scrshot & GFX_MOVIE) && (gfx->pvt->movie->fr & 64) == 0)
-    {
-        uint_8 *scr;
-
-        scr  = (uint_8*)tmp;
-        scr += 430*gfx->pvt->scr->pitch + 620;
-        for (j = 0; j < 5; j++)
-        {
-            for (i = 0; gfx_rec_bmp[j][i] != 0; i++)
-            {
-                if (gfx_rec_bmp[j][i] != ' ')
-                    scr[i] = 16;
-            }
-            scr += gfx->pvt->scr->pitch;
-        }
-    }
-
-    if (SDL_MUSTLOCK(gfx->pvt->scr))
-        SDL_UnlockSurface(gfx->pvt->scr);
-    
-    if (!((gfx->scrshot & GFX_MOVIE) && (gfx->pvt->movie->fr & 64) == 0))
-    {
-        static SDL_Rect norec = { 0, 0, 20, 5 };
-        norec.x = gfx->pvt->ofs_x + 620;
-        norec.y = gfx->pvt->ofs_y + 470;
-
-        SDL_FillRect(gfx->pvt->scr, &norec, gfx->b_color);
-    }
-}
-#endif
-
-/* ======================================================================== */
-/*  GFX_TICK_GENERIC -- Services a gfx_t tick in any graphics format        */
-/* ======================================================================== */
-LOCAL void gfx_tick_generic(gfx_t *gfx)
-{
-    uint_8 *scr;
+    uint8_t *scr;
 
     if (SDL_MUSTLOCK(gfx->pvt->scr))
         SDL_LockSurface(gfx->pvt->scr);
 
     scr = gfx->pvt->ofs_x + gfx->pvt->scr->pitch * gfx->pvt->ofs_y +
-          (uint_8 *) gfx->pvt->scr->pixels;
+          (uint8_t *) gfx->pvt->scr->pixels;
 
     gfx_scale
     (
@@ -704,142 +596,6 @@ LOCAL void gfx_tick_generic(gfx_t *gfx)
     if (SDL_MUSTLOCK(gfx->pvt->scr))
         SDL_UnlockSurface(gfx->pvt->scr);
 }
-
-
-#if 0
-
-/* ======================================================================== */
-/*  GFX_TICK_320X200 -- Services a gfx_t tick (in 320x200 mode)             */
-/* ======================================================================== */
-void gfx_tick_320x200(gfx_t *gfx)
-{
-    uint_8  *vid, *scr, pix, *tmp;
-    int x, y;
-
-    /* -------------------------------------------------------------------- */
-    /*  Draw the frame to the screen surface.                               */
-    /* -------------------------------------------------------------------- */
-
-    if (SDL_MUSTLOCK(gfx->pvt->scr))
-        SDL_LockSurface(gfx->pvt->scr);
-
-    scr = gfx->pvt->ofs_x + gfx->pvt->scr->pitch * gfx->pvt->ofs_y +
-          (uint_8 *) gfx->pvt->scr->pixels;
-    tmp = scr;
-    vid = (uint_8 *) gfx->vid;
-    for (y = 0; y < 200; y++)
-    {
-        for (x = 0; x < 160; x++)
-        {
-            pix     = *vid++;
-            scr[0] = scr[1] = pix;
-            scr   += 2;
-        }
-        scr += gfx->pvt->scr->pitch - 320;
-    }
-
-    /* Put the word "REC" in the lower right if a movie's on */
-    if (gfx->scrshot & GFX_MOVIE)
-    {
-        if ((gfx->pvt->movie->fr & 64) == 0)
-        {
-            scr  = tmp;
-            scr += 194*gfx->pvt->scr->pitch + 300;
-            for (y = 0; y < 5; y++)
-            {
-                for (x = 0; gfx_rec_bmp[y][x] != 0; x++)
-                {
-                    if (gfx_rec_bmp[y][x] != ' ')
-                        scr[x] = 16;
-                }
-                scr += gfx->pvt->scr->pitch;
-            }
-        }
-    }
-
-
-    if (SDL_MUSTLOCK(gfx->pvt->scr))
-        SDL_UnlockSurface(gfx->pvt->scr);
-}
-#endif
-
-
-#if 0
-/* ======================================================================== */
-/*  GFX_TICK_320X240X16 -- Services a gfx_t tick (in 320x240 16bpp mode)    */
-/* ======================================================================== */
-void gfx_tick_320x240_16(gfx_t *gfx)
-{
-    uint_8  *vid; 
-    uint_32 *scr, *tmp;
-    int x, y;
-
-    /* -------------------------------------------------------------------- */
-    /*  Draw the frame to the screen surface.                               */
-    /* -------------------------------------------------------------------- */
-    if (gfx->b_dirty > 0)
-    {
-        static SDL_Rect top = { 0, 0, 320, 20 }, bot = { 0, 220, 320, 20 } ;
-        uint_32 bord;
-
-        top.x = gfx->pvt->ofs_x;
-        top.y = gfx->pvt->ofs_y;
-        bot.x = gfx->pvt->ofs_x;
-        bot.y = gfx->pvt->ofs_y + 220;
-
-        gfx->b_dirty--;
-
-        bord = SDL_MapRGB(gfx->pvt->scr->format,
-                          gfx_stic_palette[gfx->b_color][0],
-                          gfx_stic_palette[gfx->b_color][1],
-                          gfx_stic_palette[gfx->b_color][2]);
-        SDL_FillRect(gfx->pvt->scr, &top, bord);
-        SDL_FillRect(gfx->pvt->scr, &bot, bord);
-    }
-
-    if (SDL_MUSTLOCK(gfx->pvt->scr))
-        SDL_LockSurface(gfx->pvt->scr);
-
-    scr = gfx->pvt->ofs_x + 
-          (uint_32*)(gfx->pvt->scr->pitch * (gfx->pvt->ofs_y + 20) +
-                     (uint_8*)gfx->pvt->scr->pixels);
-    tmp = scr;
-    vid = (uint_8 *) gfx->vid;
-    for (y = 0; y < 200; y++)
-    {
-        for (x = 0; x < 160; x += 4)
-        {
-            *scr++ = gfx_stic_palette16[*vid++];
-            *scr++ = gfx_stic_palette16[*vid++];
-            *scr++ = gfx_stic_palette16[*vid++];
-            *scr++ = gfx_stic_palette16[*vid++];
-        }
-        scr = (uint_32*)((uint_8*)scr + gfx->pvt->scr->pitch) - 160;
-    }
-
-    /* Put the word "REC" in the lower right if a movie's on */
-    if (gfx->scrshot & GFX_MOVIE)
-    {
-        if ((gfx->pvt->movie->fr & 64) == 0)
-        {
-            scr = (uint_32*)((uint_8*)tmp + 194*gfx->pvt->scr->pitch) + 300;
-            for (y = 0; y < 5; y++)
-            {
-                for (x = 0; gfx_rec_bmp[y][x] != 0; x++)
-                {
-                    if (gfx_rec_bmp[y][x] != ' ')
-                        scr[x] = gfx_stic_palette16[16];
-                }
-                scr = (uint_32*)((uint_8*)scr + gfx->pvt->scr->pitch);
-            }
-        }
-    }
-
-
-    if (SDL_MUSTLOCK(gfx->pvt->scr))
-        SDL_UnlockSurface(gfx->pvt->scr);
-}
-#endif
 
 /* ======================================================================== */
 /*  GFX_VID_ENABLE   -- Alert gfx that video has been enabled or blanked    */
@@ -886,7 +642,7 @@ void gfx_set_bord
     /*  (which is useful for debugging) sets the blanked colors to be       */
     /*  dimmed versions of the normal palette.                              */
     /* -------------------------------------------------------------------- */
-    if (gfx->debug_blank == 0)
+    if (!gfx->debug_blank)
     {
         int i;
 
@@ -901,8 +657,8 @@ void gfx_set_bord
 /* ======================================================================== */
 /*  GFX_SCRSHOT      -- Write a 320x200 screen shot to a GIF file.          */
 /* ======================================================================== */
-LOCAL uint_8 scrshot_buf[320*200];
-void gfx_scrshot(uint_8 *scr)
+LOCAL uint8_t scrshot_buf[320*200];
+void gfx_scrshot(uint8_t *scr)
 {
     static int last = -1;
     FILE * f;
@@ -913,13 +669,13 @@ void gfx_scrshot(uint_8 *scr)
     /* -------------------------------------------------------------------- */
     /*  Search for an unused screen-shot file name.                         */
     /* -------------------------------------------------------------------- */
-    do 
+    do
     {
         num = (num + 1) % 10000;
 
         snprintf(f_name, sizeof(f_name), "shot%.4d.gif", num);
 
-        if (!file_exists(f_name)) 
+        if (!file_exists(f_name))
             break;
 
     } while (num != last);
@@ -944,7 +700,7 @@ void gfx_scrshot(uint_8 *scr)
     {
         fprintf(stderr, "Error:  Could not open '%s' for screen dump.\n",
                 f_name);
-        return; 
+        return;
     }
 
 
@@ -1011,7 +767,7 @@ void gfx_movieupd(gfx_t *gfx)
         /* ---------------------------------------------------------------- */
         /*  If a movie's open, close it.                                    */
         /* ---------------------------------------------------------------- */
-        if ((gfx->scrshot & GFX_MOVIE) != 0) 
+        if ((gfx->scrshot & GFX_MOVIE) != 0)
         {
             if (pvt->movie->f)
             {
@@ -1025,7 +781,7 @@ void gfx_movieupd(gfx_t *gfx)
 #endif
                        "    Dupe frames:         %10d\n"
                        "    Dupe rows:           %10d\n"
-                       "    Compression ratio:   %8.2f:1\n", 
+                       "    Compression ratio:   %8.2f:1\n",
                        pvt->movie->fr,
                        pvt->movie->tot_bytes,
                        pvt->movie->tot_bytes / pvt->movie->fr,
@@ -1049,13 +805,13 @@ void gfx_movieupd(gfx_t *gfx)
         /*  Otherwise, open a new movie.                                    */
         /*  Search for an unused movie file name.                           */
         /* ---------------------------------------------------------------- */
-        do 
+        do
         {
             num = (num + 1) % 10000;
 
             snprintf(f_name, sizeof(f_name), "mvi_%.4d.imv", num);
 
-            if (!file_exists(f_name)) 
+            if (!file_exists(f_name))
                 break;
 
         } while (num != last);
@@ -1080,7 +836,7 @@ void gfx_movieupd(gfx_t *gfx)
         {
             fprintf(stderr, "Error:  Could not open '%s' for movie.\n",
                     f_name);
-            return; 
+            return;
         }
 
         jzp_printf("\nStarted movie file '%s'\n", f_name); jzp_flush();
@@ -1107,9 +863,9 @@ void gfx_movieupd(gfx_t *gfx)
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*          Copyright (c) 1998-2006, Joseph Zbiciak, John Tanner            */
 /* ======================================================================== */

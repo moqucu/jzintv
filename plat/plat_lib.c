@@ -2,7 +2,6 @@
  * ============================================================================
  *  Title:    Platform Portability "Library"
  *  Author:   J. Zbiciak, T. Lindner
- *  $Id: plat_lib.c,v 1.2 2002/04/17 18:32:53 im14u2c Exp $
  * ============================================================================
  *  This module fills in missing features on various platforms.
  * ============================================================================
@@ -11,12 +10,12 @@
  *  STRICMP          -- Case-insensitive string compare.
  *  SNPRINTF         -- Like sprintf(), only with bounds checking.
  *  PLAT_DELAY       -- Sleep w/ millisecond precision.
+ *  GET_EXE_DIR      -- Get the directory containing this executable
  * ============================================================================
  */
 
- 
 #include "config.h"
-#include "sdl.h"
+#include "plat/plat_lib_config.h"
 
 #ifdef USE_TERMIO
 # include <termio.h>
@@ -33,7 +32,20 @@
 /* ------------------------------------------------------------------------ */
 /*  GET_TIME -- Return current time in seconds as a double.                 */
 /* ------------------------------------------------------------------------ */
-#ifndef NO_GETTIMEOFDAY
+#if GET_TIME_STRATEGY == GTS_CLOCK_GETTIME
+double get_time(void)
+{
+    struct timespec now;
+    double seconds;
+
+    clock_gettime(CLOCK_MONOTONIC, &now);
+
+    seconds = (double)now.tv_sec + (double)now.tv_nsec * 1e-9;
+    return seconds;
+}
+#endif
+
+#if GET_TIME_STRATEGY == GTS_GETTIMEOFDAY
 double get_time(void)
 {
     struct timeval now;
@@ -45,16 +57,19 @@ double get_time(void)
 
     return seconds;
 }
-#else
+#endif
 
-# if defined(WIN32) && !defined(NO_QUERY_PERF_COUNTER)
-
-#  define WIN32_LEAN_AND_MEAN
-#  include <windows.h>
-#  include <math.h>
-
+#if GET_TIME_STRATEGY == GTS_WIN_PERF_COUNTERS
+#  ifndef WIN_HEADERS_INCLUDED
+#     define WIN_HEADERS_INCLUDED
+#     define WIN32_LEAN_AND_MEAN
+#     include <windows.h>
+#     include <math.h>
+#  endif
 
 LOCAL double perf_rate = -1;
+
+extern double win32_get_time_fallback(void);
 
 double get_time(void)
 {
@@ -79,201 +94,86 @@ double get_time(void)
         return seconds;
     }
 
-    return SDL_GetTicks() / 1000.0;
+    return win32_get_time_fallback();
 }
-# else
+#endif
 
-# if defined(WII)
+#if GET_TIME_STRATEGY == GTS_WII
 double get_time(void)
 {
     extern double wii_get_time();
 
     return wii_get_time();
 }
+#endif
 
-#  else
-double get_time(void)
-{
-    return SDL_GetTicks() / 1000.0;
-}
+/* ------------------------------------------------------------------------ */
+/*  PLAT_DELAY        -- Sleep w/ millisecond precision.                    */
+/*  PLAT_DELAY_NO_SDL -- Sleep w/ millisecond precision.                    */
+/* ------------------------------------------------------------------------ */
+#if PLAT_DELAY_STRATEGY_NO_SDL == PDS_WIN_WAIT_TIMER
+#  ifndef WIN_HEADERS_INCLUDED
+#     define WIN_HEADERS_INCLUDED
+#     define WIN32_LEAN_AND_MEAN
+#     include <windows.h>
+#     include <math.h>
 #  endif
-# endif
-#endif
-
-
-/* ------------------------------------------------------------------------ */
-/*  STRDUP           -- Copy a string into freshly malloc'd storage.        */
-/*                                                                          */
-/*  Unfortunately, strdup() is not specified by ANSI.  *sigh*               */
-/* ------------------------------------------------------------------------ */
-#ifdef NO_STRDUP
-
-char * strdup(const char *s)
+void plat_delay_no_sdl(unsigned msec)
 {
-    size_t len = strlen(s) + 1;
-    char *new_str = malloc(len);
+    HANDLE timer; 
+    LARGE_INTEGER ft; 
 
-    if (new_str) strcpy(new_str, s);
+    /* Windows wants 100ns intervals */
+    /* Also, -ve to specify _relative_ time */
+    ft.QuadPart = -(10000ll*msec); 
 
-    return new_str;
-}
-
-#endif /* NO_STRDUP */
-
-/* ------------------------------------------------------------------------ */
-/*  STRICMP          -- Case-insensitive strcmp.                            */
-/* ------------------------------------------------------------------------ */
-#ifdef NO_STRICMP
-int stricmp(const char *s1, const char *s2)
-{
-    while (*s1 && *s2 && tolower(*s1) == tolower(*s2))
-    {
-        s1++;
-        s2++;
-    }
-    return *s1 == *s2 ? 0 : (*s1 <  *s2 ? -1 : 1);
+    timer = CreateWaitableTimer(NULL, TRUE, NULL); 
+    SetWaitableTimer(timer, &ft, 0, NULL, NULL, 0); 
+    WaitForSingleObject(timer, INFINITE); 
+    CloseHandle(timer); 
 }
 #endif
 
-/* ------------------------------------------------------------------------ */
-/*  SNPRINTF         -- Like sprintf(), only with bounds checking.          */
-/* ------------------------------------------------------------------------ */
-/*  WARNING:  THIS COULD CAUSE BUFFER OVERFLOW PROBLEMS AND IS MERELY       */
-/*            A SHIM WHICH IS BEING USED TO GET jzIntv TO COMPILE.          */
-/* ------------------------------------------------------------------------ */
-#ifdef NO_SNPRINTF
-# include <stdarg.h>
-
-/* ------------------------------------------------------------------------ */
-/*  WARNING:  THIS COULD CAUSE BUFFER OVERFLOW PROBLEMS AND IS MERELY       */
-/*            A SHIM WHICH IS BEING USED TO GET jzIntv TO COMPILE.          */
-/* ------------------------------------------------------------------------ */
-void snprintf(char * buf, int len, const char * fmt, ...)
+#if PLAT_DELAY_STRATEGY_NO_SDL == PDS_NANOSLEEP
+void plat_delay_no_sdl(unsigned delay)
 {
-    va_list ap;
-    va_start(ap, fmt);
-    vsprintf(buf, fmt, ap);
-    UNUSED(len);
+    struct timespec ts;
+    ts.tv_sec = delay / 1000;
+    ts.tv_nsec = (delay % 1000) * 1000000;
+    nanosleep(&ts, NULL);
 }
-#endif /* NO_SNPRINTF */
+#endif
 
-/* ------------------------------------------------------------------------ */
-/*  PLAT_DELAY       -- Sleep w/ millisecond precision.                     */
-/* ------------------------------------------------------------------------ */
-#if defined(NO_SDL_DELAY) && !defined(macintosh)
-void plat_delay(unsigned delay)
+#if PLAT_DELAY_STRATEGY_NO_SDL == PDS_USLEEP
+void plat_delay_no_sdl(unsigned delay)
 {
-    double now, soon = get_time() + ((double)delay / 1000.0);
-    
+    usleep(delay * 1000);
+}
+#endif
+
+#if PLAT_DELAY_STRATEGY_NO_SDL == PDS_BUSY_LOOP
+void plat_delay_no_sdl(unsigned delay)
+{
+    double soon = get_time() + ((double)delay / 1000.0);
+
     /* -------------------------------------------------------------------- */
     /*  BAD BAD BAD: Sit in a busy loop until time expires.                 */
     /* -------------------------------------------------------------------- */
     while (get_time() < soon)
         ;
-    
+
     return;
-}
-#endif /* NO_SDL_DELAY */
-#if !defined(NO_SDL_DELAY) && !defined(macintosh)
-void plat_delay(unsigned delay)
-{
-    SDL_Delay(delay);
 }
 #endif
 
-
-/* ======================================================================== */
-/*  Portable random number generator, from Knuth vol 2.                     */
-/*  J. Zbiciak, 1998                                                        */
-/*                                                                          */
-/*  This code is provided without any waranty of fitness for any            */
-/*  purpose.  Caveat emptor.  Your mileage may vary.  Void where            */
-/*  prohibited or taxed by law.  Not part of this nutritious breakfast.     */
-/* ======================================================================== */
-
-LOCAL unsigned __rand_buf[128], __rand_ptr = 0;
-
-/* ======================================================================== */
-/*  RAND_JZ      -- Return a random integer in the range  [0, 2^32)         */
-/* ======================================================================== */
-uint_32 rand_jz(void)
+#if PLAT_DELAY_STRATEGY != PDS_MACINTOSH \
+   && PLAT_DELAY_STRATEGY != PDS_SDL_DELAY
+void plat_delay(unsigned delay)
 {
-    uint_32 p, p1, p2;
-
-    /* -------------------------------------------------------------------- */
-    /*  Lagged Fibonacci Sequence Random Number Generator.                  */
-    /*                                                                      */
-    /*  This random number generator comes from Knuth vol 2., 3rd Ed,       */
-    /*  p27-29.  The algorithm should produce a sequence whose most         */
-    /*  significant bits have a period of 2^31 * (2^127 - 1) and whose      */
-    /*  least significant bits have a period of 2^127 - 1.  Not bad.        */
-    /*  The lags of 30 and 127 come from Table 1 on p29.                    */
-    /*                                                                      */
-    /*  The final XOR that this function performs is my own invention.      */
-    /*  XOR'ing with a constant should not negatively impact the random     */
-    /*  sequence, but it may slightly obscure a poor initialization         */
-    /*  sequence.                                                           */
-    /* -------------------------------------------------------------------- */
-
-    p  = __rand_ptr++ & 127;
-    p1 = (p -  30) & 127;
-    p2 = (p - 127) & 127;
-
-    return 0x5A4A3A2A ^ (__rand_buf[p] = __rand_buf[p1] + __rand_buf[p2]);
+    plat_delay_no_sdl(delay);
 }
+#endif
 
-/* ======================================================================== */
-/*  DRAND_JZ     -- Return a random double in the range [0.0, 1.0).         */
-/* ======================================================================== */
-double drand_jz(void)
-{
-    return rand_jz() / (((double)(~0U)) + 1.0);
-}
-
-/* ======================================================================== */
-/*  SRAND_JZ     -- Seed the random number generator, setting it to a       */
-/*                  known initial state.                                    */
-/* ======================================================================== */
-void srand_jz(uint_32 seed)
-{
-    uint_32 s = seed ^ 0x2A3A4A5A;
-    int i, j;
-
-    /* -------------------------------------------------------------------- */
-    /*  This initializer uses the user-provided seed to drive a linear-     */
-    /*  feedback-shift-register (LFSR) random number generator to produce   */
-    /*  the initial random number buffer for the lagged-Fibonacci           */
-    /*  generator that rand_jz() uses.  The LFSR uses the equation          */
-    /*  x = x^-29 + x^-31, which gives a maximal LFSR sequence of 2^32 - 1  */
-    /*  values.                                                             */
-    /*                                                                      */
-    /*  The user-provided seed is salted with my favorite magic constant,   */
-    /*  0x2A3A4A5A, to provide the initial LSFR setting.  If that comes     */
-    /*  up zero, then the salt is removed, giving an initial LSFR value of  */
-    /*  0x2A3A4A5A.                                                         */
-    /*                                                                      */
-    /*  The LFSR is run for 43 iterations between buffer writes.  43 is     */
-    /*  relatively prime to 2^32 - 1, and so all 2^32 - 1 unique seeds      */
-    /*  will produce unique LFSR sequences to be written to the lagged-     */
-    /*  Fibonacci generator buffer.                                         */
-    /*                                                                      */
-    /*  The output of the LFSR is XORed with the initial seed for a         */
-    /*  touch of randomness, but I doubt that it significantly impacts      */
-    /*  its randomness.  LFSR's are already pretty good random number       */
-    /*  generators.  :-)                                                    */
-    /* -------------------------------------------------------------------- */
-
-    if (!s) 
-        s = 0x2A3A4A5A;
-
-    for (i = 0; i < 127; i++)
-    {
-        for (j = 0; j <= 42; j++)
-            s = (((s ^ (s >> 2)) >> 29) & 1) | (s << 1);
-
-        __rand_buf[i] = seed ^ s;
-    }
-}
 
 /* ======================================================================== */
 /*  Window size functions                                                   */
@@ -291,12 +191,38 @@ void srand_jz(uint_32 seed)
 /*  use the default width.                                                  */
 /* ======================================================================== */
 
+/* ------------------------------------------------------------------------ */
+/*  Outsourced implementation: Ask GNU Readline!                            */
+/* ------------------------------------------------------------------------ */
+#ifdef USE_GNU_READLINE
+# define HAVE_WIDTH_IMPL
+# include <readline/readline.h>
+
+int get_disp_width(void)
+{
+    int rows, cols;
+    rl_get_screen_size(&rows, &cols);
+    return cols;
+}
+
+int set_disp_width(int new_width)
+{
+    UNUSED(new_width);
+    return get_disp_width();
+}
+
+void init_disp_width(int width)
+{
+    UNUSED(width);
+}
+#endif
 
 /* ------------------------------------------------------------------------ */
 /*  Weakest implementation:  Just return 80 unless we're told to return     */
 /*  something else.                                                         */
 /* ------------------------------------------------------------------------ */
-#if !defined(WIN32) && !defined(CAN_TIOCGWINSZ)
+#if !defined(HAVE_WIDTH_IMPL) && !defined(WIN32) && !defined(CAN_TIOCGWINSZ)
+# define HAVE_WIDTH_IMPL
 LOCAL int disp_width = -1;
 
 int get_disp_width(void)
@@ -319,17 +245,18 @@ void init_disp_width(int width)
 /* ------------------------------------------------------------------------ */
 /*  WIN32 Implementation:  Eventually use "mode con:" to change size.       */
 /* ------------------------------------------------------------------------ */
-#if defined(WIN32)
+#if !defined(HAVE_WIDTH_IMPL) && defined(WIN32)
+# define HAVE_WIDTH_IMPL
 LOCAL int disp_width = -1;
 
-LOCAL void set_width_from_mode_con(void)
+LOCAL int set_width_from_mode_con(void)
 {
     FILE *f;
     f = popen("mode con:", "r");
     if (f)
     {
         char buf[80];
-        int w;
+        int w = -1;
 
         while (fgets(buf, sizeof(buf), f) != NULL)
         {
@@ -338,7 +265,13 @@ LOCAL void set_width_from_mode_con(void)
         }
 
         pclose(f);
+
+        if ( w == -1 ) // couldn't find it!
+            return -1;
+        else
+            return 0;  // success
     }
+    return 0;
 }
 
 int get_disp_width(void)
@@ -356,16 +289,15 @@ int set_disp_width(int new_width)
     sprintf(buf, "mode con: cols=%d", new_width);
 
     if (system(buf) == 0)
-        set_width_from_mode_con();
+        if ( set_width_from_mode_con() < 0 ) // asking Windows didn't work?
+            disp_width = new_width;          // hack:  assume it worked.
 
     return disp_width;
 }
 
 void init_disp_width(int width)
 {
-
     disp_width = width > 0 ? width : 80;
-
 }
 
 #endif
@@ -373,7 +305,8 @@ void init_disp_width(int width)
 /* ------------------------------------------------------------------------ */
 /*  TIOCGWINSZ w/out SIGWINCH:  Always call the ioctl when asked the size.  */
 /* ------------------------------------------------------------------------ */
-#if !defined(WIN32) && defined(CAN_TIOCGWINSZ) && !defined(CAN_SIGWINCH)
+#if !defined(HAVE_WIDTH_IMPL) && defined(CAN_TIOCGWINSZ) && !defined(CAN_SIGWINCH)
+# define HAVE_WIDTH_IMPL
 LOCAL int disp_width = 80;
 
 int get_disp_width(void)
@@ -392,17 +325,18 @@ int set_disp_width(int new_width)
     return get_disp_width();
 }
 
-void init_disp_width(int new_width)
+void init_disp_width(int width)
 {
-    disp_width = new_width > 0 ? new_width : disp_width;
+    disp_width = width > 0 ? width : 80;
 }
 #endif
 
 /* ------------------------------------------------------------------------ */
 /*  TIOCGWINSZ with SIGWINCH:  Only call the ioctl if a SIGWINCH happened.  */
 /* ------------------------------------------------------------------------ */
-#if !defined(WIN32) && defined(CAN_TIOCGWINSZ) && defined(CAN_SIGWINCH)
-#include <signal.h>
+#if !defined(HAVE_WIDTH_IMPL) && defined(CAN_TIOCGWINSZ) && defined(CAN_SIGWINCH)
+# define HAVE_WIDTH_IMPL
+# include <signal.h>
 
 LOCAL volatile char need_width_ioctl = 1;
 LOCAL int           disp_width       = 80;
@@ -410,7 +344,6 @@ LOCAL int           disp_width       = 80;
 LOCAL void sigwinch_handler(int sig)
 {
     UNUSED(sig);
-    signal(SIGWINCH, sigwinch_handler);
     need_width_ioctl = 1;
 }
 
@@ -424,6 +357,7 @@ int get_disp_width(void)
         if (ioctl(0, TIOCGWINSZ, &my_win) == 0)
             disp_width = my_win.ws_col;
     }
+    signal(SIGWINCH, sigwinch_handler);
 
     return disp_width;
 }
@@ -455,10 +389,9 @@ void init_disp_width(int new_width)
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
-/*           Copyright (c) 1998-2010, Joseph Zbiciak, Tim Lindner           */
+/*           Copyright (c) 1998-2020, Joseph Zbiciak, Tim Lindner           */
 /* ======================================================================== */
-

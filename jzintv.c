@@ -2,7 +2,6 @@
  * ============================================================================
  *  Title:    MAIN
  *  Author:   J. Zbiciak
- *  $Id: jzintv.c,v 1.41 2001/11/02 02:00:02 im14u2c Exp $
  * ============================================================================
  *  Main Simulator Driver File
  * ============================================================================
@@ -12,49 +11,44 @@
 
 #include "config.h"
 
-#ifndef macintosh
-#ifndef USE_AS_BACKEND
-#include "sdl.h"
-#endif
-#endif
-
 #include <signal.h>
 #include "plat/plat.h"
+#include "lzoe/lzoe.h"
 #include "file/file.h"
 #include "periph/periph.h"
 #include "cp1600/cp1600.h"
 #include "mem/mem.h"
+#include "ecs/ecs.h"
 #include "icart/icart.h"
 #include "bincfg/bincfg.h"
 #include "bincfg/legacy.h"
 #include "pads/pads.h"
 #include "pads/pads_cgc.h"
 #include "pads/pads_intv2pc.h"
+#include "avi/avi.h"
 #include "gfx/gfx.h"
+#include "gfx/palette.h"
 #include "snd/snd.h"
 #include "ay8910/ay8910.h"
 #include "demo/demo.h"
 #include "stic/stic.h"
 #include "speed/speed.h"
 #include "debug/debug_.h"
+#include "debug/debug_if.h"
 #include "event/event.h"
 #include "ivoice/ivoice.h"
 #include "jlp/jlp.h"
+#include "locutus/locutus_adapt.h"
+#include "cheat/cheat.h"
 #include "cfg/mapping.h"
 #include "cfg/cfg.h"
 
-#ifdef macintosh
-# include "console.h"
-#endif
-
 cfg_t intv;
 
-double elapsed(int);
-
-/*volatile int please_die = 0;*/
-/*volatile int reset = 0;*/
-
-/*static void usage(void);*/
+double elapsed(const bool);
+void save_state(int);
+void load_dump(void);
+static void fake_osd(uint8_t*, uint32_t);
 
 /*
  * ============================================================================
@@ -78,17 +72,23 @@ static char * release(void)
  */
 static const char * cart_name(void)
 {
-    static char name_buf[64];
-    uint_16 title_addr, lo, hi, ch;
-    int year;
-    int i, ps;
-    const char *base_name; 
+    static char *name_buf = NULL;
+    static size_t name_buf_alloc = 0;
+    const size_t max_header_name_len = 64;
+    uint16_t title_addr, lo, hi, ch;
+    int year = 0;
+    int ps;
+    size_t i = 0;
+    const char *base_name;
     char *s1, *s2;
+
+    if (name_buf)
+        name_buf[0] = 0;
 
     if ((base_name = intv.cart_name) != NULL)
     {
-        year = intv.cart_year;
         i = 0;
+        year = intv.cart_year;
         goto got_name;
     }
 
@@ -98,25 +98,35 @@ static const char * cart_name(void)
     else
         base_name++;
 
+    periph_t *const intv_periph = AS_PERIPH(intv.intv);
 
-    lo = periph_peek((periph_p)intv.intv, (periph_p)intv.intv, 0x500A, ~0);
-    hi = periph_peek((periph_p)intv.intv, (periph_p)intv.intv, 0x500B, ~0);
+    lo = periph_peek(intv_periph, intv_periph, 0x500A, ~0U);
+    hi = periph_peek(intv_periph, intv_periph, 0x500B, ~0U);
 
     if ((lo | hi) & 0xFF00)
-        return base_name;
+        goto got_name;
 
     title_addr = ((hi << 8) | lo);
 
-    year = 1900 + periph_peek((periph_p)intv.intv, 
-                              (periph_p)intv.intv, title_addr, ~0);
+    year = 1900 + (int)periph_peek(intv_periph, intv_periph, title_addr, ~0U);
 
     if (year < 1977 || year > 2050)
-        return base_name;
+        goto got_name;
 
-    for (i = 0; i < 64 - 8; i++)
+    for (i = 0; i != max_header_name_len; i++)
     {
-        ch = periph_peek((periph_p)intv.intv, 
-                         (periph_p)intv.intv, title_addr + i + 1, ~0);
+        ch = periph_peek(intv_periph, intv_periph,
+                         title_addr + (uint32_t)i + 1, ~0U);
+
+
+        /* Add 9 for room for date and NUL terminator */
+        if (i + 9 >= name_buf_alloc)
+        {
+            name_buf_alloc = 2*name_buf_alloc > 256 ? 2*name_buf_alloc : 256;
+            name_buf = REALLOC(name_buf, char, name_buf_alloc);
+            if (!name_buf)
+                return NULL;
+        }
 
         name_buf[i] = ch;
 
@@ -124,8 +134,12 @@ static const char * cart_name(void)
             break;
 
         if (ch < 32 || ch > 126)
-            return base_name;
+        {
+            name_buf[i] = 0;
+            goto got_name;
+        }
     }
+    name_buf[i] = 0;
 
     ps = 1;
     i  = 0;
@@ -137,17 +151,32 @@ static const char * cart_name(void)
             if (!ps)
                 i = s2 - name_buf;
         }
+    name_buf[i] = 0;
 
 got_name:
     if (i == 0)
     {
-        strncpy(name_buf, base_name, 64-8);
-        name_buf[64-8] = 0; 
-        i = strlen(name_buf);
+        const size_t base_len = strlen(base_name);
+
+        if (base_len + 9 >= name_buf_alloc)
+        {
+            name_buf_alloc =
+                2*name_buf_alloc > base_len + 9u ? 2*name_buf_alloc 
+                                                 : base_len + 9u;
+
+            name_buf = REALLOC(name_buf, char, name_buf_alloc);
+            if (!name_buf)
+                return NULL;
+        }
+
+        strcpy(name_buf, base_name);
     }
 
-    snprintf(name_buf + i, 8, " (%4d)", year);
+    strip_bad_utf8(name_buf, name_buf);
+    i = strlen(name_buf);
 
+    if (year >= 1977 && year <= 2050)
+        snprintf(name_buf + i, 8, " (%4d)", year);
 
     return name_buf;
 }
@@ -160,10 +189,15 @@ got_name:
  */
 static void graceful_death(int x)
 {
-    if (intv.do_exit < 2)
+    if (intv.debugging && intv.debug.step_count)
+    {
+        fprintf(stderr, "Requesting debugger halt.\n");
+        intv.debug.step_count = 0;
+        return;
+    } else if (intv.do_exit < 2)
     {
         if (intv.do_exit) fprintf(stderr, "\nOUCH!\n");
-        fprintf(stderr, 
+        fprintf(stderr,
                 "\nRequesting exit:  Received signal %d.\n"
                 "(You may need to press enter if you're at a prompt.)\n", x);
     } else
@@ -180,13 +214,13 @@ static void graceful_death(int x)
  *                  started, in CP1610 clock cycles (895kHz)
  * ============================================================================
  */
-double elapsed(int restart)
+double elapsed(const bool restart)
 {
     static double start;
     static int init = 0;
     double now;
 
-    if (!init || restart) 
+    if (!init || restart)
     {
         start = get_time();
         init = 1;
@@ -194,7 +228,7 @@ double elapsed(int restart)
 
     now = get_time();
 
-    return (now - start) * 894886.25;
+    return (now - start) * (intv.pal_mode ? 1000000. : 894886.25);
 }
 
 /*
@@ -211,11 +245,11 @@ static void do_gui_mode(void)
     {
         switch (cmd)
         {
-            case '\r' : case '\n' : goto na; break; /* ignore CR, LF */
-            case 'p'  : intv.do_pause = !intv.do_pause;     break;
+            case '\r' : case '\n' : goto na;        /* ignore CR, LF */
+            case 'p'  : intv.do_pause = PAUSE_TOG;          break;
             case 'q'  : intv.do_exit  = 1;                  break;
             case 'r'  : intv.do_reset = 2;                  break;
-            default   : putchar('!');  goto bad;            break;
+            default   : putchar('!');  goto bad;
         }
 
         putchar('.');
@@ -231,16 +265,15 @@ na:     ;
  *  In the beginning, there was a main....
  * ============================================================================
  */
-#ifdef USE_AS_BACKEND
-int jzintv_entry_point(int argc, char *argv[]) 
-#else
-int main(int argc, char *argv[]) 
-#endif
-{ 
+int jzintv_entry_point(int argc, char *argv[])
+{
     int iter = 0, arg;
     double cycles = 0, rate, irate, then, now, icyc;
-    uint_32 s_cnt = 0;
-    int paused = 0;
+    double disp_time = get_time(), reset_time = disp_time, curr_time = disp_time;
+    double pause_until = disp_time;
+    bool pause_key = false, was_paused = false;
+    bool first = true;
+    uint32_t s_cnt = 0;
     char title[128];
 
     /* -------------------------------------------------------------------- */
@@ -304,7 +337,8 @@ int main(int argc, char *argv[])
 #endif
 #ifdef USE_AS_BACKEND
 	optind=0;
-#endif	
+#endif
+reload:
     cfg_init(&intv, argc, argv);
     init_disp_width(0);
     jzp_flush();
@@ -327,7 +361,7 @@ int main(int argc, char *argv[])
             perror("fopen()");
             fprintf
             (
-            stderr, 
+            stderr,
             "Warning: Unable to open \\\\.\\UserPort\\.\n"
             "         Under WinNT/2K/XP, jzIntv may be unable to use INTV2PC.\n"
             "         Win95/98/ME users can ignore this warning.\n"
@@ -337,34 +371,38 @@ int main(int argc, char *argv[])
     }
 #endif
 
-    
+
     /* -------------------------------------------------------------------- */
     /*  Set the window title.  If we recognize a standard Intellivision     */
     /*  ROM header at 0x5000, then also include the cartridge name.         */
     /* -------------------------------------------------------------------- */
     #if 1
-    snprintf(title, 128, "jzintv %.32s : %.64s", release(), cart_name());
-    title[127] = 0;
-    gfx_set_title(&intv.gfx,title);
+    {
+        const char *const r = release();
+        const char *const n = cart_name();
+        /*
+        fprintf(stderr, "r = \'%s\', len = %d\n", r, (int)strlen(r));
+        fprintf(stderr, "n = \'%s\', len = %d\n", n, (int)strlen(n));
+        */
+        snprintf(title, 128, "jzintv %.32s : %.64s", r, n);
+        title[127] = 0;
+        /*
+        fprintf(stderr, "t = \'%s\', len = %d\n", title, (int)strlen(title));
+        */
+        gfx_set_title(&intv.gfx,title);
+    }
     #endif
 
     /* -------------------------------------------------------------------- */
     /*  Run the simulator.                                                  */
     /* -------------------------------------------------------------------- */
-    if (intv.debugging)
-        debug_tk((periph_p)&(intv.debug),1);
-
     jzp_printf("Starting jzIntv...\n");
     jzp_flush();
 
-    if (intv.start_dly > 0)
-        plat_delay(intv.start_dly);
-
 restart:
 
-    iter = 1;
-    now = elapsed(1);
-    while (now == elapsed(0))    /* Burn some time. */
+    now = elapsed(/* restart = */ true);
+    while (now == elapsed(/* restart = */ false))    /* Burn some time. */
         ;
 
     icyc   = 0;
@@ -374,124 +412,132 @@ restart:
         speed_resync(&(intv.speed));
 
     if (!intv.debugging)
-        intv.debug.step_count = ~0U;
+        intv.debug.step_count = -1;
 
-    paused = 0;
+    pause_key   = false;
+    was_paused  = false;
+    curr_time   = get_time();
+    disp_time   = curr_time;
+    pause_until = curr_time;
 
-    while (intv.do_exit == 0)
+    if (first && intv.start_dly > 0)
+        pause_until += intv.start_dly / 1000.;
+
+    first = false;
+
+    while (intv.do_exit == 0 && intv.do_reload == 0)
     {
-        uint_64 max_step;
-        int do_reset = intv.do_reset;
+        uint32_t max_step;
+        uint32_t do_reset = intv.do_reset;
 
         if (intv.gui_mode)
             do_gui_mode();
+
+        if (intv.do_dump)
+        {
+			jzp_printf("\nDump requested.\n");
+            intv.do_dump = 0;
+			save_state(0);
+		}
+
+        if (intv.do_load)
+        {
+			jzp_printf("\nLoad requested.\n");
+            intv.do_load = 0;
+			load_dump();
+		}
 
         if (do_reset)
         {
             if (intv.do_reset == 2)
                 intv.do_reset = 0;
             max_step = 1000; /* arbitrary */
+            intv.gfx.scrshot |= GFX_RESET;
+            gfx_vid_enable(&(intv.gfx), 0);
+            if (s_cnt == 40)
+                gfx_set_bord(&(intv.gfx), 0);
         } else
         {
-            if (s_cnt)
+            if (s_cnt > 140)
+            {
+                break;
+            } else if (s_cnt)
             {
                 s_cnt = 0;
                 periph_reset(intv.intv);
             }
             /* This is incredibly hackish, and is an outgrowth of my
              * decoupled tick architecture.  */
-            max_step = intv.stic.next_phase - intv.stic.stic_cr.now;
-#if 1
-            if (intv.cp1600.periph.now > intv.stic.stic_cr.now)
-            {
-                uint_64 diff;
-                diff = intv.cp1600.periph.now - intv.stic.stic_cr.now;
-                if (diff < max_step)
-                    max_step -= diff;
-            } else if (intv.stic.stic_cr.now > intv.cp1600.periph.now)
-            {
-                uint_64 diff;
-                diff = intv.stic.stic_cr.now - intv.cp1600.periph.now;
-                if (diff < max_step)
-                    max_step -= diff;
-            } 
-#endif
+            if (intv.cp1600.req_q.horizon > intv.cp1600.periph.now)
+                max_step = 
+                    (uint32_t)
+                        (intv.cp1600.req_q.horizon - intv.cp1600.periph.now);
+            else
+                max_step = 5;
+            if (max_step > 20000) max_step = 20000;
             if (max_step < 5) max_step = 5;
         }
 
 #if 0
 jzp_printf("cpu.now = %-8d  stic.now = %-8d diff = %-8d step = %-8d\n", (int)intv.cp1600.periph.now, (int)intv.stic.stic_cr.now, (int)intv.cp1600.periph.now-(int)intv.stic.stic_cr.now, (int)max_step);
 #endif
-
-        if (intv.do_pause) 
-        { 
-            paused = !paused; intv.do_pause = 0; 
-            if (!paused)
-                speed_resync(&(intv.speed));
+        if (intv.gfx.req_pause && intv.do_pause == PAUSE_NOP)
+        {
+            intv.do_pause = PAUSE_2SEC;
+            intv.gfx.req_pause = false;
         }
 
-        if (intv.event.change_kbd)
+        if (intv.do_pause != PAUSE_NOP)
         {
-            if (intv.event.change_kbd == 5)
+            if (intv.do_pause == PAUSE_2SEC)
             {
-                intv.event.cur_kbd = (intv.event.cur_kbd + 1) & 3;
-            } else
-            if (intv.event.change_kbd == 6)
-            {
-                intv.event.cur_kbd = (intv.event.cur_kbd - 1) & 3;
-            } else
-            if (intv.event.change_kbd == 7)
-            {
-                if (intv.event.prv_kbd)
-                {
-                    intv.event.cur_kbd = intv.event.prv_kbd - 1;
-                    intv.event.prv_kbd = 0;
-                }
-            } else
-            if (intv.event.change_kbd >= 8 && intv.event.change_kbd < 12)
-            {
-                intv.event.prv_kbd = intv.event.cur_kbd + 1;
-                intv.event.cur_kbd = (intv.event.change_kbd - 8) & 3;
+                pause_until = curr_time + 2.0;
             } else
             {
-                intv.event.cur_kbd = (intv.event.change_kbd - 1) & 3;
+                pause_key = intv.do_pause == PAUSE_TOG ? !pause_key
+                          : intv.do_pause == PAUSE_OFF ? false : true;
             }
 
-            jzp_clear_and_eol(
-                jzp_printf("Change keyboard to %d", intv.event.cur_kbd));
-            jzp_flush();
-            intv.event.change_kbd = 0;
-            memset(intv.pad0.l, 0, sizeof(intv.pad0.l));
-            memset(intv.pad0.r, 0, sizeof(intv.pad0.r));
-            memset(intv.pad0.k, 0, sizeof(intv.pad0.k));
-            memset(intv.pad1.l, 0, sizeof(intv.pad1.l));
-            memset(intv.pad1.r, 0, sizeof(intv.pad1.r));
-            memset(intv.pad1.k, 0, sizeof(intv.pad1.k));
+            intv.do_pause = PAUSE_NOP;
         }
 
+        bool paused = pause_key || pause_until > curr_time;
 
-        if (paused)
+        if (was_paused && !paused)
+            speed_resync(&(intv.speed));
+
+        was_paused = paused;
+
+        if (intv.chg_evt_map)
+        {
+            event_change_active_map(&intv.event,
+                                    (ev_map_change_req)intv.chg_evt_map);
+            pad_reset_inputs(&intv.pad0);
+            pad_reset_inputs(&intv.pad1);
+            intv.chg_evt_map = 0;
+        }
+
+        if (paused || do_reset)
         {
             intv.gfx.dirty = 1;
-            intv.gfx.periph.tick  ((periph_p)&(intv.gfx),   20000);
-            intv.event.periph.tick((periph_p)&(intv.event), 0);
-            plat_delay(1000/60);
-        } else if (do_reset)
-        {
-            intv.gfx.dirty = 1;
-            intv.gfx.periph.tick  ((periph_p)&(intv.gfx),   20000);
-            intv.event.periph.tick((periph_p)&(intv.event), 20000);
-            plat_delay(1000/60);
-            cycles += 20000;
+            gfx_refresh(&intv.gfx);
+            snd_play_silence(&(intv.snd));
+            intv.event.periph.tick(AS_PERIPH(&intv.event), 0);
+            plat_delay(1000/240);
         } else
-            cycles += periph_tick((periph_p)(intv.intv), max_step);
+        {
+            intv.gfx.scrshot &= ~GFX_RESET;
+            cycles += periph_tick(AS_PERIPH(intv.intv), max_step);
+        }
 
         if (!intv.debugging && intv.debug.step_count == 0)
-            intv.debug.step_count = ~0U;
+            intv.debug.step_count = -1;
 
-        if (!intv.debugging && !do_reset && (iter++&1023) == 0)
+        curr_time = get_time();
+
+        if (!intv.debugging && !do_reset && (curr_time > disp_time + 1.0))
         {
-
+            disp_time = curr_time;
             then  = now;
             now   = elapsed(0);
             rate  = (cycles / now);
@@ -501,16 +547,16 @@ jzp_printf("cpu.now = %-8d  stic.now = %-8d diff = %-8d step = %-8d\n", (int)int
                 icyc  = cycles;
 
                 jzp_printf("Rate: [%6.2f%% %6.2f%%]  Drop Gfx:[%6.2f%% %6d] "
-                       "Snd:[%6.2f%% %2d %6.3f]\r", 
+                       "Snd:[%6.2f%% %2d %6.3f]\r",
                         rate * 100., irate * 100.,
-                        100. * intv.gfx.tot_dropped_frames / intv.gfx.tot_frames, 
+                        100. * intv.gfx.tot_dropped_frames / intv.gfx.tot_frames,
                         (int)intv.gfx.tot_dropped_frames,
-                        100. * intv.snd.mixbuf.tot_drop / intv.snd.tot_frame, 
+                        100. * intv.snd.mixbuf.tot_drop / intv.snd.tot_frame,
                         (int)intv.snd.mixbuf.tot_drop,
                         (double)intv.snd.tot_dirty / intv.snd.tot_frame);
 
 #if 0
-                jzp_printf("speed: min=%-8d max=%-8d thresh=%-8.1f frame=%-8d\n", 
+                jzp_printf("speed: min=%-8d max=%-8d thresh=%-8.1f frame=%-8d\n",
                         intv.speed.periph.min_tick,
                         intv.speed.periph.max_tick,
                         intv.speed.threshold * 1e6,
@@ -519,8 +565,9 @@ jzp_printf("cpu.now = %-8d  stic.now = %-8d diff = %-8d step = %-8d\n", (int)int
                 jzp_flush();
             }
 
-            if ((iter&65535) == 1)
+            if (curr_time > (reset_time + 60.0))
             {
+                reset_time = curr_time;
                 then = elapsed(1);
                 cycles = icyc = 0;
             }
@@ -531,30 +578,31 @@ jzp_printf("cpu.now = %-8d  stic.now = %-8d diff = %-8d step = %-8d\n", (int)int
             intv.cp1600.r[7] = 0x1000;
             gfx_vid_enable(&(intv.gfx), 0);
             s_cnt++;
-        } else 
-        {
-            if (s_cnt > 140) break;
-            s_cnt = 0;
+            debug_fault_detected = DEBUG_NO_FAULT;
         }
+
+        if (debug_fault_detected && !intv.debugging && plat_is_batch_mode())
+            intv.do_exit = -1;
     }
 
-    s_cnt = 0x2A3A4A5A;
+    uint64_t seed = 0x2A3A4A5A;
 
     arg = 0;
     gfx_set_bord  (&(intv.gfx), 0);
     gfx_vid_enable(&(intv.gfx), 1);
     intv.gfx.scrshot |= GFX_RESET;
+    iter = 0;
 
-    while (intv.do_exit == 0)
+    while (intv.do_exit == 0 && intv.do_reload == 0)
     {
         int i, j;
-        uint_8 p;
+        uint8_t p;
 
         if (intv.gui_mode)
             do_gui_mode();
 
         if (intv.do_reset) arg = 1;
-        if (intv.do_reset != 1 && arg) 
+        if ((intv.do_reset == 0 && arg) || intv.do_reset == 2)
         {
             intv.do_reset = 0;
 
@@ -562,35 +610,54 @@ jzp_printf("cpu.now = %-8d  stic.now = %-8d diff = %-8d step = %-8d\n", (int)int
             for (i = 0; i < 160 * 200; i++)
                 intv.stic.disp[i] = p;
 
-            gfx_set_bord  (&(intv.gfx), p);
+            gfx_set_bord(&(intv.gfx), p);
             intv.gfx.scrshot &= ~GFX_RESET;
+            periph_reset(intv.intv);
             goto restart;
         }
-        
+
+        int fade = iter < 60 ? (60 - iter) / 4 : 0;
         for (i = 0; i < 160 * 200; i++)
         {
-            for (j = 0; j < 16; j++)
-                s_cnt = (s_cnt << 1) | (1 & ((s_cnt >> 28) ^ (s_cnt >> 30)));
+            for (j = 0; j < 4; j++)
+                seed = (seed >> 1) ^ (seed & 1 ? 0xD800000000000000u : 0);
 
-
-            p = (s_cnt & 0xF) + 16;
-            if (p == 16) p = 0;
+            p = (seed & 0xF) + 17 + fade;
+            if (p > 31) p = 31;
 
             intv.stic.disp[i] = p;
         }
+        if (iter < 100)
+        {
+            snd_play_static(&intv.snd);
+            iter++;
+        } else
+        {
+            snd_play_silence(&(intv.snd));
+            fake_osd(intv.stic.disp, (uint32_t)seed);
+        }
 
         intv.gfx.dirty = 1;
-        intv.gfx.periph.tick  ((periph_p)&(intv.gfx),   0);
-        intv.event.periph.tick((periph_p)&(intv.event), 0);
+        gfx_refresh(&intv.gfx);
+        intv.event.periph.tick(AS_PERIPH(&intv.event), 0);
         plat_delay(1000/60);
     }
 
     if (intv.do_exit)
-        jzp_printf("\nExited on user request.\n");
+        jzp_printf(
+            intv.do_exit > 0 ? "\nExited on user request.\n"
+                             : "\nExited because game crashed.\n");
+
+    if (intv.do_reload)
+    {
+        intv.do_reload = 0;
+        jzp_printf("\nAttempting reload.\n");
+        cfg_dtor(&intv);
+        goto reload;
+    }
 
     cfg_dtor(&intv);
-
-    return 0;
+    return intv.do_exit > 0 ? 0 : 1;
 }
 
 
@@ -606,21 +673,21 @@ jzp_printf("cpu.now = %-8d  stic.now = %-8d diff = %-8d step = %-8d\n", (int)int
 void dump_state(void)
 {
     FILE *f;
-    int addr, data, i, j;
+    uint32_t i, j, addr, data;
 
     f = fopen("dump.mem","wb");
-    if (!f) 
-    { 
+    if (!f)
+    {
         perror("fopen(\"dump.mem\", \"w\")");
-        jzp_printf("couldn't open dump.mem, not dumping memory.\n"); 
+        jzp_printf("couldn't open dump.mem, not dumping memory.\n");
     }
     else
     {
         intv.debug.show_rd = 0;
         intv.debug.show_wr = 0;
         for (addr = 0; addr <= 0xFFFF; addr++)
-        {   
-            data = periph_peek((periph_p)intv.intv, (periph_p)intv.intv,
+        {
+            data = periph_peek(AS_PERIPH(intv.intv), AS_PERIPH(intv.intv),
                                addr, 0);
             fputc((data >> 8) & 0xFF, f);
             fputc((data     ) & 0xFF, f);
@@ -630,26 +697,26 @@ void dump_state(void)
     }
 
     f = fopen("dump.cpu", "wb");
-    if (!f) 
-    { 
+    if (!f)
+    {
         perror("fopen(\"dump.cpu\", \"w\")");
-        jzp_printf("couldn't open dump.cpu, not dumping cpu info.\n"); return; 
+        jzp_printf("couldn't open dump.cpu, not dumping cpu info.\n"); return;
     }
 
     fprintf(f, "CP-1600 State Dump\n");
-    fprintf(f, "Tot Cycles:   %lld\n", intv.cp1600.tot_cycle);
-    fprintf(f, "Tot Instrs:   %lld\n", intv.cp1600.tot_instr);
-    fprintf(f, "Tot Cache:    %d\n", intv.cp1600.tot_cache);
-    fprintf(f, "Tot NonCache: %d\n", intv.cp1600.tot_noncache);
+    fprintf(f, "Tot Cycles:   %" U64_FMT "\n", intv.cp1600.tot_cycle);
+    fprintf(f, "Tot Instrs:   %" U64_FMT "\n", intv.cp1600.tot_instr);
+    fprintf(f, "Tot Cache:    %" U64_FMT "\n", intv.cp1600.tot_cache);
+    fprintf(f, "Tot NonCache: %" U64_FMT "\n", intv.cp1600.tot_noncache);
     fprintf(f, "Registers:    %.4x %.4x %.4x %.4x %.4x %.4x %.4x %.4x\n",
-            intv.cp1600.r[0], intv.cp1600.r[1], 
+            intv.cp1600.r[0], intv.cp1600.r[1],
             intv.cp1600.r[2], intv.cp1600.r[3],
-            intv.cp1600.r[4], intv.cp1600.r[5], 
+            intv.cp1600.r[4], intv.cp1600.r[5],
             intv.cp1600.r[6], intv.cp1600.r[7]);
     fprintf(f, "Flags:        S:%d C:%d O:%d Z:%d I:%d D:%d intr:%d irq:%d\n",
-            intv.cp1600.S, intv.cp1600.C, intv.cp1600.O, intv.cp1600.Z, 
+            intv.cp1600.S, intv.cp1600.C, intv.cp1600.O, intv.cp1600.Z,
             intv.cp1600.I, intv.cp1600.D,
-            intv.cp1600.intr, intv.cp1600.req_bus.intrq);
+            intv.cp1600.intr, intv.cp1600.req_ack_state);
 
     fprintf(f, "Cacheability Map:\n");
 
@@ -675,7 +742,7 @@ void dump_state(void)
         fprintf(f, "   %.4x-%.4x:", addr, addr + 63);
         for (j = 0; j < 64; j++)
         {
-            fprintf(f, "%c", 
+            fprintf(f, "%c",
                     intv.cp1600.execute[addr + j] == fn_decode_1st ? '-' :
                     intv.cp1600.execute[addr + j] == fn_decode     ? 'N' :
                     intv.cp1600.execute[addr + j] == fn_invalid    ? '!' :
@@ -685,6 +752,734 @@ void dump_state(void)
     }
 
     fclose(f);
+}
+
+/*
+ * ============================================================================
+ *  SAVE_STATE
+ * ============================================================================
+ */
+
+void save_state(int altname)
+{
+#if 1
+    UNUSED(altname);
+    jzp_printf("Loading and saving dumps currently disabled.\n");
+#else
+    FILE *f;
+    int addr, i, k;
+	unsigned short data;
+
+	if (altname) {
+		f = fopen("dump_check.sav","wb");
+	} else {
+		f = fopen("dump.sav","wb");
+	}
+    if (!f)
+    {
+        perror("fopen(\"dump.sav\", \"w\")");
+        jzp_printf("couldn't open dump.sav.\n");
+
+		return;
+    }
+
+    char phase[7];
+    memcpy(phase, "phase_1", sizeof(phase));
+	fwrite(phase, sizeof(phase), 1, f);
+
+    fwrite(&intv.cp1600.periph.addr_base, sizeof(intv.cp1600.periph.addr_base), 1, f);
+    fwrite(&intv.cp1600.periph.addr_mask, sizeof(intv.cp1600.periph.addr_mask), 1, f);
+    fwrite(&intv.cp1600.periph.now, sizeof(intv.cp1600.periph.now), 1, f);
+    fwrite(&intv.cp1600.periph.min_tick, sizeof(intv.cp1600.periph.min_tick), 1, f);
+    fwrite(&intv.cp1600.periph.max_tick, sizeof(intv.cp1600.periph.max_tick), 1, f);
+    fwrite(&intv.cp1600.periph.next_tick, sizeof(intv.cp1600.periph.next_tick), 1, f);
+
+    fwrite(&intv.cp1600.snoop.addr_base, sizeof(intv.cp1600.snoop.addr_base), 1, f);
+    fwrite(&intv.cp1600.snoop.addr_mask, sizeof(intv.cp1600.snoop.addr_mask), 1, f);
+    fwrite(&intv.cp1600.snoop.now, sizeof(intv.cp1600.snoop.now), 1, f);
+    fwrite(&intv.cp1600.snoop.min_tick, sizeof(intv.cp1600.snoop.min_tick), 1, f);
+    fwrite(&intv.cp1600.snoop.max_tick, sizeof(intv.cp1600.snoop.max_tick), 1, f);
+    fwrite(&intv.cp1600.snoop.next_tick, sizeof(intv.cp1600.snoop.next_tick), 1, f);
+
+    fwrite(&intv.cp1600.tot_cycle, sizeof(intv.cp1600.tot_cycle), 1, f);
+    fwrite(&intv.cp1600.tot_instr, sizeof(intv.cp1600.tot_instr), 1, f);
+    fwrite(&intv.cp1600.tot_cache, sizeof(intv.cp1600.tot_cache), 1, f);
+    fwrite(&intv.cp1600.tot_noncache, sizeof(intv.cp1600.tot_noncache), 1, f);
+
+    for (i = 0; i <= 7; i++)
+    {
+        fwrite(&intv.cp1600.r[i], sizeof(intv.cp1600.r[i]), 1, f);
+    }
+
+    fwrite(&intv.cp1600.S, sizeof(intv.cp1600.S), 1, f);
+    fwrite(&intv.cp1600.C, sizeof(intv.cp1600.C), 1, f);
+    fwrite(&intv.cp1600.O, sizeof(intv.cp1600.O), 1, f);
+    fwrite(&intv.cp1600.Z, sizeof(intv.cp1600.Z), 1, f);
+    fwrite(&intv.cp1600.I, sizeof(intv.cp1600.I), 1, f);
+    fwrite(&intv.cp1600.D, sizeof(intv.cp1600.D), 1, f);
+
+    fwrite(&intv.cp1600.intr, sizeof(intv.cp1600.intr), 1, f);
+
+//  fwrite(&intv.cp1600.req_bus.intrq, sizeof(intv.cp1600.req_bus.intrq), 1, f);
+
+    memcpy(phase, "phase_2", sizeof(phase));
+	fwrite(phase, sizeof(phase), 1, f);
+
+//  fwrite(&intv.cp1600.req_bus.intrq_until, sizeof(intv.cp1600.req_bus.intrq_until), 1, f);
+//  fwrite(&intv.cp1600.req_bus.busrq_until, sizeof(intv.cp1600.req_bus.busrq_until), 1, f);
+//  fwrite(&intv.cp1600.req_bus.next_intrq, sizeof(intv.cp1600.req_bus.next_intrq), 1, f);
+//  fwrite(&intv.cp1600.req_bus.next_busrq, sizeof(intv.cp1600.req_bus.next_busrq), 1, f);
+//  fwrite(&intv.cp1600.req_bus.intak, sizeof(intv.cp1600.req_bus.intak), 1, f);
+//  fwrite(&intv.cp1600.req_bus.busak, sizeof(intv.cp1600.req_bus.busak), 1, f);
+
+    memcpy(phase, "phase_3", sizeof(phase));
+	fwrite(phase, sizeof(phase), 1, f);
+
+    fwrite(&intv.cp1600.oldpc, sizeof(intv.cp1600.oldpc), 1, f);
+    fwrite(&intv.cp1600.ext, sizeof(intv.cp1600.ext), 1, f);
+    fwrite(&intv.cp1600.int_vec, sizeof(intv.cp1600.int_vec), 1, f);
+
+    memcpy(phase, "phase_4", sizeof(phase));
+	fwrite(phase, sizeof(phase), 1, f);
+
+    for (i = 0; i < 1 << (CP1600_MEMSIZE-CP1600_DECODE_PAGE - 5); i++)
+    {
+        fwrite(&intv.cp1600.cacheable[i], sizeof(intv.cp1600.cacheable[i]), 1, f);
+    }
+
+    memcpy(phase, "phase_5", sizeof(phase));
+	fwrite(phase, sizeof(phase), 1, f);
+
+//  fwrite(&intv.cp1600.instr_tick_per, sizeof(intv.cp1600.instr_tick_per), 1, f);
+
+	for (addr = 0; addr <= 0xFFFF; addr++)
+	{
+		data = periph_peek(AS_PERIPH(intv.intv), AS_PERIPH(intv.intv),
+						   addr, 0);
+        fwrite(&data, sizeof(data), 1, f);
+	}
+
+    memcpy(phase, "phase_6", sizeof(phase));
+	fwrite(phase, sizeof(phase), 1, f);
+
+    fwrite(&intv.stic.stic_cr.addr_base, sizeof(intv.stic.stic_cr.addr_base), 1, f);
+    fwrite(&intv.stic.stic_cr.addr_mask, sizeof(intv.stic.stic_cr.addr_mask), 1, f);
+    fwrite(&intv.stic.stic_cr.now, sizeof(intv.stic.stic_cr.now), 1, f);
+    fwrite(&intv.stic.stic_cr.min_tick, sizeof(intv.stic.stic_cr.min_tick), 1, f);
+    fwrite(&intv.stic.stic_cr.max_tick, sizeof(intv.stic.stic_cr.max_tick), 1, f);
+    fwrite(&intv.stic.stic_cr.next_tick, sizeof(intv.stic.stic_cr.next_tick), 1, f);
+
+    fwrite(&intv.stic.snoop_btab.addr_base, sizeof(intv.stic.snoop_btab.addr_base), 1, f);
+    fwrite(&intv.stic.snoop_btab.addr_mask, sizeof(intv.stic.snoop_btab.addr_mask), 1, f);
+    fwrite(&intv.stic.snoop_btab.now, sizeof(intv.stic.snoop_btab.now), 1, f);
+    fwrite(&intv.stic.snoop_btab.min_tick, sizeof(intv.stic.snoop_btab.min_tick), 1, f);
+    fwrite(&intv.stic.snoop_btab.max_tick, sizeof(intv.stic.snoop_btab.max_tick), 1, f);
+    fwrite(&intv.stic.snoop_btab.next_tick, sizeof(intv.stic.snoop_btab.next_tick), 1, f);
+
+    fwrite(&intv.stic.snoop_gram.addr_base, sizeof(intv.stic.snoop_gram.addr_base), 1, f);
+    fwrite(&intv.stic.snoop_gram.addr_mask, sizeof(intv.stic.snoop_gram.addr_mask), 1, f);
+    fwrite(&intv.stic.snoop_gram.now, sizeof(intv.stic.snoop_gram.now), 1, f);
+    fwrite(&intv.stic.snoop_gram.min_tick, sizeof(intv.stic.snoop_gram.min_tick), 1, f);
+    fwrite(&intv.stic.snoop_gram.max_tick, sizeof(intv.stic.snoop_gram.max_tick), 1, f);
+    fwrite(&intv.stic.snoop_gram.next_tick, sizeof(intv.stic.snoop_gram.next_tick), 1, f);
+
+//  fwrite(&intv.stic.req_bus->intrq, sizeof(intv.stic.req_bus->intrq), 1, f);
+//  fwrite(&intv.stic.req_bus->intrq_until, sizeof(intv.stic.req_bus->intrq_until), 1, f);
+//  fwrite(&intv.stic.req_bus->busrq_until, sizeof(intv.stic.req_bus->busrq_until), 1, f);
+//  fwrite(&intv.stic.req_bus->next_intrq, sizeof(intv.stic.req_bus->next_intrq), 1, f);
+//  fwrite(&intv.stic.req_bus->next_busrq, sizeof(intv.stic.req_bus->next_busrq), 1, f);
+//  fwrite(&intv.stic.req_bus->intak, sizeof(intv.stic.req_bus->intak), 1, f);
+//  fwrite(&intv.stic.req_bus->busak, sizeof(intv.stic.req_bus->busak), 1, f);
+
+//  fwrite(&intv.stic.cp_row, sizeof(intv.stic.cp_row), 1, f);
+    fwrite(&intv.stic.prev_vid_enable, sizeof(intv.stic.prev_vid_enable), 1, f);
+    fwrite(&intv.stic.vid_enable, sizeof(intv.stic.vid_enable), 1, f);
+    fwrite(&intv.stic.mode, sizeof(intv.stic.mode), 1, f);
+    fwrite(&intv.stic.p_mode, sizeof(intv.stic.p_mode), 1, f);
+    fwrite(&intv.stic.bt_dirty, sizeof(intv.stic.bt_dirty), 1, f);
+    fwrite(&intv.stic.gr_dirty, sizeof(intv.stic.gr_dirty), 1, f);
+    fwrite(&intv.stic.ob_dirty, sizeof(intv.stic.ob_dirty), 1, f);
+
+    fwrite(&intv.stic.rand_regs, sizeof(intv.stic.rand_regs), 1, f);
+    fwrite(&intv.stic.pal, sizeof(intv.stic.pal), 1, f);
+    fwrite(&intv.stic.drop_frame, sizeof(intv.stic.drop_frame), 1, f);
+    fwrite(&intv.stic.gmem_accessible, sizeof(intv.stic.gmem_accessible), 1, f);
+    fwrite(&intv.stic.stic_accessible, sizeof(intv.stic.stic_accessible), 1, f);
+//  fwrite(&intv.stic.next_irq, sizeof(intv.stic.next_irq), 1, f);
+
+    memcpy(phase, "phase_7", sizeof(phase));
+	fwrite(phase, sizeof(phase), 1, f);
+
+//  fwrite(&intv.stic.phase, sizeof(intv.stic.phase), 1, f);
+//  fwrite(&intv.stic.next_phase, sizeof(intv.stic.next_phase), 1, f);
+
+    memcpy(phase, "phase_8", sizeof(phase));
+	fwrite(phase, sizeof(phase), 1, f);
+
+    for (i=0; i<0x40; i++) {
+        fwrite(&intv.stic.raw[i], sizeof(intv.stic.raw[i]), 1, f);
+    }
+
+    for (i=0; i<0x140 * 8; i++) {
+        fwrite(&intv.stic.gmem[i], sizeof(intv.stic.gmem[i]), 1, f);
+    }
+
+//  fwrite(&intv.stic.fifo_ptr, sizeof(intv.stic.fifo_ptr), 1, f);
+
+    memcpy(phase, "phase8a", sizeof(phase));
+	fwrite(phase, sizeof(phase), 1, f);
+
+    for (i=0; i<240; i++) {
+        fwrite(&intv.stic.btab_sr[i], sizeof(intv.stic.btab_sr[i]), 1, f);
+    }
+    for (i=0; i<240; i++) {
+        fwrite(&intv.stic.btab[i], sizeof(intv.stic.btab[i]), 1, f);
+    }
+    for (i=0; i<12; i++) {
+        fwrite(&intv.stic.last_bg[i], sizeof(intv.stic.last_bg[i]), 1, f);
+    }
+    memcpy(phase, "phase8b", sizeof(phase));
+	fwrite(phase, sizeof(phase), 1, f);
+
+    fwrite(&intv.stic.time, sizeof(intv.stic.time), 1, f);
+
+    memcpy(phase, "phase8c", sizeof(phase));
+	fwrite(phase, sizeof(phase), 1, f);
+
+    for (i=0; i<240*8; i++) {
+        fwrite(&intv.stic.bt_bmp[i], sizeof(intv.stic.bt_bmp[i]), 1, f);
+    }
+    for (i=0; i<16*16  / 8; i++) {
+        fwrite(&intv.stic.mob_img[i], sizeof(intv.stic.mob_img[i]), 1, f);
+    }
+    for (i=0; i<8; i++) {
+        for (k=0; k<16; k++) {
+            fwrite(&intv.stic.mob_bmp[i][k], sizeof(intv.stic.mob_bmp[i][k]), 1, f);
+        }
+    }
+    for (i=0; i<192*224 / 8; i++) {
+        fwrite(&intv.stic.mpl_img[i], sizeof(intv.stic.mpl_img[i]), 1, f);
+    }
+    for (i=0; i<192*224 /32; i++) {
+        fwrite(&intv.stic.mpl_vsb[i], sizeof(intv.stic.mpl_vsb[i]), 1, f);
+    }
+    for (i=0; i<192*224 /32; i++) {
+        fwrite(&intv.stic.mpl_pri[i], sizeof(intv.stic.mpl_pri[i]), 1, f);
+    }
+    for (i=0; i<192*224 / 8; i++) {
+        fwrite(&intv.stic.xbt_img[i], sizeof(intv.stic.xbt_img[i]), 1, f);
+    }
+    for (i=0; i<192*224 /32; i++) {
+        fwrite(&intv.stic.xbt_bmp[i], sizeof(intv.stic.xbt_bmp[i]), 1, f);
+    }
+    for (i=0; i<192*224 / 8; i++) {
+        fwrite(&intv.stic.image[i], sizeof(intv.stic.image[i]), 1, f);
+    }
+
+    memcpy(phase, "phase8d", sizeof(phase));
+	fwrite(phase, sizeof(phase), 1, f);
+
+    for (i=0; i<8; i++) {
+        for (k=0; k<4; k++) {
+            fwrite(&intv.stic.gfx->bbox[i][k], sizeof(intv.stic.gfx->bbox[i][k]), 1, f);
+        }
+    }
+
+    fwrite(&intv.stic.gfx->dirty, sizeof(intv.stic.gfx->dirty), 1, f);
+    fwrite(&intv.stic.gfx->drop_frame, sizeof(intv.stic.gfx->drop_frame), 1, f);
+    fwrite(&intv.stic.gfx->dropped_frames, sizeof(intv.stic.gfx->dropped_frames), 1, f);
+    fwrite(&intv.stic.gfx->tot_frames, sizeof(intv.stic.gfx->tot_frames), 1, f);
+    fwrite(&intv.stic.gfx->tot_dropped_frames, sizeof(intv.stic.gfx->tot_dropped_frames), 1, f);
+
+    fwrite(&intv.stic.gfx->b_color, sizeof(intv.stic.gfx->b_color), 1, f);
+    fwrite(&intv.stic.gfx->b_dirty, sizeof(intv.stic.gfx->b_dirty), 1, f);
+    fwrite(&intv.stic.gfx->x_blank, sizeof(intv.stic.gfx->x_blank), 1, f);
+    fwrite(&intv.stic.gfx->y_blank, sizeof(intv.stic.gfx->y_blank), 1, f);
+    fwrite(&intv.stic.gfx->x_delay, sizeof(intv.stic.gfx->x_delay), 1, f);
+    fwrite(&intv.stic.gfx->y_delay, sizeof(intv.stic.gfx->y_delay), 1, f);
+    fwrite(&intv.stic.gfx->debug_blank, sizeof(intv.stic.gfx->debug_blank), 1, f);
+
+    memcpy(phase, "phase8e", sizeof(phase));
+	fwrite(phase, sizeof(phase), 1, f);
+
+    fwrite(&intv.stic.gfx->periph.addr_base, sizeof(intv.stic.gfx->periph.addr_base), 1, f);
+    fwrite(&intv.stic.gfx->periph.addr_mask, sizeof(intv.stic.gfx->periph.addr_mask), 1, f);
+    fwrite(&intv.stic.gfx->periph.now, sizeof(intv.stic.gfx->periph.now), 1, f);
+    fwrite(&intv.stic.gfx->periph.min_tick, sizeof(intv.stic.gfx->periph.min_tick), 1, f);
+    fwrite(&intv.stic.gfx->periph.max_tick, sizeof(intv.stic.gfx->periph.max_tick), 1, f);
+    fwrite(&intv.stic.gfx->periph.next_tick, sizeof(intv.stic.gfx->periph.next_tick), 1, f);
+
+    fwrite(&intv.stic.gfx->periph.next_tick, sizeof(intv.stic.gfx->periph.next_tick), 1, f);
+
+    memcpy(phase, "phase_9", sizeof(phase));
+	fwrite(phase, sizeof(phase), 1, f);
+
+#if 0
+	for (k=0; k<32; k++) {
+        fwrite(&intv.exec.banksw[k], sizeof(intv.exec.banksw[k]), 1, f);
+	}
+	for (k=0; k<32; k++) {
+        fwrite(&intv.exec2.banksw[k], sizeof(intv.exec2.banksw[k]), 1, f);
+	}
+	for (k=0; k<32; k++) {
+        fwrite(&intv.sys_ram.banksw[k], sizeof(intv.sys_ram.banksw[k]), 1, f);
+	}
+	for (k=0; k<32; k++) {
+        fwrite(&intv.sys_ram2.banksw[k], sizeof(intv.sys_ram2.banksw[k]), 1, f);
+	}
+	for (k=0; k<32; k++) {
+        fwrite(&intv.scr_ram.banksw[k], sizeof(intv.scr_ram.banksw[k]), 1, f);
+	}
+	for (k=0; k<32; k++) {
+        fwrite(&intv.glt_ram.banksw[k], sizeof(intv.glt_ram.banksw[k]), 1, f);
+	}
+	for (k=0; k<32; k++) {
+        fwrite(&intv.game0.banksw[k], sizeof(intv.game0.banksw[k]), 1, f);
+	}
+	for (k=0; k<32; k++) {
+        fwrite(&intv.game1.banksw[k], sizeof(intv.game1.banksw[k]), 1, f);
+	}
+	for (k=0; k<32; k++) {
+        fwrite(&intv.game2.banksw[k], sizeof(intv.game2.banksw[k]), 1, f);
+	}
+	for (k=0; k<32; k++) {
+        fwrite(&intv.ecs0.banksw[k], sizeof(intv.ecs0.banksw[k]), 1, f);
+	}
+	for (k=0; k<32; k++) {
+        fwrite(&intv.ecs1.banksw[k], sizeof(intv.ecs1.banksw[k]), 1, f);
+	}
+	for (k=0; k<32; k++) {
+        fwrite(&intv.ecs2.banksw[k], sizeof(intv.ecs2.banksw[k]), 1, f);
+	}
+	for (k=0; k<32; k++) {
+        fwrite(&intv.ecs_ram.banksw[k], sizeof(intv.ecs_ram.banksw[k]), 1, f);
+	}
+#endif
+
+    memcpy(phase, "phase10", sizeof(phase));
+	fwrite(phase, sizeof(phase), 1, f);
+
+	for (k=0; k<4096 + 256; k++) {
+        fwrite(&intv.exec_img[k], sizeof(intv.exec_img[k]), 1, f);
+	}
+	for (k=0; k<2048; k++) {
+        fwrite(&intv.grom_img[k], sizeof(intv.grom_img[k]), 1, f);
+	}
+	for (k=0; k<4096 * 3; k++) {
+        fwrite(&intv.ecs_img[k], sizeof(intv.ecs_img[k]), 1, f);
+	}
+
+    memcpy(phase, "phase11", sizeof(phase));
+	fwrite(phase, sizeof(phase), 1, f);
+
+    // Write periph's notion of 'now'
+    fwrite(&intv.intv->periph.now, sizeof(intv.intv->periph.now), 1, f);
+
+    fclose(f);
+#endif
+}
+
+
+/*
+ * ============================================================================
+ *  LOAD_DUMP
+ * ============================================================================
+ */
+
+void load_dump(void)
+{
+#if 1
+    jzp_printf("Loading and saving dumps currently disabled.\n");
+#else
+    FILE *f;
+    int addr, i, k;
+	unsigned short data;
+	char phase[8];
+    memset(phase, 0, sizeof(phase));
+
+    f = fopen("dump.sav","rb");
+    if (!f)
+    {
+        perror("fopen(\"dump.sav\", \"r\")");
+        jzp_printf("couldn't open dump.sav.\n");
+
+		return;
+    }
+
+	fread(phase, sizeof(phase)-1, 1, f);
+	jzp_printf("phase read: %s\n", phase);//1
+
+    fread(&intv.cp1600.periph.addr_base, sizeof(intv.cp1600.periph.addr_base), 1, f);
+    fread(&intv.cp1600.periph.addr_mask, sizeof(intv.cp1600.periph.addr_mask), 1, f);
+    fread(&intv.cp1600.periph.now, sizeof(intv.cp1600.periph.now), 1, f);
+    fread(&intv.cp1600.periph.min_tick, sizeof(intv.cp1600.periph.min_tick), 1, f);
+    fread(&intv.cp1600.periph.max_tick, sizeof(intv.cp1600.periph.max_tick), 1, f);
+    fread(&intv.cp1600.periph.next_tick, sizeof(intv.cp1600.periph.next_tick), 1, f);
+
+    fread(&intv.cp1600.snoop.addr_base, sizeof(intv.cp1600.snoop.addr_base), 1, f);
+    fread(&intv.cp1600.snoop.addr_mask, sizeof(intv.cp1600.snoop.addr_mask), 1, f);
+    fread(&intv.cp1600.snoop.now, sizeof(intv.cp1600.snoop.now), 1, f);
+    fread(&intv.cp1600.snoop.min_tick, sizeof(intv.cp1600.snoop.min_tick), 1, f);
+    fread(&intv.cp1600.snoop.max_tick, sizeof(intv.cp1600.snoop.max_tick), 1, f);
+    fread(&intv.cp1600.snoop.next_tick, sizeof(intv.cp1600.snoop.next_tick), 1, f);
+
+    fread(&intv.cp1600.tot_cycle, sizeof(intv.cp1600.tot_cycle), 1, f);
+    fread(&intv.cp1600.tot_instr, sizeof(intv.cp1600.tot_instr), 1, f);
+    fread(&intv.cp1600.tot_cache, sizeof(intv.cp1600.tot_cache), 1, f);
+    fread(&intv.cp1600.tot_noncache, sizeof(intv.cp1600.tot_noncache), 1, f);
+
+    for (i = 0; i <= 7; i++)
+    {
+        fread(&intv.cp1600.r[i], sizeof(intv.cp1600.r[i]), 1, f);
+    }
+
+    fread(&intv.cp1600.S, sizeof(intv.cp1600.S), 1, f);
+    fread(&intv.cp1600.C, sizeof(intv.cp1600.C), 1, f);
+    fread(&intv.cp1600.O, sizeof(intv.cp1600.O), 1, f);
+    fread(&intv.cp1600.Z, sizeof(intv.cp1600.Z), 1, f);
+    fread(&intv.cp1600.I, sizeof(intv.cp1600.I), 1, f);
+    fread(&intv.cp1600.D, sizeof(intv.cp1600.D), 1, f);
+
+    fread(&intv.cp1600.intr, sizeof(intv.cp1600.intr), 1, f);
+
+
+	fread(phase, sizeof(phase)-1, 1, f);
+	jzp_printf("phase read: %s\n", phase); //2
+
+//  fread(&intv.cp1600.req_bus.intrq, sizeof(intv.cp1600.req_bus.intrq), 1, f);
+//  fread(&intv.cp1600.req_bus.intrq_until, sizeof(intv.cp1600.req_bus.intrq_until), 1, f);
+//  fread(&intv.cp1600.req_bus.busrq_until, sizeof(intv.cp1600.req_bus.busrq_until), 1, f);
+//  fread(&intv.cp1600.req_bus.next_intrq, sizeof(intv.cp1600.req_bus.next_intrq), 1, f);
+//  fread(&intv.cp1600.req_bus.next_busrq, sizeof(intv.cp1600.req_bus.next_busrq), 1, f);
+//  fread(&intv.cp1600.req_bus.intak, sizeof(intv.cp1600.req_bus.intak), 1, f);
+//  fread(&intv.cp1600.req_bus.busak, sizeof(intv.cp1600.req_bus.busak), 1, f);
+
+	fread(phase, sizeof(phase)-1, 1, f);
+	jzp_printf("phase read: %s\n", phase); //3
+
+    fread(&intv.cp1600.oldpc, sizeof(intv.cp1600.oldpc), 1, f);
+    fread(&intv.cp1600.ext, sizeof(intv.cp1600.ext), 1, f);
+    fread(&intv.cp1600.int_vec, sizeof(intv.cp1600.int_vec), 1, f);
+
+	fread(phase, sizeof(phase)-1, 1, f);
+	jzp_printf("phase read: %s\n", phase); //4
+
+    for (i = 0; i < 1 << (CP1600_MEMSIZE-CP1600_DECODE_PAGE - 5); i++)
+    {
+        fread(&intv.cp1600.cacheable[i], sizeof(intv.cp1600.cacheable[i]), 1, f);
+    }
+
+	fread(phase, sizeof(phase)-1, 1, f);
+	jzp_printf("phase read: %s\n", phase); //5
+
+//  fread(&intv.cp1600.instr_tick_per, sizeof(intv.cp1600.instr_tick_per), 1, f);
+
+	for (addr = 0; addr <= 0xFFFF; addr++)
+	{
+        fread(&data, sizeof(data), 1, f);
+        if (addr > 0x40)
+        {
+            periph_write(AS_PERIPH(intv.intv), AS_PERIPH(intv.intv),
+                               addr, data);
+        }
+	}
+
+	fread(phase, sizeof(phase)-1, 1, f);
+	jzp_printf("phase read: %s\n", phase); //6
+
+    fread(&intv.stic.stic_cr.addr_base, sizeof(intv.stic.stic_cr.addr_base), 1, f);
+    fread(&intv.stic.stic_cr.addr_mask, sizeof(intv.stic.stic_cr.addr_mask), 1, f);
+    fread(&intv.stic.stic_cr.now, sizeof(intv.stic.stic_cr.now), 1, f);
+    fread(&intv.stic.stic_cr.min_tick, sizeof(intv.stic.stic_cr.min_tick), 1, f);
+    fread(&intv.stic.stic_cr.max_tick, sizeof(intv.stic.stic_cr.max_tick), 1, f);
+    fread(&intv.stic.stic_cr.next_tick, sizeof(intv.stic.stic_cr.next_tick), 1, f);
+
+    fread(&intv.stic.snoop_btab.addr_base, sizeof(intv.stic.snoop_btab.addr_base), 1, f);
+    fread(&intv.stic.snoop_btab.addr_mask, sizeof(intv.stic.snoop_btab.addr_mask), 1, f);
+    fread(&intv.stic.snoop_btab.now, sizeof(intv.stic.snoop_btab.now), 1, f);
+    fread(&intv.stic.snoop_btab.min_tick, sizeof(intv.stic.snoop_btab.min_tick), 1, f);
+    fread(&intv.stic.snoop_btab.max_tick, sizeof(intv.stic.snoop_btab.max_tick), 1, f);
+    fread(&intv.stic.snoop_btab.next_tick, sizeof(intv.stic.snoop_btab.next_tick), 1, f);
+
+    fread(&intv.stic.snoop_gram.addr_base, sizeof(intv.stic.snoop_gram.addr_base), 1, f);
+    fread(&intv.stic.snoop_gram.addr_mask, sizeof(intv.stic.snoop_gram.addr_mask), 1, f);
+    fread(&intv.stic.snoop_gram.now, sizeof(intv.stic.snoop_gram.now), 1, f);
+    fread(&intv.stic.snoop_gram.min_tick, sizeof(intv.stic.snoop_gram.min_tick), 1, f);
+    fread(&intv.stic.snoop_gram.max_tick, sizeof(intv.stic.snoop_gram.max_tick), 1, f);
+    fread(&intv.stic.snoop_gram.next_tick, sizeof(intv.stic.snoop_gram.next_tick), 1, f);
+
+//  fread(&intv.stic.req_bus->intrq, sizeof(intv.stic.req_bus->intrq), 1, f);
+//  fread(&intv.stic.req_bus->intrq_until, sizeof(intv.stic.req_bus->intrq_until), 1, f);
+//  fread(&intv.stic.req_bus->busrq_until, sizeof(intv.stic.req_bus->busrq_until), 1, f);
+//  fread(&intv.stic.req_bus->next_intrq, sizeof(intv.stic.req_bus->next_intrq), 1, f);
+//  fread(&intv.stic.req_bus->next_busrq, sizeof(intv.stic.req_bus->next_busrq), 1, f);
+//  fread(&intv.stic.req_bus->intak, sizeof(intv.stic.req_bus->intak), 1, f);
+//  fread(&intv.stic.req_bus->busak, sizeof(intv.stic.req_bus->busak), 1, f);
+
+//  fread(&intv.stic.cp_row, sizeof(intv.stic.cp_row), 1, f);
+    fread(&intv.stic.prev_vid_enable, sizeof(intv.stic.prev_vid_enable), 1, f);
+    fread(&intv.stic.vid_enable, sizeof(intv.stic.vid_enable), 1, f);
+    fread(&intv.stic.mode, sizeof(intv.stic.mode), 1, f);
+
+    fread(&intv.stic.p_mode, sizeof(intv.stic.p_mode), 1, f);
+    fread(&intv.stic.bt_dirty, sizeof(intv.stic.bt_dirty), 1, f);
+    fread(&intv.stic.gr_dirty, sizeof(intv.stic.gr_dirty), 1, f);
+    fread(&intv.stic.ob_dirty, sizeof(intv.stic.ob_dirty), 1, f);
+    fread(&intv.stic.rand_regs, sizeof(intv.stic.rand_regs), 1, f);
+
+    fread(&intv.stic.pal, sizeof(intv.stic.pal), 1, f);
+    fread(&intv.stic.drop_frame, sizeof(intv.stic.drop_frame), 1, f);
+    fread(&intv.stic.gmem_accessible, sizeof(intv.stic.gmem_accessible), 1, f);
+    fread(&intv.stic.stic_accessible, sizeof(intv.stic.stic_accessible), 1, f);
+//  fread(&intv.stic.next_irq, sizeof(intv.stic.next_irq), 1, f);
+
+	fread(phase, sizeof(phase)-1, 1, f);
+	jzp_printf("phase read: %s\n", phase); //7
+
+//  fread(&intv.stic.phase, sizeof(intv.stic.phase), 1, f);
+//  fread(&intv.stic.next_phase, sizeof(intv.stic.next_phase), 1, f);
+
+	fread(phase, sizeof(phase)-1, 1, f);
+	jzp_printf("phase read: %s\n", phase); //8
+
+    for (i=0; i<0x40; i++) {
+        fread(&intv.stic.raw[i], sizeof(intv.stic.raw[i]), 1, f);
+    }
+
+    for (i=0; i<0x140 * 8; i++) {
+        fread(&intv.stic.gmem[i], sizeof(intv.stic.gmem[i]), 1, f);
+    }
+
+//  fread(&intv.stic.fifo_ptr, sizeof(intv.stic.fifo_ptr), 1, f);
+
+	fread(phase, sizeof(phase)-1, 1, f);
+	jzp_printf("phase read: %s\n", phase); //8a
+
+    for (i=0; i<240; i++) {
+        fread(&intv.stic.btab_sr[i], sizeof(intv.stic.btab_sr[i]), 1, f);
+    }
+    for (i=0; i<240; i++) {
+        fread(&intv.stic.btab[i], sizeof(intv.stic.btab[i]), 1, f);
+    }
+    for (i=0; i<12; i++) {
+        fread(&intv.stic.last_bg[i], sizeof(intv.stic.last_bg[i]), 1, f);
+    }
+
+	fread(phase, sizeof(phase)-1, 1, f);
+	jzp_printf("phase read: %s\n", phase); //8b
+
+    fread(&intv.stic.time, sizeof(intv.stic.time), 1, f);
+
+	fread(phase, sizeof(phase)-1, 1, f);
+	jzp_printf("phase read: %s\n", phase); //8c
+
+    for (i=0; i<240*8; i++) {
+        fread(&intv.stic.bt_bmp[i], sizeof(intv.stic.bt_bmp[i]), 1, f);
+    }
+    for (i=0; i<16*16  / 8; i++) {
+        fread(&intv.stic.mob_img[i], sizeof(intv.stic.mob_img[i]), 1, f);
+    }
+    for (i=0; i<8; i++) {
+        for (k=0; k<16; k++) {
+            fread(&intv.stic.mob_bmp[i][k], sizeof(intv.stic.mob_bmp[i][k]), 1, f);
+        }
+    }
+    for (i=0; i<192*224 / 8; i++) {
+        fread(&intv.stic.mpl_img[i], sizeof(intv.stic.mpl_img[i]), 1, f);
+    }
+    for (i=0; i<192*224 /32; i++) {
+        fread(&intv.stic.mpl_vsb[i], sizeof(intv.stic.mpl_vsb[i]), 1, f);
+    }
+    for (i=0; i<192*224 /32; i++) {
+        fread(&intv.stic.mpl_pri[i], sizeof(intv.stic.mpl_pri[i]), 1, f);
+    }
+    for (i=0; i<192*224 / 8; i++) {
+        fread(&intv.stic.xbt_img[i], sizeof(intv.stic.xbt_img[i]), 1, f);
+    }
+    for (i=0; i<192*224 /32; i++) {
+        fread(&intv.stic.xbt_bmp[i], sizeof(intv.stic.xbt_bmp[i]), 1, f);
+    }
+    for (i=0; i<192*224 / 8; i++) {
+        fread(&intv.stic.image[i], sizeof(intv.stic.image[i]), 1, f);
+    }
+
+	fread(phase, sizeof(phase)-1, 1, f);
+	jzp_printf("phase read: %s\n", phase); //8d
+
+    for (i=0; i<8; i++) {
+        for (k=0; k<4; k++) {
+            fread(&intv.stic.gfx->bbox[i][k], sizeof(intv.stic.gfx->bbox[i][k]), 1, f);
+        }
+    }
+
+    fread(&intv.stic.gfx->dirty, sizeof(intv.stic.gfx->dirty), 1, f);
+    fread(&intv.stic.gfx->drop_frame, sizeof(intv.stic.gfx->drop_frame), 1, f);
+    fread(&intv.stic.gfx->dropped_frames, sizeof(intv.stic.gfx->dropped_frames), 1, f);
+    fread(&intv.stic.gfx->tot_frames, sizeof(intv.stic.gfx->tot_frames), 1, f);
+    fread(&intv.stic.gfx->tot_dropped_frames, sizeof(intv.stic.gfx->tot_dropped_frames), 1, f);
+
+    fread(&intv.stic.gfx->b_color, sizeof(intv.stic.gfx->b_color), 1, f);
+    fread(&intv.stic.gfx->b_dirty, sizeof(intv.stic.gfx->b_dirty), 1, f);
+    fread(&intv.stic.gfx->x_blank, sizeof(intv.stic.gfx->x_blank), 1, f);
+    fread(&intv.stic.gfx->y_blank, sizeof(intv.stic.gfx->y_blank), 1, f);
+    fread(&intv.stic.gfx->x_delay, sizeof(intv.stic.gfx->x_delay), 1, f);
+    fread(&intv.stic.gfx->y_delay, sizeof(intv.stic.gfx->y_delay), 1, f);
+    fread(&intv.stic.gfx->debug_blank, sizeof(intv.stic.gfx->debug_blank), 1, f);
+
+	fread(phase, sizeof(phase)-1, 1, f);
+	jzp_printf("phase read: %s\n", phase); //9
+
+    fread(&intv.stic.gfx->periph.addr_base, sizeof(intv.stic.gfx->periph.addr_base), 1, f);
+    fread(&intv.stic.gfx->periph.addr_mask, sizeof(intv.stic.gfx->periph.addr_mask), 1, f);
+    fread(&intv.stic.gfx->periph.now, sizeof(intv.stic.gfx->periph.now), 1, f);
+    fread(&intv.stic.gfx->periph.min_tick, sizeof(intv.stic.gfx->periph.min_tick), 1, f);
+    fread(&intv.stic.gfx->periph.max_tick, sizeof(intv.stic.gfx->periph.max_tick), 1, f);
+    fread(&intv.stic.gfx->periph.next_tick, sizeof(intv.stic.gfx->periph.next_tick), 1, f);
+
+    fread(&intv.stic.gfx->periph.next_tick, sizeof(intv.stic.gfx->periph.next_tick), 1, f);
+
+	fread(phase, sizeof(phase)-1, 1, f);
+	jzp_printf("phase read: %s\n", phase); //9
+
+#if 0
+	for (k=0; k<32; k++) {
+        fread(&intv.exec.banksw[k], sizeof(intv.exec.banksw[k]), 1, f);
+	}
+	for (k=0; k<32; k++) {
+        fread(&intv.exec2.banksw[k], sizeof(intv.exec2.banksw[k]), 1, f);
+	}
+	for (k=0; k<32; k++) {
+        fread(&intv.sys_ram.banksw[k], sizeof(intv.sys_ram.banksw[k]), 1, f);
+	}
+	for (k=0; k<32; k++) {
+        fread(&intv.sys_ram2.banksw[k], sizeof(intv.sys_ram2.banksw[k]), 1, f);
+	}
+	for (k=0; k<32; k++) {
+        fread(&intv.scr_ram.banksw[k], sizeof(intv.scr_ram.banksw[k]), 1, f);
+	}
+	for (k=0; k<32; k++) {
+        fread(&intv.glt_ram.banksw[k], sizeof(intv.glt_ram.banksw[k]), 1, f);
+	}
+	for (k=0; k<32; k++) {
+        fread(&intv.game0.banksw[k], sizeof(intv.game0.banksw[k]), 1, f);
+	}
+	for (k=0; k<32; k++) {
+        fread(&intv.game1.banksw[k], sizeof(intv.game1.banksw[k]), 1, f);
+	}
+	for (k=0; k<32; k++) {
+        fread(&intv.game2.banksw[k], sizeof(intv.game2.banksw[k]), 1, f);
+	}
+	for (k=0; k<32; k++) {
+        fread(&intv.ecs0.banksw[k], sizeof(intv.ecs0.banksw[k]), 1, f);
+	}
+	for (k=0; k<32; k++) {
+        fread(&intv.ecs1.banksw[k], sizeof(intv.ecs1.banksw[k]), 1, f);
+	}
+	for (k=0; k<32; k++) {
+        fread(&intv.ecs2.banksw[k], sizeof(intv.ecs2.banksw[k]), 1, f);
+	}
+	for (k=0; k<32; k++) {
+        fread(&intv.ecs_ram.banksw[k], sizeof(intv.ecs_ram.banksw[k]), 1, f);
+	}
+#endif
+
+	fread(phase, sizeof(phase)-1, 1, f);
+	jzp_printf("phase read: %s\n", phase); //10
+
+	for (k=0; k<4096 + 256; k++) {
+        fread(&intv.exec_img[k], sizeof(intv.exec_img[k]), 1, f);
+	}
+	for (k=0; k<2048; k++) {
+        fread(&intv.grom_img[k], sizeof(intv.grom_img[k]), 1, f);
+	}
+	for (k=0; k<4096 * 3; k++) {
+        fread(&intv.ecs_img[k], sizeof(intv.ecs_img[k]), 1, f);
+	}
+
+	fread(phase, sizeof(phase)-1, 1, f);
+	jzp_printf("phase read: %s\n", phase); //10
+
+
+    // Get periph's notion of 'now'
+    fread(&intv.intv->periph.now, sizeof(intv.intv->periph.now), 1, f);
+
+    fclose(f);
+
+	save_state(1);
+
+    // Force display refreshes everywhere
+    stic_resync(&(intv.stic));
+    gfx_resync(&(intv.gfx));
+
+    // Force time to resync
+    speed_resync(&(intv.speed));
+
+	jzp_printf("load ended\n");
+#endif
+}
+
+static const char *const osd_top[] =
+{
+    "  ##    #    #    ##      ##  ",
+    " ####   #    #   ####    #### ",
+    "##  ##  #    #  ##  ##  ##  ##",
+    "#    #  #    #  #    #  #    #",
+    "#       #    #  #   ##       #",
+    "#       ######  #  ###     ## ",
+    "#       ######  # ## #     ## ",
+    "#       #    #  ###  #       #",
+    "#       #    #  ##   #       #",
+    "#    #  #    #  #    #  #    #",
+    "##  ##  #    #  ##  ##  ##  ##",
+    " ####   #    #   ####    #### ",
+    "  ##    #    #    ##      ##  ",
+    0
+};
+
+static const char *const osd_bot[] =
+{
+    "#     #  #    # #######  #####",
+    "##   ##  #    # #######  #####",
+    "##   ##  #    #    #     #    ",
+    "### ###  #    #    #     #    ",
+    "# ### #  #    #    #     #    ",
+    "# ### #  #    #    #     #### ",
+    "#  #  #  #    #    #     #### ",
+    "#     #  #    #    #     #    ",
+    "#     #  #    #    #     #    ",
+    "#     #  #    #    #     #    ",
+    "#     #  ##  ##    #     #    ",
+    "#     #  ######    #     #####",
+    "#     #   ####     #     #####",
+    0
+};
+
+/* ======================================================================== */
+/*  PUT_OSD_BITS -- Just a bit of fun.                                      */
+/* ======================================================================== */
+static void put_osd_bits(uint8_t *dst, const char * const *src, int color)
+{
+    for (int i = 0; src[i]; ++i)
+        for (int j = 0; src[i][j]; ++j)
+            if (src[i][j] == '#')
+                dst[i*160 + j] = color;
+}
+
+/* ======================================================================== */
+/*  FAKE_OSD     -- Just a bit of fun.                                      */
+/* ======================================================================== */
+static void fake_osd(uint8_t *disp, uint32_t rnd)
+{
+    int ofs = 0;
+
+    if ((rnd & 0x0F) == 0)
+        ofs += (rnd & 0x20) ? -160 : +160;
+
+    if ((rnd & 0xAA8000) == 0)
+        ofs += (rnd & 0x2000000) ? -1 : 1;
+
+    put_osd_bits(disp + 16*160 + 120 + ofs, osd_top, 14);  // Yellow-Green
+    put_osd_bits(disp + 170*160 + 120 + ofs, osd_bot, 14); 
 }
 
 /* ======================================================================== */
@@ -698,9 +1493,9 @@ void dump_state(void)
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
-/*                 Copyright (c) 1998-2006, Joseph Zbiciak                  */
+/*                 Copyright (c) 1998-2020, Joseph Zbiciak                  */
 /* ======================================================================== */

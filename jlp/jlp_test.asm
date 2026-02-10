@@ -13,15 +13,20 @@
 ;*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       *;
 ;*  General Public License for more details.                                *;
 ;*                                                                          *;
-;*  You should have received a copy of the GNU General Public License       *;
-;*  along with this program; if not, write to the Free Software             *;
-;*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               *;
+;*  You should have received a copy of the GNU General Public License along *;
+;*  with this program; if not, write to the Free Software Foundation, Inc., *;
+;*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             *;
 ;* ======================================================================== *;
 ;*                   Copyright (c) 2009, Joseph Zbiciak                     *;
 ;* ======================================================================== *;
 
-
             ROMW    16              ; Use 16-bit ROM width
+            CFGVAR  "name" = "JLP Feature Test"
+            CFGVAR  "year" = 2009
+            CFGVAR  "author" = "Joe Zbiciak"
+            CFGVAR  "jlp" = 3
+            CFGVAR  "jlp_flash" = 100
+            CFGVAR  "license" = "GPLv2+"
 
 ;; ======================================================================== ;;
 ;;  Scratch Memory                                                          ;;

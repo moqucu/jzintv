@@ -6,11 +6,11 @@ DESCRIPTION: "  Reconfigurable Cross-assembler producing Intel (TM)
         Hex format object records.  ";
 SYSTEM:     UNIX, MS-Dos ;
 FILENAME:   fraosub.c;
-WARNINGS:   "This software is in the public domain.  
-        Any prior copyright claims are relinquished.  
+WARNINGS:   "This software is in the public domain.
+        Any prior copyright claims are relinquished.
 
-        This software is distributed with no warranty whatever.  
-        The author takes no responsibility for the consequences 
+        This software is distributed with no warranty whatever.
+        The author takes no responsibility for the consequences
         of its use."  ;
 SEE-ALSO:   frasmain.c;
 AUTHORS:    Mark Zenier;
@@ -24,22 +24,21 @@ AUTHORS:    Mark Zenier;
 */
 
 #include "config.h"
+#include "lzoe/lzoe.h"
 #include "file/file.h"
 #include <stdio.h>
 #include "frasmdat.h"
 #include "fragcon.h"
-#include "types.h"
+#include "as1600_types.h"
 #include "protos.h"
 #include "intermed.h"
+#include "intvec.h"
 #include "icart/icartrom.h"
-#include "icart/icartbin.h"
+#include "collect.h"
 
-#define OUTRESULTLEN 256
-#define NUMHEXPERL 16
-#define SOURCEOFFSET 24
-#define NUMHEXSOURCE 6
-
-#define INTELLEN 32
+static int source_offset    = 32;
+static int num_hex_source   = 4;
+static int num_hex_per_line = 8;
 
 extern FILE *smapf;
 extern char *srcmapfn;
@@ -55,16 +54,17 @@ static int   show_coded_lines   = TRUE;
 #define LISTMODESTK (256)
 static int listmodestk[LISTMODESTK];
 
-static unsigned char    outresult[OUTRESULTLEN];
-static unsigned short   outrs16  [OUTRESULTLEN / 2];
-static int  nextresult;
+static unsigned short *outrs16 = NULL;
+static size_t outrs16_alloc = 0;
+static size_t nextresult;
 static int  genlocctr, resultloc;
 
 static unsigned mode_set = 0, mode_clr = 0, type_flag = 0;
-static icartrom_t icart_rom;
-extern ictype_t   icart_type;
 
 static const char *oeptr;
+
+static const char *over_file = NULL;
+static int         over_line = 0;
 
 #define MAXIMPWID   24
 
@@ -111,7 +111,6 @@ static int count_nl(const char *s)
     return cnt;
 }
 
-
 static void parsemode(const char *modestr)
 {
     int action = 0;
@@ -147,9 +146,9 @@ static void parsemode(const char *modestr)
 
         switch (action)
         {
-            case '+': { set |=  bit; clr &= ~bit; break; } 
-            case '-': { set &= ~bit; clr |=  bit; break; } 
-            case '=': { set  =  bit; clr  = ~bit; break; } 
+            case '+': { set |=  bit; clr &= ~bit; break; }
+            case '-': { set &= ~bit; clr |=  bit; break; }
+            case '=': { set  =  bit; clr  = ~bit; break; }
             case 'R' : case 'W' : case 'B' : case 'N':
             case 'r' : case 'w' : case 'b' : case 'n':
                 frp2error("Mode syntax: Missing action character"); break;
@@ -164,10 +163,13 @@ static void parsemode(const char *modestr)
 
 static void markrange(int startaddr, int endaddr)
 {
-    icartrom_addseg(&icart_rom, NULL, startaddr, endaddr - startaddr, 
-                    mode_set, mode_clr);
+    const char *err;
+
+    if ((err = collect_addseg( NULL, startaddr, endaddr - startaddr + 1,
+                               currpag, mode_set, mode_clr )) != NULL)
+        frp2error(err);
 }
-        
+
 void outphase(void)
 /*
     description process all the lines in the intermediate file
@@ -217,15 +219,15 @@ void outphase(void)
 
                 switch (lm)
                 {
-                    case LIST_ON: 
+                    case LIST_ON:
                         lineLflag          = show_noncode_lines;
                         show_coded_lines   = TRUE;
                         show_noncode_lines = TRUE;  break;
-                    case LIST_CODE: 
+                    case LIST_CODE:
                         lineLflag          = FALSE;
                         show_coded_lines   = TRUE;
                         show_noncode_lines = FALSE; break;
-                    case LIST_OFF: 
+                    case LIST_OFF:
                         lineLflag          = FALSE;
                         show_coded_lines   = FALSE;
                         show_noncode_lines = FALSE; break;
@@ -256,7 +258,8 @@ void outphase(void)
                 {
                     char hbuf[12];
                     sprintf(hbuf,  "0x%X",   rec->set_equ.value);
-                    fprintf(loutf, "%-*.*s", SOURCEOFFSET, SOURCEOFFSET, hbuf);
+                    fprintf(loutf, "%-*.*s", source_offset, 
+                            source_offset, hbuf);
                     if(lineLflag)
                     {
                         fputs(lineLbuff, loutf);
@@ -276,8 +279,8 @@ void outphase(void)
             {
                 if (listflag && show_noncode_lines)
                 {
-                    fprintf(loutf,"%-*.*s", 
-                            SOURCEOFFSET, SOURCEOFFSET, rec->string.string);
+                    fprintf(loutf,"%-*.*s",
+                            source_offset, source_offset, rec->string.string);
                     if(lineLflag)
                     {
                         fputs(lineLbuff, loutf); /* already has newline */
@@ -310,6 +313,7 @@ void outphase(void)
             case REC_LOC_SET: //'P': /* location set */
             {
                 currseg   = rec->loc_set.seg;
+                currpag   = rec->loc_set.pag;
                 locctr    = rec->loc_set.loc;
                 genlocctr = rec->loc_set.loc;
                 type_flag = rec->loc_set.type;
@@ -319,7 +323,7 @@ void outphase(void)
 
             case REC_RESERVE_RANGE:  //'R': /* reserve range */
             {
-                markrange(genlocctr, rec->reserve_range.len);
+                markrange(genlocctr, rec->reserve_range.endaddr);
                 break;
             }
 
@@ -333,7 +337,7 @@ void outphase(void)
                 mode_clr = old_clr;
                 break;
             }
-        
+
             case REC_DATA_BLOCK: //'D': /* data */
             {
                 oeptr      = rec->string.string;
@@ -343,11 +347,8 @@ void outphase(void)
                 if (listflag && (show_coded_lines || show_noncode_lines))
                 {
                     listhex();
-                    if (hexflag && srcmapfn)
-                        flushlisthex();
                 }
-                if (hexflag)
-                    outhexblock();
+                outhexblock();
                 break;
             }
 
@@ -355,6 +356,44 @@ void outphase(void)
             case REC_FILE_EXIT:
             {
                 currentfnm = rec->string.string;
+                over_file  = NULL;
+                over_line  = 0;
+                break;
+            }
+
+            case REC_CFGVAR_INT:
+            {
+                collect_cfg_var(rec->cfgvar_int.var, NULL,
+                                rec->cfgvar_int.value);
+                break;
+            }
+
+            case REC_CFGVAR_STR:
+            {
+                collect_cfg_var(rec->cfgvar_str.var,
+                                rec->cfgvar_str.value, 0);
+                break;
+            }
+
+            case REC_SRCFILE_OVER:
+            {
+                over_file = rec->srcfile_over.file;
+                over_line = rec->srcfile_over.line;
+                break;
+            }
+
+            case REC_LISTING_COLUMN:
+            {
+                num_hex_source   = rec->listing_column.hex_source;
+                num_hex_per_line = rec->listing_column.hex_no_src;
+                source_offset    = rec->listing_column.source_col;
+                break;
+            }
+
+            case REC_OVERWRITE:
+            {
+                collect_set_overwrite_flags(rec->overwrite.err_if_overwritten,
+                                            rec->overwrite.force_overwrite);
                 break;
             }
 
@@ -368,8 +407,7 @@ void outphase(void)
         pass2_release_rec(rec);
     }
 
-    if(hexflag)
-        flushhex();
+    flushhex();
 
     if(listflag)
         flushlisthex();
@@ -378,9 +416,24 @@ void outphase(void)
         sm_flush();
 }
 
+static void push_outresult(const unsigned short val)
+{
+    if (nextresult >= outrs16_alloc)
+    {
+        outrs16_alloc = outrs16_alloc ? outrs16_alloc << 1 : 256;
+        outrs16 = REALLOC(outrs16, unsigned short, outrs16_alloc);
+        if (!outrs16)
+        {
+            fprintf(stderr, "Out of memory allocating result buffer\n");
+            exit(1);
+        }
+    }
+    outrs16[nextresult++] = val;
+}
+
 void outeval(void)
 /*
-    description convert the polish form character string in the 
+    description convert the polish form character string in the
             intermediate file 'D' line to binary values in the
             output result array.
     globals     the output expression pointer
@@ -406,7 +459,7 @@ void outeval(void)
         case '7':
         case '8':
         case '9':
-            etop = (etop << 4) + ((*oeptr) - '0');
+            etop = safe_shls32(etop, 4) + ((*oeptr) - '0');
             break;
 
         case 'a':
@@ -415,22 +468,28 @@ void outeval(void)
         case 'd':
         case 'e':
         case 'f':
-            etop = (etop << 4) + ((*oeptr) - 'a' + 10);
+            etop = safe_shls32(etop, 4) + ((*oeptr) - 'a' + 10);
             break;
-        
+
         case 'A':
         case 'B':
         case 'C':
         case 'D':
         case 'E':
         case 'F':
-            etop = (etop << 4) + ((*oeptr) - 'A' + 10);
+            etop = safe_shls32(etop, 4) + ((*oeptr) - 'A' + 10);
             break;
 
 #define FRAERR frp2error
 
 #include "fraeuni.h"
 #include "fraebin.h"
+        case IFC_CLASSIFY:
+            {
+                frp2warn("Unexpected IFC_CLASSIFY in stage 2");
+                etop = 0;
+                break;
+            }
         case IFC_SYMB:
             {
                 struct symel *tsy;
@@ -443,18 +502,17 @@ void outeval(void)
                 }
                 else
                 {
-                    if(tsy->seg == SSG_EQU ||
-                       tsy->seg == SSG_SET)
+                    if(tsy->seg == SSG_SET)
                     {
-                        frp2warn( "forward reference to SET/EQU symbol");
+                        frp2warn( "forward reference to SET symbol");
                     }
                     etop = tsy->value;
                 }
             }
             break;
 
-        case IFC_CURRLOC: 
-            etop = genlocctr + (offset / 2);
+        case IFC_CURRLOC:
+            etop = genlocctr + offset;
             break;
 
         case IFC_PROGCTR:
@@ -541,7 +599,7 @@ void outeval(void)
             {
                 unsigned sign_check = estkm1p->v & 0xFFFF8000;
 
-                if (!(etop == 16 && 
+                if (!(etop == 16 &&
                       (sign_check == 0xFFFF8000 || !sign_check)) &&
                      (estkm1p->v < 0 ||
                       estkm1p->v > widthmask[etop]))
@@ -557,13 +615,12 @@ void outeval(void)
             break;
 
         case IFC_EMU8:
-            if( etop >= -128 && etop <= 255)
+            if (etop >= -128 && etop <= 255 )
             {
-                outresult[nextresult++] = etop & 0xff;
-            }
-            else
+                push_outresult(etop & 0xFF);
+            } else
             {
-                outresult[nextresult++] = 0;
+                push_outresult(0);
                 frp2error("expression exceeds available field width");
             }
             offset++;
@@ -571,13 +628,12 @@ void outeval(void)
             break;
 
         case IFC_EMS7:
-            if(etop >= -128 && etop <= 127)
+            if (etop >= -128 && etop <= 127 )
             {
-                outresult[nextresult++] = etop & 0xff;
-            }
-            else
+                push_outresult((etop & 0x7F) | (etop & 0x80 ? -0x80 : 0));
+            } else
             {
-                outresult[nextresult++] = 0;
+                push_outresult(0);
                 frp2error("expression exceeds available field width");
             }
             offset++;
@@ -587,32 +643,28 @@ void outeval(void)
         case IFC_EM16:
             if(etop >= -32768L && etop <= 65535L)
             {
-                outresult[nextresult++] = (etop >> 8) & 0xff;
-                outresult[nextresult++] = etop & 0xff;
+                push_outresult(etop);
             }
             else
             {
-                outresult[nextresult++] = 0;
-                outresult[nextresult++] = 0;
+                push_outresult(0);
                 frp2error("expression exceeds available field width");
             }
-            offset += 2;
+            offset++;
             etop = 0;
             break;
 
         case IFC_EMBR16:
             if(etop >= -32768L && etop <= 65535L)
             {
-                outresult[nextresult++] = etop & 0xff;
-                outresult[nextresult++] = (etop >> 8) & 0xff;
+                push_outresult((0x00FF & (etop >> 8)) | (0xFF00 & (etop << 8)));
             }
             else
             {
-                outresult[nextresult++] = 0;
-                outresult[nextresult++] = 0;
+                push_outresult(0);
                 frp2error("expression exceeds available field width");
             }
-            offset += 2;
+            offset++;
             etop = 0;
             break;
 
@@ -622,12 +674,13 @@ void outeval(void)
         oeptr++;
     }
 
-    genlocctr += offset / 2;
+    genlocctr += offset;
 }
 
 static int lhaddr, lhnextaddr;
 static int lhnew, lhnext = 0;
-static unsigned char listbuffhex[NUMHEXPERL];
+static int listbuffhex_size = 0;
+static unsigned short *listbuffhex = NULL;
 
 void flushlisthex(void)
 /*
@@ -642,32 +695,42 @@ void flushlisthex(void)
 
 void listhex(void)
 /*
-    description buffer the output result to block the hexidecimal 
+    description buffer the output result to block the hexadecimal
             listing on the output file to NUMHEXPERL bytes per
             listing line.
     globals     The output result array and count
             the hex line buffer and counts
 */
 {
-    register int cht;
+    register size_t cht;
     register int inhaddr = resultloc;
 
-    if(lhnew)
+    if (lhnew)
     {
         lhaddr = lhnextaddr = resultloc;
         lhnew = FALSE;
     }
 
-    for(cht = 0; cht < nextresult; cht += 2)
+    for (cht = 0; cht != nextresult; cht++)
     {
-        if(lhnextaddr != inhaddr 
-         || lhnext >= (lineLflag ? NUMHEXSOURCE : NUMHEXPERL ) )
+        if(lhnextaddr != inhaddr
+         || lhnext >= (lineLflag ? num_hex_source : num_hex_per_line ) )
         {
             listouthex();
             lhaddr = lhnextaddr = inhaddr;
         }
-        listbuffhex[lhnext++] = outresult[cht];
-        listbuffhex[lhnext++] = outresult[cht+1];
+        if (lhnext >= listbuffhex_size)
+        {
+            listbuffhex_size = listbuffhex_size ? listbuffhex_size << 1 : 256;
+            listbuffhex = REALLOC(listbuffhex, unsigned short,
+                                  listbuffhex_size);
+            if (!listbuffhex)
+            {
+                fprintf(stderr, "Out of memory allocating listbuffhex\n");
+                exit(1);
+            }
+        }
+        listbuffhex[lhnext++] = outrs16[cht];
         lhnextaddr++;
         inhaddr++;
     }
@@ -680,16 +743,21 @@ void listouthex(void)
 */
 {
     register int cn;
+    int cols = 0;       /* initially, no text on the line               */
 
     if (lhnext > 0)
     {
-        fprintf(loutf, "%.4X ", 0xFFFF & (int)lhaddr);
+        cols = 7;       /* if we have data, then we printed an address  */
 
-        for(cn = 0; cn < lhnext; cn += 2)
+        if (currpag >= 0)
+            fprintf(loutf, "%.4X:%.1X ", 0xFFFF & (int)lhaddr, currpag);
+        else
+            fprintf(loutf, "%.4X   ", 0xFFFF & (int)lhaddr);
+
+        for (cn = 0; cn < lhnext; cn++)
         {
-            fprintf(loutf, "%.2X%.2X ",
-                    0xFF & (int) listbuffhex[cn    ],
-                    0xFF & (int) listbuffhex[cn + 1]);
+            cols += 5;
+            fprintf(loutf, "%.4X ", listbuffhex[cn]);
         }
 
         if (!lineLflag)
@@ -703,29 +771,12 @@ void listouthex(void)
             lineLflag = FALSE;
     }
 
-    if(lineLflag)
+    if (lineLflag)
     {
         if(lineLbuff[0] != '\n')
         {
-            switch(lhnext)
-            {
-            case 0:
-            case 1:
-                fputs("\t\t\t",loutf);
-                break;
-            case 2:
-            case 3:
-            case 4:
-                fputs("\t\t",loutf);
-                break;
-            case 5:
-            case 6:
-                fputs("\t",loutf);
-                break;
-            default:
-                break;
-            }
-
+            int c = source_offset > cols ? source_offset - cols : 0;
+            fprintf(loutf,"%*c", c, ' ');
             fputs(lineLbuff, loutf);
             listlineno += count_nl(lineLbuff);
             lineLflag = FALSE;
@@ -736,12 +787,12 @@ void listouthex(void)
             listlineno++;
         }
     }
-        
+
     lhnext = 0;
 }
 
 static const char *sm_last_file = NULL;
-static int sm_start = -2, sm_end = -2, sm_line = -2, sm_list = -2; 
+static int sm_start = -2, sm_end = -2, sm_line = -2, sm_list = -2;
 static unsigned int sm_type = ~2;
 
 void sm_outpath(void)
@@ -770,16 +821,18 @@ void sm_outpath(void)
         fprintf(smapf, "LISTING %s\n", loutfn);
 }
 
-void sm_flush()
+void sm_flush(void)
 {
+    const char *dispfile = over_file ? over_file : currentfnm;
+
     if (sm_start > 0)
-        fprintf(smapf, "%4X %4X %2X %d %d\n", 
+        fprintf(smapf, "%4X %4X %2X %d %d\n",
                 sm_start, sm_end, sm_type, sm_line, sm_list);
 
-    if (currentfnm != sm_last_file)
+    if (dispfile != sm_last_file)
     {
-        fprintf(smapf, "FILE %s\n", currentfnm);
-        sm_last_file = currentfnm;
+        fprintf(smapf, "FILE %s\n", dispfile);
+        sm_last_file = dispfile;
     }
 
     sm_start = sm_end = sm_line = -2;
@@ -788,19 +841,22 @@ void sm_flush()
 void sm_outrange(int lo, int hi)
 {
     int list = show_coded_lines ? listlineno : 0;
+    const char *dispfile = over_file ? over_file : currentfnm;
+    int         displine = over_file ? over_line : linenumber;
+    int         displist = over_file ? 0 : list;
 
-    if (currentfnm != sm_last_file || 
-       lo          != sm_end + 1   || 
-       linenumber  != sm_line      ||
-       list        != sm_list      ||
-       type_flag   != sm_type)
+    if (dispfile  != sm_last_file ||
+       lo         != sm_end + 1   ||
+       linenumber != sm_line      ||
+       list       != sm_list      ||
+       type_flag  != sm_type)
     {
         sm_flush();
-        sm_line  = linenumber;
+        sm_line  = displine;
         sm_start = lo;
         sm_end   = hi;
         sm_type  = type_flag;
-        sm_list  = list;
+        sm_list  = displist;
         return;
     }
 
@@ -810,7 +866,6 @@ void sm_outrange(int lo, int hi)
 
 
 static int  nextoutaddr, blockaddr;
-extern unsigned int memory_bitmap[65536 >> 5];
 
 void outhexblock(void)
 /*
@@ -820,22 +875,23 @@ void outhexblock(void)
                 the intel hex line buffer
 */
 {
-    int i;
+    const char *err;
 
     blockaddr = resultloc;
     nextoutaddr = blockaddr + currseg;
 
-    for (i = 0; i < nextresult; i += 2)
-        outrs16[i>>1] = (outresult[i] << 8) | (0xFF & outresult[i + 1]);
-        
-    icartrom_addseg(&icart_rom, outrs16, nextoutaddr, nextresult >> 1, 
-                    mode_set, mode_clr);
+    if (nextoutaddr > 0xFFFF)
+    {
+        frp2error("Address overflow (pass 2)\n");
+        return;
+    }
 
-    for (i = nextoutaddr; i < nextoutaddr + (nextresult>>1); i++)
-        memory_bitmap[i >> 5] |= 1 << (i & 31);
+    if ((err = collect_addseg( outrs16, nextoutaddr, nextresult,
+                               currpag, mode_set, mode_clr )) != NULL)
+        frp2error(err);
 
     if (srcmapfn)
-        sm_outrange(nextoutaddr, nextoutaddr + (nextresult >> 1) - 1);
+        sm_outrange(nextoutaddr, nextoutaddr + nextresult - 1);
 }
 
 
@@ -846,40 +902,14 @@ void flushhex(void)
     globals     the intel hex line buffer
 */
 {
-    uint_32 size;
-    uint_8  *rom_img;
-
-#if 0
-    if(hnextsub > 0)
-        intelout(0, blockaddr, hnextsub, hlinebuff);
-    if(endsymbol != SYMNULL && endsymbol->seg > 0)
-        intelout(1, endsymbol->value, 0, "");
-    else
-        intelout(1, 0L, 0, "");
-#endif
-        
-    if (binoutf && cfgoutf)
-    {
-        icb_write_bincfg(binoutf, cfgoutf, &icart_rom, 0);
-    } 
-
-    if (romoutf)
-    {
-        rom_img = icartrom_genrom(&icart_rom, &size, icart_type);
-        if (rom_img)
-        {
-            fwrite(rom_img, 1, size, romoutf);
-            fflush(romoutf);
-        }
-        free(rom_img);
-    }
+    collect_flush();
 }
 
 
 
 #define UBUFSZ (32)
 
-static struct 
+static struct
 {
     int        line;
     const char *file;
@@ -916,17 +946,17 @@ void frp2undef(struct symel *symp)
             undef_filt[i].symb == symp->symstr)
             return;
     }
-    
+
     /* insert this error in the filter */
     undef_filt[undef_filt_idx].file = currentfnm;
     undef_filt[undef_filt_idx].line = linenumber;
     undef_filt[undef_filt_idx].symb = symp->symstr;
     undef_filt_idx = (undef_filt_idx + 1) % UBUFSZ;
-    
+
     /* Now print the error. */
     if ((symp->flags & SFLAG_ARRAY) == 0)
     {
-        fprintf(loutf, "%s:%d: ERROR - undefined symbol  %s\n", 
+        fprintf(loutf, "%s:%d: ERROR - undefined symbol  %s\n",
                 currentfnm, linenumber, symp->symstr);
         listlineno++;
     } else
@@ -939,7 +969,7 @@ void frp2undef(struct symel *symp)
             const char *aidx_str = strchr(symstr, 0x01);
             unsigned    aidx_val = 0;
 
-            if (aidx_str && 
+            if (aidx_str &&
                 (aidx_str[1] & 0x80) == 0x80  &&
                 (aidx_str[2] & 0x80) == 0x80  &&
                 (aidx_str[3] & 0x80) == 0x80  &&
@@ -959,15 +989,15 @@ void frp2undef(struct symel *symp)
                     fprintf(loutf, "\n");
                     listlineno++;
                 }
-                fprintf(loutf, 
+                fprintf(loutf,
                         "%s:%d: INTERNAL ERROR IN ARRAY ENCODING",
                         currentfnm, linenumber);
                 break;
             }
             if (first)
                 fprintf(loutf, "%s:%d: ERROR - undefined array index %.*s",
-                        currentfnm, linenumber, 
-                        (int)(aidx_str - symp->symstr), 
+                        currentfnm, linenumber,
+                        (int)(aidx_str - symp->symstr),
                         symp->symstr);
             first = 0;
             fprintf(loutf, "[%d]", aidx_val);
@@ -979,7 +1009,7 @@ void frp2undef(struct symel *symp)
     errorcnt++;
 }
 
-void frp2warn(char *str)
+void frp2warn(const char *str)
 /*
     description second pass - print a warning message on the listing
             file, varying the format for console messages.
@@ -996,7 +1026,7 @@ void frp2warn(char *str)
 }
 
 
-void frp2error(char *str)
+void frp2error(const char *str)
 /*
     description second pass - print a message on the listing file
     parameters  message
@@ -1023,4 +1053,183 @@ void flushsourceline(void)
         listlineno += count_nl(lineLbuff);
     }
     lineLflag = FALSE;
+}
+
+typedef struct tz_info
+{
+    int pm;
+    int hour;
+    int min;
+    int tot_minutes;
+} tz_info;
+
+LOCAL tz_info compute_tz(const struct tm *const t, const struct tm *gmt)
+{
+    tz_info tz = { 0, 0, 0, 0 };
+    int hr_diff = ((t->tm_hour - gmt->tm_hour + 12) % 24) - 12;
+    int ah_diff = hr_diff < 0 ? -hr_diff : hr_diff;
+    int mn_diff = hr_diff < 0 ? (gmt->tm_min - t->tm_min) 
+                              : (t->tm_min - gmt->tm_min);
+    int abs_minutes;
+
+    if (mn_diff < 0)
+    {
+        mn_diff += 60;
+        if (ah_diff > 0)
+            ah_diff--;
+    }
+
+    abs_minutes = ah_diff * 60 + mn_diff;
+
+    tz.pm   = hr_diff >= 0 ? '+' : '-';
+    tz.hour = ah_diff;
+    tz.min  = mn_diff;
+    tz.tot_minutes = hr_diff < 0 ? -abs_minutes : abs_minutes;
+    return tz;
+}
+
+/* Format time for TODAY_STR_xxx, w/NUL termination. */
+/* Returns size of the output. */
+int format_time_string(const struct tm *const t, 
+                       const struct tm *const gmt,
+                       const char *const fmt, 
+                       char *const bufbeg, 
+                       const int space)
+{
+    const int y_hi = t->tm_year / 100 + 19;
+    const int y_lo = t->tm_year % 100;
+    const int mon  = t->tm_mon + 1;
+    const int hr12 = t->tm_hour == 0 ? 12
+                   : t->tm_hour > 12 ? t->tm_hour - 12
+                   :                   t->tm_hour;
+    const int ampm = t->tm_hour < 12 ? 'A' : 'P';
+    char *      buf    = bufbeg;
+    char *const bufend = bufbeg + space - 6;  /* room for +hhmm and \0 */
+    int i = 0;
+
+    while (fmt[i] && buf < bufend)
+    {
+        const int c0 = fmt[i + 0];
+        const int c1 = fmt[i + 1];
+
+        if (c0 != '%')
+        {
+            *buf++ = c0;
+            i++;
+            continue;
+        }
+
+        /* Saw %; commit to consuming two chars */
+        i += 2;
+
+#       define TWODIG(x) \
+            *buf++ = ((x) / 10) % 10 + '0'; \
+            *buf++ = (x) % 10 + '0';
+
+        switch (c1)
+        {
+            case 'Y': { TWODIG(y_hi); TWODIG(y_lo);  continue; }
+            case 'y': { TWODIG(y_lo);                continue; }
+            case 'm': { TWODIG(mon);                 continue; }
+            case 'd': { TWODIG(t->tm_mday);          continue; }
+            case 'H': { TWODIG(t->tm_hour);          continue; }
+            case 'M': { TWODIG(t->tm_min);           continue; }
+            case 'S': { TWODIG(t->tm_sec);           continue; }
+            case 'I': { TWODIG(hr12);                continue; }
+            case 'p': { *buf++ = ampm; *buf++ = 'M'; continue; }
+            case '%': { *buf++ = '%';                continue; }
+            case 'z':
+            {
+                tz_info tz = compute_tz(t, gmt);
+                *buf++ = tz.pm;
+                TWODIG(tz.hour);
+                TWODIG(tz.min);
+                continue;
+            }
+            case 0:
+            {
+                fraerror("% at end of format string in TODAY_STR_xxx");
+                return 0;
+            }
+            default:
+            {
+                fraerror("unknown format character in TODAY_STR_xxx");
+                return 0;
+            }
+        }
+#       undef TWODIG
+    }
+
+    *buf++ = 0;
+
+    return buf - bufbeg;
+}
+
+/* Unpack time values as constant expressions for TODAY_VAL_xxx */
+/* Returns an intvec with the unpacked exprs */
+intvec_t *unpack_time_exprs(const struct tm *const t, 
+                            const struct tm *const gmt,
+                            const char *const fmt)
+{
+    const int year = t->tm_year + 1900;
+    const int y_lo = t->tm_year % 100;
+    const int mon  = t->tm_mon + 1;
+    const int hr12 = t->tm_hour == 0 ? 12
+                   : t->tm_hour > 12 ? t->tm_hour - 12
+                   :                   t->tm_hour;
+    const int ampm = t->tm_hour >= 12;
+    intvec_t *const RESTRICT iv = intvec_new();
+    int i = 0;
+
+    while (fmt[i])
+    {
+        const int c0 = fmt[i + 0];
+        const int c1 = fmt[i + 1];
+
+        if (c0 != '%')
+        {
+            i++;
+            continue;
+        }
+
+        /* Saw %; commit to consuming two chars */
+        i += 2;
+
+#       define CST_EXPR(x) \
+            intvec_push(iv, exprnode(PCCASE_CONS,0,IGP_CONSTANT,0,(x),SYMNULL))
+
+        switch (c1)
+        {
+            case 'Y': { CST_EXPR(year);              continue; }
+            case 'y': { CST_EXPR(y_lo);              continue; }
+            case 'm': { CST_EXPR(mon);               continue; }
+            case 'd': { CST_EXPR(t->tm_mday);        continue; }
+            case 'H': { CST_EXPR(t->tm_hour);        continue; }
+            case 'M': { CST_EXPR(t->tm_min);         continue; }
+            case 'S': { CST_EXPR(t->tm_sec);         continue; }
+            case 'I': { CST_EXPR(hr12);              continue; }
+            case 'p': { CST_EXPR(ampm);              continue; }
+            case '%': { /* ignore */                 continue; }
+            case 'z':
+            {
+                tz_info tz = compute_tz(t, gmt);
+                CST_EXPR(tz.tot_minutes);
+                continue;
+            }
+            case 0:
+            {
+                fraerror("% at end of format string in TODAY_VAL_xxx");
+                iv->len = 0;
+                return iv;
+            }
+            default:
+            {
+                fraerror("unknown format character in TODAY_VAL_xxx");
+                iv->len = 0;
+                return iv;
+            }
+        }
+    }
+
+    return iv;
 }

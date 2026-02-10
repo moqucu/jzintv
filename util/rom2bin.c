@@ -1,20 +1,6 @@
 /* ======================================================================== */
 /*  Decodes a .ROM file and then dumps out information about it.            */
 /* ------------------------------------------------------------------------ */
-/*  This program is free software; you can redistribute it and/or modify    */
-/*  it under the terms of the GNU General Public License as published by    */
-/*  the Free Software Foundation; either version 2 of the License, or       */
-/*  (at your option) any later version.                                     */
-/*                                                                          */
-/*  This program is distributed in the hope that it will be useful,         */
-/*  but WITHOUT ANY WARRANTY; without even the implied warranty of          */
-/*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
-/*  General Public License for more details.                                */
-/*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
-/* ------------------------------------------------------------------------ */
 /*                 Copyright (c) 1998-2001, Joseph Zbiciak                  */
 /* ======================================================================== */
 
@@ -35,8 +21,9 @@ const char *rom_errors[] =
     "Bad ROM Header",
     "CRC-16 Error in ROM Segments",
     "Bad ROM Segment Address Range",
-    "Bad ROM Fine-Address Range",   
+    "Bad ROM Fine-Address Range",
     "CRC-16 Error in Enable Tables",
+    "Short File / Truncated Structure",
     "Unknown Error"
 };
 
@@ -67,7 +54,7 @@ usage:
     }
 
     icartrom_init(&the_icart);
-    decoded = icartrom_readfile(argv[1], &the_icart);
+    decoded = icartrom_readfile(argv[1], &the_icart, 0);
 
     if (decoded < 0)
     {
@@ -82,7 +69,7 @@ usage:
     icb_show_summary(&the_icart);
 
     if (show_rom)
-    {   
+    {
         FILE *fb, *fc;
         char bin_name[1024], cfg_name[1024];
         char *s;
@@ -100,7 +87,7 @@ usage:
         printf("Config file: %s\nBIN file:    %s\n", cfg_name, bin_name);
         fc = fopen(cfg_name, "wb");
         fb = fopen(bin_name, "wb");
-        if (!fc || !fb) 
+        if (!fc || !fb)
         {
             fprintf(stderr, "Can't open output files.\n");
             exit(1);
@@ -127,9 +114,9 @@ usage:
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                 Copyright (c) 1998-2001, Joseph Zbiciak                  */
 /* ======================================================================== */

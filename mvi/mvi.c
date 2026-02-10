@@ -121,12 +121,12 @@
 #define FLG_DLTMAP (16)
 #define FLG_LZOCMP (32)
 
-LOCAL uint_8 *enc_vid = NULL, *enc_buf = NULL, *enc_vid2;
+LOCAL uint8_t *enc_vid = NULL, *enc_buf = NULL, *enc_vid2;
 #ifndef NO_LZO
-LOCAL uint_8 *lzo_wrk = NULL, *lzo_tmp = NULL;
+LOCAL uint8_t *lzo_wrk = NULL, *lzo_tmp = NULL;
 #endif
-LOCAL uint_32 rowrpt[MVI_MAX_Y >> 5];
-LOCAL uint_32 rowdlt[MVI_MAX_Y >> 5];
+LOCAL uint32_t rowrpt[MVI_MAX_Y >> 5];
+LOCAL uint32_t rowdlt[MVI_MAX_Y >> 5];
 
 #define ENC_BUF_SZ (MVI_MAX_X * MVI_MAX_Y + 128)
 
@@ -152,17 +152,17 @@ void mvi_init(mvi_t *movie, int x_dim, int y_dim)
         for (j = 0; j < 4; j++)
             movie->bbox[i][j] = 0;
 
-    movie->vid = CALLOC(uint_8, x_dim*y_dim); /* 1 byte/pixel, just like gfx */
+    movie->vid = CALLOC(uint8_t, x_dim*y_dim); /* 1 byte/pixel, just like gfx */
     movie->fr  = 0;
     movie->f   = NULL;
 
-    if (!enc_buf ) enc_buf  = CALLOC(uint_8, ENC_BUF_SZ);
-    if (!enc_vid ) enc_vid  = CALLOC(uint_8, MVI_MAX_X * MVI_MAX_Y);
-    if (!enc_vid2) enc_vid2 = CALLOC(uint_8, MVI_MAX_X * MVI_MAX_Y);
+    if (!enc_buf ) enc_buf  = CALLOC(uint8_t, ENC_BUF_SZ);
+    if (!enc_vid ) enc_vid  = CALLOC(uint8_t, MVI_MAX_X * MVI_MAX_Y);
+    if (!enc_vid2) enc_vid2 = CALLOC(uint8_t, MVI_MAX_X * MVI_MAX_Y);
 
 #ifndef NO_LZO
-    if (!lzo_wrk) lzo_wrk = CALLOC(uint_8, LZO1X_MEM_COMPRESS);
-    if (!lzo_tmp) lzo_tmp = CALLOC(uint_8, ENC_BUF_SZ);
+    if (!lzo_wrk) lzo_wrk = CALLOC(uint8_t, LZO1X_MEM_COMPRESS);
+    if (!lzo_tmp) lzo_tmp = CALLOC(uint8_t, ENC_BUF_SZ);
 #endif
 
     if (!enc_buf || !enc_vid || !enc_vid2 || !movie->vid)
@@ -175,18 +175,18 @@ void mvi_init(mvi_t *movie, int x_dim, int y_dim)
 /* ======================================================================== */
 /*  MVI_WR_FRAME:  Encode and write a movie frame to the movie file.        */
 /* ======================================================================== */
-void mvi_wr_frame(mvi_t *movie, uint_8 *vid, uint_8 bbox[8][4])
+void mvi_wr_frame(mvi_t *movie, uint8_t *vid, uint8_t bbox[8][4])
 {
     int send_bbox = 0, send_frame = 0, send_rle = 0;
     int send_rowrpt = 0, lzo_comp = 0;
     int enc_height_rd = movie->y_dim, enc_height = movie->y_dim;
     int send_rowdlt = 0, rowdlt_ok = 0;
     int yi, yo;
-    uint_8 header_byte = 0;
+    uint8_t header_byte = 0;
     int rle_max_len;
-    uint_8 *enc_hdr;
-    uint_8 *enc_ptr = enc_buf;
-    uint_8 *evid = vid;
+    uint8_t *enc_hdr;
+    uint8_t *enc_ptr = enc_buf;
+    uint8_t *evid = vid;
     int i, j;
 
     /* -------------------------------------------------------------------- */
@@ -221,7 +221,7 @@ void mvi_wr_frame(mvi_t *movie, uint_8 *vid, uint_8 bbox[8][4])
     /*  Decide whether to send bounding box and frame.                      */
     /* -------------------------------------------------------------------- */
     send_frame = memcmp(movie->vid, vid, movie->x_dim * movie->y_dim);
-    send_bbox  = memcmp((void*)movie->bbox, bbox, sizeof(bbox));
+    send_bbox  = memcmp((void*)movie->bbox, bbox, sizeof(movie->bbox));
 
     if (!send_frame) movie->rpt_frames++;
 
@@ -239,8 +239,8 @@ void mvi_wr_frame(mvi_t *movie, uint_8 *vid, uint_8 bbox[8][4])
         for (i = 0; i < 8; i++)
             for (j = 0; j < 4; j++)
                 *enc_ptr++ = bbox[i][j];
-        
-        memcpy(movie->bbox, bbox, sizeof(bbox));
+
+        memcpy(movie->bbox, bbox, sizeof(movie->bbox));
     }
 
     /* -------------------------------------------------------------------- */
@@ -255,7 +255,7 @@ void mvi_wr_frame(mvi_t *movie, uint_8 *vid, uint_8 bbox[8][4])
             if (memcmp(movie->vid + (yi*movie->x_dim),
                               vid + (yi*movie->x_dim), movie->x_dim) == 0)
             {
-                rowdlt[yi >> 5] |= 1 << (yi & 0x1F);
+                rowdlt[yi >> 5] |= 1u << (yi & 0x1F);
                 enc_height_rd--;
                 movie->rpt_rows++;
             } else
@@ -312,7 +312,7 @@ void mvi_wr_frame(mvi_t *movie, uint_8 *vid, uint_8 bbox[8][4])
             if (!memcmp(evid + (yi-1) * movie->x_dim,
                         evid +  yi    * movie->x_dim, movie->x_dim))
             {
-                rowrpt[yi >> 5] |= 1 << (yi & 0x1F);
+                rowrpt[yi >> 5] |= 1u << (yi & 0x1F);
 
                 send_rowrpt = 1;
                 enc_height--;
@@ -348,12 +348,12 @@ void mvi_wr_frame(mvi_t *movie, uint_8 *vid, uint_8 bbox[8][4])
     /* -------------------------------------------------------------------- */
     if (send_frame)
     {
-        uint_8 *rle_ptr = enc_ptr;
-        uint_8 *vid_ptr = enc_vid;
-        uint_8 *rle_end;
-        uint_8 *vid_end;
-        uint_8 *cpstart = enc_vid;
-        uint_8 p0, p1, p2, p3;
+        uint8_t *rle_ptr = enc_ptr;
+        uint8_t *vid_ptr = enc_vid;
+        uint8_t *rle_end;
+        uint8_t *vid_end;
+        uint8_t *cpstart = enc_vid;
+        uint8_t p0, p1, p2, p3;
 
         rle_max_len = (movie->x_dim * enc_height) >> 1;
 
@@ -383,7 +383,7 @@ void mvi_wr_frame(mvi_t *movie, uint_8 *vid, uint_8 bbox[8][4])
                 vid_ptr += 2;
                 continue;
             }
-        
+
             /* ------------------------------------------------------------ */
             /*  See how long the run is.                                    */
             /* ------------------------------------------------------------ */
@@ -395,7 +395,7 @@ void mvi_wr_frame(mvi_t *movie, uint_8 *vid, uint_8 bbox[8][4])
                 if (p2 != p0 || p3 != p0)
                     break;
             }
-            
+
             fl_len = i >> 1;  /* always even number, so div-by-2 */
 
             /* ------------------------------------------------------------ */
@@ -448,7 +448,7 @@ void mvi_wr_frame(mvi_t *movie, uint_8 *vid, uint_8 bbox[8][4])
             /*  Advance the input video pointer beyond fill run.  That      */
             /*  location also marks the beginning of the next copy run.     */
             /* ------------------------------------------------------------ */
-            vid_ptr += fl_len << 1; 
+            vid_ptr += fl_len << 1;
             cpstart  = vid_ptr;
 
             /* ------------------------------------------------------------ */
@@ -490,9 +490,9 @@ void mvi_wr_frame(mvi_t *movie, uint_8 *vid, uint_8 bbox[8][4])
             /* ------------------------------------------------------------ */
             /*  Don't let copy run overflow buffer!                         */
             /* ------------------------------------------------------------ */
-            if (rle_ptr + 2 + (cp_len>>8) + (cp_len>>1) >= rle_end)       
-                goto no_rle;                                              
-                                                                          
+            if (rle_ptr + 2 + (cp_len>>8) + (cp_len>>1) >= rle_end)
+                goto no_rle;
+
             /* ------------------------------------------------------------ */
             /*  Output the copy run.                                        */
             /* ------------------------------------------------------------ */
@@ -501,7 +501,7 @@ void mvi_wr_frame(mvi_t *movie, uint_8 *vid, uint_8 bbox[8][4])
                 int p;
                 cp_cur  = cp_len > 256 ? 256 : cp_len;
                 cp_len -= cp_cur;
-                
+
                 *rle_ptr++ = cp_cur - 2;
                 for (j = 0; j < cp_cur; j += 2)
                 {
@@ -597,23 +597,22 @@ no_rle:
 /* ======================================================================== */
 /*  MVI_RD_FRAME -- Reads a frame from a movie file and decodes it.         */
 /* ======================================================================== */
-int  mvi_rd_frame(mvi_t *movie, uint_8 *vid, uint_8 bbox[8][4])
+int  mvi_rd_frame(mvi_t *movie, uint8_t *vid, uint8_t bbox[8][4])
 {
-    int new_dims   = 0;
     int got_frame  = 0;
     int got_bbox   = 0;
     int got_rowrpt = 0;
     int got_rle    = 0;
     int got_rowdlt = 0;
     int lzo_comp   = 0;
-    uint_8 *dec_ptr = enc_buf, *dec_end;
-    uint_8 *dec_vid;
-    uint_8 *dvid;
+    uint8_t *dec_ptr = enc_buf, *dec_end;
+    uint8_t *dec_vid;
+    uint8_t *dvid;
     size_t tot_rd;
-    uint_32 flags;
+    uint32_t flags;
     int i, j;
     int enc_height, enc_height_rd;
-    uint_32 fr_len;
+    uint32_t fr_len;
 
     /* -------------------------------------------------------------------- */
     /*  Sanity check.                                                       */
@@ -646,10 +645,9 @@ again:
         {
             movie->x_dim = new_x_dim;
             movie->y_dim = new_y_dim;
-            new_dims = 1;
             if (new_x_dim > MVI_MAX_X || new_y_dim > MVI_MAX_Y)
             {
-                fprintf(stderr, "MVI_RD: Movie size %dx%d too large!", 
+                fprintf(stderr, "MVI_RD: Movie size %dx%d too large!",
                         new_x_dim, new_y_dim);
                 return -1;
             }
@@ -661,21 +659,21 @@ again:
     /* -------------------------------------------------------------------- */
     /*  Pull apart the frame header.                                        */
     /* -------------------------------------------------------------------- */
-    fr_len = (enc_buf[0] <<  0) | 
+    fr_len = (enc_buf[0] <<  0) |
              (enc_buf[1] <<  8) |
              (enc_buf[2] << 16) |
              (enc_buf[3] << 24);
 
-    if (fr_len > ENC_BUF_SZ) 
+    if (fr_len > ENC_BUF_SZ)
     {
-        fprintf(stderr, 
+        fprintf(stderr,
                 "MVI_RD: Frame size too large: %d bytes (%.8X bytes)\n",
                 fr_len, fr_len);
         exit(1);
     }
 
     movie->last_fr = movie->fr;
-    
+
     movie->fr = (enc_buf[4] <<  0) |
                 (enc_buf[5] <<  8) |
                 (enc_buf[6] << 16);
@@ -699,7 +697,7 @@ again:
 
     if (tot_rd != fr_len)
     {
-        fprintf(stderr, 
+        fprintf(stderr,
                 "MVI_RD: Short read on frame %d (%d vs %d bytes)\n"
                 "        Previous frame was frame %d\n",
                 movie->fr, (int)tot_rd, fr_len, movie->last_fr);
@@ -710,7 +708,7 @@ again:
     /* -------------------------------------------------------------------- */
     /*  Sanity check flags.                                                 */
     /* -------------------------------------------------------------------- */
-    if ((flags & 0xC0) != 0 || 
+    if ((flags & 0xC0) != 0 ||
         (got_rle    != 0 && got_frame == 0) ||
         (got_rowdlt != 0 && got_frame == 0) ||
         (got_rowrpt != 0 && got_frame == 0))
@@ -739,7 +737,7 @@ again:
 #else
     if (lzo_comp)
     {
-        int r; 
+        int r;
         lzo_uint lzo_len = 0;
 
         if (!lzo_tmp)
@@ -749,8 +747,8 @@ again:
             return -1;
         }
 
-        r = lzo1x_decompress(dec_ptr, fr_len - 8, lzo_tmp, 
-                             &lzo_len, 
+        r = lzo1x_decompress(dec_ptr, fr_len - 8, lzo_tmp,
+                             &lzo_len,
                              (lzo_voidp)NULL);
 
         if (r == LZO_E_OK)
@@ -795,8 +793,8 @@ again:
 
         for (i = 0; i < movie->y_dim; i += 32)
         {
-            uint_32 tmp = rowdlt[i >> 5];
-            
+            uint32_t tmp = rowdlt[i >> 5];
+
             while (tmp)
             {
                 tmp &= tmp - 1;
@@ -824,8 +822,8 @@ again:
 
         for (i = 0; i < enc_height_rd; i += 32)
         {
-            uint_32 tmp = rowrpt[i >> 5];
-            
+            uint32_t tmp = rowrpt[i >> 5];
+
             while (tmp)
             {
                 tmp &= tmp - 1;
@@ -913,7 +911,7 @@ again:
 
             while (len-->0) { *dec_vid++ = p; *dec_vid++ = p; }
         }
-        
+
         if (remain != 0)
         {
             fprintf(stderr, "MVI_RD:  Error in RLE data!\n");
@@ -970,14 +968,14 @@ again:
     /* -------------------------------------------------------------------- */
     if (got_frame)
         memcpy(movie->vid, vid, movie->x_dim * movie->y_dim);
-  
+
 
     /* -------------------------------------------------------------------- */
     /*  Copy over current bounding boxes.                                   */
     /* -------------------------------------------------------------------- */
-    memcpy(bbox, movie->bbox, sizeof(bbox));
+    memcpy(bbox, movie->bbox, sizeof(movie->bbox));
 
-    return (got_frame ? 0 : MVI_FR_SAME) | 
+    return (got_frame ? 0 : MVI_FR_SAME) |
            (got_bbox  ? 0 : MVI_BB_SAME);
 }
 
@@ -992,9 +990,9 @@ again:
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                 Copyright (c) 1998-2005, Joseph Zbiciak                  */
 /* ======================================================================== */

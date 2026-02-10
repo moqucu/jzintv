@@ -22,7 +22,7 @@ int spc_do_ald(int addr, int no_block)
     int ready;
 
     ready = cr_do_read(crp, 0x80) & 0x8000;
-    if (!no_block) 
+    if (!no_block)
         while (!ready)
             ready = cr_do_read(crp, 0x80) & 0x8000;
 
@@ -56,8 +56,8 @@ main()
     /* -------------------------------------------------------------------- */
     /*  Reset the FIFO, ready it for data.                                  */
     /* -------------------------------------------------------------------- */
-    cr_do_write(crp, 0x81, 0x400); 
-    cr_do_write(crp, 0x81, 0x400); 
+    cr_do_write(crp, 0x81, 0x400);
+    cr_do_write(crp, 0x81, 0x400);
     while (cr_do_read(crp, 0x81) & 0x8000)
         ;
     while ((cr_do_read(crp, 0x80) & 0x8000) == 0)
@@ -82,9 +82,9 @@ main()
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                 Copyright (c) 1998-2001, Joseph Zbiciak                  */
 /* ======================================================================== */

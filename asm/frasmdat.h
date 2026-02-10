@@ -20,10 +20,6 @@ AUTHORS:    Mark Zenier;
 #include <ctype.h>
 #define PRINTCTRL(char) ((char)+'@')
 
-#ifndef Global
-#define Global  extern
-#endif
-
 #ifdef USEINDEX
 #define strchr index
 #endif
@@ -37,7 +33,7 @@ extern int strlen();
 #include <string.h>
 #endif
 
-#define local 
+#define local
 
 #define TRUE 1
 #define FALSE 0
@@ -90,14 +86,14 @@ struct opsynt
     int         gentabsub;
 };
 
-struct igel 
+struct igel
 {
     int         selmask;
     int         criteria;
     const char *genstr;
 };
-    
-#define PPEXPRLEN 256
+
+#define PPEXPRLEN 1024
 
 struct evalrel
 {
@@ -106,19 +102,10 @@ struct evalrel
     char    exprstr[PPEXPRLEN];
 };
 
-#define INBUFFSZ (16384)
+#define INBUFFSZ (1 << 20)
 
 extern int nextsymnum;
-Global struct symel **symbindex;
-
-#define EXPRLSIZE (INBUFFSZ/2)
-extern int nextexprs;
-Global int exprlist[EXPRLSIZE];
-Global int exprvals[EXPRLSIZE];
-
-#define STRLSIZE (INBUFFSZ/2)
-extern int  nextstrs;
-Global char *stringlist[STRLSIZE];
+extern struct symel **symbindex;
 
 extern struct opsym optab[];
 extern int    gnumopcode;
@@ -127,53 +114,56 @@ extern struct igel igtab[];
 extern int    ophashlnk[];
 
 #define NUMPEXP 6
-Global struct evalrel evalr[NUMPEXP];
+extern struct evalrel evalr[NUMPEXP];
 
-#define PESTKDEPTH 32
+#define PESTKDEPTH (1 << 12)
 struct evstkel
 {
     int v;
     int s;
 };
 
-Global struct evstkel   estk[PESTKDEPTH], *estkm1p;
+extern struct evstkel   estk[PESTKDEPTH], *estkm1p;
 
-Global int  currseg; 
-Global int  locctr; 
+extern int  currseg;
+extern int  locctr;
+extern int  currpag;
 
-extern FILE *yyin;
+extern LZFILE *yyin;
 extern int  listflag;
 extern int hexvalid, hexflag;
-Global FILE *romoutf, *binoutf, *cfgoutf, *loutf;
-Global char *loutfn;
-Global int listlineno;
+extern FILE *romoutf, *binoutf, *cfgoutf, *loutf;
+extern char *loutfn;
+extern int listlineno;
 extern int errorcnt, warncnt;
 
 
-#define IFSTKDEPTH 32
-extern int  ifstkpt; 
-Global enum { If_Active, If_Skip, If_Err } 
-    elseifstk[IFSTKDEPTH], endifstk[IFSTKDEPTH];
+#define IFSTKDEPTH 256
+extern int  ifstkpt;
+enum If_Mode { If_Active, If_Skip, If_Err };
+extern enum If_Mode elseifstk[IFSTKDEPTH], endifstk[IFSTKDEPTH];
+extern int expmacstk[IFSTKDEPTH];
 
 extern int  frarptact, frarptcnt, frarptskip;
 
 #define FILESTKDPTH 32
-Global int currfstk;
+extern int currfstk;
 #define nextfstk (currfstk+1)
-Global struct fstkel
+struct fstkel
 {
     const char  *fnm;
-    FILE        *fpt;
+    LZFILE      *fpt;
     int         line;
-} infilestk[FILESTKDPTH];
+};
+extern struct fstkel infilestk[FILESTKDPTH];
 
-Global int lnumstk[FILESTKDPTH];
+extern int lnumstk[FILESTKDPTH];
 
 enum readacts
 {
-    Nra_normal, 
-    Nra_new, 
-    Nra_end 
+    Nra_normal,
+    Nra_new,
+    Nra_end
 } ;
 
 extern enum readacts nextreadact;
@@ -189,7 +179,7 @@ extern char ignosel[] ;
 
 #define NUM_CHTA 6
 extern int chtnxalph, *chtcpoint, *chtnpoint ;
-Global int *(chtatab[NUM_CHTA]);
+extern int *(chtatab[NUM_CHTA]);
 
 #define CF_END      -2
 #define CF_INVALID  -1
@@ -199,4 +189,23 @@ Global int *(chtatab[NUM_CHTA]);
 
 #include "asm/typetags.h"
 
-Global path_t * as1600_search_path;
+/* Values for CLASSIFY operator */
+#define CLASS_ABS       (-1)
+#define CLASS_SET       (-2)
+#define CLASS_EQU       (-3)
+#define CLASS_STRING    (-4)
+#define CLASS_FEATURE   (-5)
+#define CLASS_RESV      (-6)
+#define CLASS_EMPTY     (-7)
+#define CLASS_UNUSED    (-8)
+#define CLASS_UNKNOWN   (-9)
+#define CLASS_UNDEF     (-10000)
+
+extern path_t * as1600_search_path;
+
+/* The moment we started the assembler. */
+extern time_t asm_time;
+extern struct tm asm_time_local;
+extern struct tm asm_time_gmt;
+
+#include "intvec.h"

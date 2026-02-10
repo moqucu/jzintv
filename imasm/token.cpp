@@ -11,8 +11,8 @@ as published by the Free Software Foundation; either version 2
 of the License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of 
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the 
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
@@ -23,6 +23,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "token.h"
 #include "excep.h"
+
+using namespace std;
 
 Token::Token(const char *szSeps)
 {
@@ -60,7 +62,7 @@ Token &Token::operator =(string &sBuff)
 
 const char *Token::operator[](size_t i)
 {
-    return i > m_tokVector.size() ? NULL : m_tokVector[i].c_str();
+    return i > m_tokVector.size() ? nullptr : m_tokVector[i].c_str();
 }
 
 void Token::Tokenize()
@@ -100,9 +102,9 @@ void Token::Tokenize()
 
     last_nws[1] = 0;
 
-    // Now separate into tokens 
+    // Now separate into tokens
     pStart = szBuff;
-    while ((pSep = strpbrk(pStart, m_szSeps)) != NULL && *pSep != 0)
+    while ((pSep = strpbrk(pStart, m_szSeps)) != nullptr && *pSep != 0)
     {
         *pSep = 0;                              // Zero-out separator
         m_tokVector.push_back(string(pStart));  // Save up to separator

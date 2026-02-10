@@ -17,11 +17,16 @@ extern void   jzp_clear_and_eol(int cur_len);
 
 extern void jzp_init
 (
-    int silent, 
-    FILE *fout, 
+    int silent,
+    FILE *fout,
     int  (*fn)(void *, const char *, va_list),
     void *fn_arg
 );
+
+/*  Return a printer_t that does jzp_printf().  Use a forward decl here to  */
+/*  to avoid introducing a new compile dependency.                          */
+struct printer_t;
+struct printer_t *jzp_printer(void);
 
 #endif
 

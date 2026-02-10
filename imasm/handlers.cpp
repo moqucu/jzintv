@@ -12,8 +12,8 @@ as published by the Free Software Foundation; either version 2
 of the License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of 
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the 
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
@@ -33,13 +33,13 @@ extern RegHelp g_reg;
 
 //-----------------------------------------------------------------------------
 // Name: HandleIDC_NEW()
-// Desc: 
+// Desc:
 //-----------------------------------------------------------------------------
 void HandleIDC_NEW(HWND hMDIWnd)
 {
     HWND hChild = CreateMDIWindow(  g_szChildClass,
-                                    (LPSTR)"untitled", 
-                                    WS_CHILD | WS_CLIPCHILDREN | WS_CLIPSIBLINGS, 
+                                    (LPSTR)"untitled",
+                                    WS_CHILD | WS_CLIPCHILDREN | WS_CLIPSIBLINGS,
                                     CW_USEDEFAULT,
                                     CW_USEDEFAULT,
                                     CW_USEDEFAULT,
@@ -52,7 +52,7 @@ void HandleIDC_NEW(HWND hMDIWnd)
 
 //-----------------------------------------------------------------------------
 // Name: HandleIDC_SAVEAS()
-// Desc: 
+// Desc:
 //-----------------------------------------------------------------------------
 int HandleIDC_SAVEAS(HWND hWnd)
 {
@@ -60,11 +60,11 @@ int HandleIDC_SAVEAS(HWND hWnd)
     int iRet = 0;
 
     WndInfo *pWI = (WndInfo *)GetWindowLong(hWnd, WL_INFOPTR);
-    
+
     if (pWI)
     {
         ZeroMemory(&of, sizeof (OPENFILENAME));
-        
+
         of.lStructSize = sizeof (OPENFILENAME);
         of.hwndOwner = hWnd;
         of.hInstance = g_hInst;
@@ -82,12 +82,12 @@ int HandleIDC_SAVEAS(HWND hWnd)
 
 //-----------------------------------------------------------------------------
 // Name: HandleIDC_SAVE()
-// Desc: 
+// Desc:
 //-----------------------------------------------------------------------------
 void HandleIDC_SAVE(HWND hWnd)
 {
     WndInfo *pWI = (WndInfo *)GetWindowLong(hWnd, WL_INFOPTR);
-    
+
     if (pWI)
     {
         if (*pWI->szFileName == NUL)
@@ -100,7 +100,7 @@ void HandleIDC_SAVE(HWND hWnd)
 
         if (SaveFile(pWI->hRichEd, pWI->szFileName))
         {
-            pWI->bIsDirty = false;  
+            pWI->bIsDirty = false;
             SetCaptionPrintf(hWnd, "%s", pWI->szFileName);
         }
     }
@@ -108,7 +108,7 @@ void HandleIDC_SAVE(HWND hWnd)
 
 //-----------------------------------------------------------------------------
 // Name: HandleIDC_OPEN()
-// Desc: 
+// Desc:
 //-----------------------------------------------------------------------------
 void HandleIDC_OPEN(HWND hMDIWnd)
 {
@@ -116,7 +116,7 @@ void HandleIDC_OPEN(HWND hMDIWnd)
     char szFileName[MAX_PATH] = "";
 
     ZeroMemory(&of, sizeof (OPENFILENAME));
-    
+
     of.lStructSize = sizeof (OPENFILENAME);
     of.hwndOwner = hMDIWnd;
     of.hInstance = g_hInst;
@@ -136,7 +136,7 @@ void HandleIDC_OPEN(HWND hMDIWnd)
 
 //-----------------------------------------------------------------------------
 // Name: HandleIDC_OPENPROJECT()
-// Desc: 
+// Desc:
 //-----------------------------------------------------------------------------
 void HandleIDC_OPENPROJECT(HWND hMDIWnd, FilePane *pFP)
 {
@@ -144,7 +144,7 @@ void HandleIDC_OPENPROJECT(HWND hMDIWnd, FilePane *pFP)
     char szFileName[MAX_PATH] = "";
 
     ZeroMemory(&of, sizeof (OPENFILENAME));
-    
+
     of.lStructSize = sizeof (OPENFILENAME);
     of.hwndOwner = hMDIWnd;
     of.hInstance = g_hInst;
@@ -167,7 +167,7 @@ void HandleIDC_OPENPROJECT(HWND hMDIWnd, FilePane *pFP)
 
 //-----------------------------------------------------------------------------
 // Name: HandleEN_UPDATE()
-// Desc: 
+// Desc:
 //-----------------------------------------------------------------------------
 void HandleEN_UPDATE(HWND hWnd)
 {
@@ -210,12 +210,12 @@ void HandleEN_UPDATE(HWND hWnd)
             iPos = 0;
 
             DWORD dwCol = GetWordColor(szLastWord);
-            
+
             if (dwCol != RGB(0, 0, 0))
             {
                 // Colorize the text
                 Highlight(hWnd, dwCol, dwEnd - (strlen(szLastWord)+1), dwEnd-1);
-                
+
                 // Reset the  selection
                 SendMessage(hWnd, EM_SETSEL, (WPARAM)dwStart, (LPARAM)dwEnd);
                 Highlight(hWnd, RGB(0, 0, 0), dwStart, dwEnd);
@@ -230,7 +230,7 @@ void HandleEN_UPDATE(HWND hWnd)
 
 //-----------------------------------------------------------------------------
 // Name: HandleIDC_PRECOMPILE()
-// Desc: 
+// Desc:
 //-----------------------------------------------------------------------------
 void HandleIDC_PRECOMPILE(HWND hWnd)
 {
@@ -238,7 +238,7 @@ void HandleIDC_PRECOMPILE(HWND hWnd)
     char szSrc[MAX_PATH], szDst[MAX_PATH], szErr[MAX_PATH];
 
     WndInfo *pWI = (WndInfo *)GetWindowLong(hWnd, WL_INFOPTR);
-    
+
     if (pWI)
     {
         // First, write to a temporary file
@@ -257,13 +257,13 @@ void HandleIDC_PRECOMPILE(HWND hWnd)
         }
 
         DeleteFile(szSrc);
-        DeleteFile(szDst);  
+        DeleteFile(szDst);
     }
 }
 
 //-----------------------------------------------------------------------------
 // Name: HandleIDC_FONT()
-// Desc: 
+// Desc:
 //-----------------------------------------------------------------------------
 void HandleIDC_FONT(HWND hClient)
 {
@@ -287,14 +287,14 @@ void HandleIDC_FONT(HWND hClient)
     if (pWI)
     {
         SendMessage(pWI->hRichEd, EM_GETCHARFORMAT, (WPARAM)SCF_DEFAULT, (LPARAM)&cfmt);
-        
+
         cf.lStructSize = sizeof (CHOOSEFONT);
         cf.hwndOwner = hWnd;
         cf.lpLogFont = &lf;
         cf.Flags = CF_FORCEFONTEXIST | CF_SCREENFONTS | CF_INITTOLOGFONTSTRUCT;
 
         strcpy(lf.lfFaceName, cfmt.szFaceName);
-        
+
         iRet = ChooseFont(&cf);
 
         if (iRet != 0)
@@ -313,7 +313,7 @@ void HandleIDC_FONT(HWND hClient)
             do
             {
                 WndInfo *pWI = (WndInfo *)GetWindowLong(hWnd, WL_INFOPTR);
-                
+
                 if (pWI)
                 {
                     // Turn off EN_UPDATE and EN_CHANGE messages
@@ -337,7 +337,7 @@ void HandleIDC_FONT(HWND hClient)
 
 //-----------------------------------------------------------------------------
 // Name: HandleIDC_PROJECTNEW()
-// Desc: 
+// Desc:
 //-----------------------------------------------------------------------------
 void HandleIDC_PROJECTNEW(HWND hWnd, FilePane *pFP)
 {
@@ -360,61 +360,61 @@ void HandleIDC_PROJECTNEW(HWND hWnd, FilePane *pFP)
 
 //-----------------------------------------------------------------------------
 // Name: HandleIDC_PROJECTADDSOURCE()
-// Desc: 
+// Desc:
 //-----------------------------------------------------------------------------
 void HandleIDC_PROJECTADDSOURCE(HWND hWnd, FilePane *pFP)
 {
     char szFileName[MAX_PATH] = "";
     char szFileTitle[MAX_PATH] = "";
-    
+
     if (pFP->IsOpen())
     {
         if (GetAsmFileName(hWnd, szFileTitle, szFileName))
         {
             pFP->AddSourceFile(szFileTitle, szFileName);
-        }   
+        }
     }
 }
 
 //-----------------------------------------------------------------------------
 // Name: HandleIDC_PROJECTADDINCLUDE()
-// Desc: 
+// Desc:
 //-----------------------------------------------------------------------------
 void HandleIDC_PROJECTADDINCLUDE(HWND hWnd, FilePane *pFP)
 {
     char szFileName[MAX_PATH] = "";
     char szFileTitle[MAX_PATH] = "";
-    
+
     if (pFP->IsOpen())
     {
         if (GetAsmFileName(hWnd, szFileTitle, szFileName))
         {
             pFP->AddIncludeFile(szFileTitle, szFileName);
-        }   
+        }
     }
 }
 
 //-----------------------------------------------------------------------------
 // Name: HandleIDC_PROJECTADDOTHER()
-// Desc: 
+// Desc:
 //-----------------------------------------------------------------------------
 void HandleIDC_PROJECTADDOTHER(HWND hWnd, FilePane *pFP)
 {
     char szFileName[MAX_PATH] = "";
     char szFileTitle[MAX_PATH] = "";
-    
+
     if (pFP->IsOpen())
     {
         if (GetAsmFileName(hWnd, szFileTitle, szFileName))
         {
             pFP->AddOtherFile(szFileTitle, szFileName);
-        }   
+        }
     }
 }
 
 //-----------------------------------------------------------------------------
 // Name: HandleIDC_PROJECTREMOVE()
-// Desc: 
+// Desc:
 //-----------------------------------------------------------------------------
 void HandleIDC_PROJECTREMOVE(HWND hWnd, FilePane *pFP)
 {
@@ -424,6 +424,6 @@ void HandleIDC_PROJECTREMOVE(HWND hWnd, FilePane *pFP)
 
 //-----------------------------------------------------------------------------
 // Name: ()
-// Desc: 
+// Desc:
 //-----------------------------------------------------------------------------
 

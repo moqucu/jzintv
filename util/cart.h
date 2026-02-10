@@ -5,8 +5,8 @@
 /*  (Based on routines from my own SUCK.BAS.)                               */
 /* ======================================================================== */
 
-#ifndef _CART_H_
-#define _CART_H_
+#ifndef CART_H_
+#define CART_H_
 
 /* ------------------------------------------------------------------------ */
 /*  Cart-reader structure                                                   */
@@ -39,12 +39,12 @@ typedef enum ctrl_bits_t
 /* ------------------------------------------------------------------------ */
 /*  GI Bus Protocol Enumerations.                                           */
 /* ------------------------------------------------------------------------ */
-typedef enum gi_bus_phase_t 
+typedef enum gi_bus_phase_t
 {
     RESET   =   0,                          /* Reset the bus.               */
     NACT    =   MSYNC,                      /* No ACTion                    */
     ADAR    =   MSYNC|              BC1,    /* Address Data to Addr Reg     */
-    IAB     =   MSYNC|      BC2,            /* Interrupt Address to Bus     */ 
+    IAB     =   MSYNC|      BC2,            /* Interrupt Address to Bus     */
     DTB     =   MSYNC|      BC2 |   BC1,    /* Data To Bus                  */
     BAR     =   MSYNC|BDIR,                 /* Bus to Address Register      */
     DW      =   MSYNC|BDIR |            BC1,/* Data Write                   */
@@ -135,9 +135,9 @@ void cr_init_ports(unsigned long base);
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                 Copyright (c) 1998-2001, Joseph Zbiciak                  */
 /* ======================================================================== */

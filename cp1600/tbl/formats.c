@@ -1,7 +1,7 @@
 /* Auto generated, do not edit */
 
 #include "cp1600/op_tables.h"
-const uint_8 dec_format[] =
+const uint8_t dec_format[] =
 {
 /*0000000000*/   fmt_impl_1op_a,    /* Implied 1-op arithmetic  (a)     */
 /*0000000001*/   fmt_impl_1op_a,    /* Implied 1-op arithmetic  (a)     */

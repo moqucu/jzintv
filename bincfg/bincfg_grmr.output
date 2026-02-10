@@ -17,7 +17,7 @@ Grammar
     6       | seed_config
     7       | error_tok
 
-    8 seed_config: /* empty */
+    8 seed_config: %empty
     9            | eolns
 
    10 sec_memspan: sec_banksw
@@ -26,9 +26,9 @@ Grammar
    13            | sec_memattr
    14            | sec_preload
 
-   15 bankswitch: TOK_SEC_BANKSWITCH
+   15 banksw_head: TOK_SEC_BANKSWITCH
 
-   16 sec_banksw: bankswitch eoln banksw_list
+   16 sec_banksw: banksw_head eoln banksw_list
 
    17 banksw_list: banksw_list banksw_rec
    18            | banksw_rec
@@ -37,290 +37,310 @@ Grammar
    20           | eoln
    21           | error_tok eoln
 
-   22 mapping: TOK_SEC_MAPPING
+   22 mapping_head: TOK_SEC_MAPPING
 
-   23 sec_mapping: mapping eoln mapping_list
+   23 sec_mapping: mapping_head eoln mapping_list
 
    24 mapping_list: mapping_list mapping_rec
    25             | mapping_rec
 
-   26 mapping_rec: hex_num '-' hex_num '=' hex_num eoln
-   27            | hex_num '-' hex_num '=' hex_num TOK_PAGE hex_num eoln
-   28            | eoln
-   29            | error_tok eoln
+   26 mapping_rec: hex_num '-' hex_num '=' hex_num memattr_page
+   27            | eoln
+   28            | error_tok eoln
 
-   30 ecsbank: TOK_SEC_ECSBANK
+   29 ecsbank_head: TOK_SEC_ECSBANK
 
-   31 sec_ecsbank: ecsbank eoln ecsbank_list
+   30 sec_ecsbank: ecsbank_head eoln ecsbank_list
 
-   32 ecsbank_list: ecsbank_list ecsbank_rec
-   33             | ecsbank_rec
+   31 ecsbank_list: ecsbank_list ecsbank_rec
+   32             | ecsbank_rec
 
-   34 ecsbank_rec: hex_num ':' hex_num '-' hex_num '=' hex_num eoln
-   35            | eoln
-   36            | error_tok eoln
+   33 ecsbank_rec: hex_num ':' hex_num '-' hex_num '=' hex_num eoln
+   34            | eoln
+   35            | error_tok eoln
 
-   37 memattr: TOK_SEC_MEMATTR
+   36 memattr_head: TOK_SEC_MEMATTR
 
-   38 sec_memattr: memattr eoln memattr_list
+   37 sec_memattr: memattr_head eoln memattr_list
 
-   39 memattr_list: memattr_list memattr_rec
-   40             | memattr_rec
+   38 memattr_list: memattr_list memattr_rec
+   39             | memattr_rec
 
-   41 memattr_rec: hex_num '-' hex_num '=' memattr dec_num eoln
-   42            | hex_num '-' hex_num eoln
-   43            | eoln
-   44            | error_tok eoln
+   40 memattr_rec: hex_num '-' hex_num '=' memattr_page
+   41            | eoln
+   42            | error_tok eoln
 
-   45 preload: TOK_SEC_PRELOAD
+   43 memattr_page: eoln
+   44             | memattr_tok dec_num memattr_page
+   45             | TOK_PAGE hex_num memattr_page
 
-   46 sec_preload: preload eoln preload_list
+   46 preload_head: TOK_SEC_PRELOAD
 
-   47 preload_list: preload_list preload_rec
-   48             | preload_rec
+   47 sec_preload: preload_head eoln preload_list
 
-   49 preload_rec: hex_num '-' hex_num '=' hex_num eoln
-   50            | error_tok eoln
+   48 preload_list: preload_list preload_rec
+   49             | preload_rec
 
-   51 macro: TOK_SEC_MACRO
+   50 preload_rec: hex_num '-' hex_num '=' hex_num eoln
+   51            | error_tok eoln
+   52            | eoln
 
-   52 sec_macro: macro eoln macro_list
+   53 macro_head: TOK_SEC_MACRO
 
-   53 macro_list: macro_list macro_rec
-   54           | macro_rec
+   54 sec_macro: macro_head eoln macro_list
 
-   55 macro_rec: TOK_MAC_QUIET macro_line
-   56          | macro_line
-   57          | TOK_MAC_QUIET eoln
-   58          | eoln
+   55 macro_list: macro_list macro_rec
+   56           | macro_rec
 
-   59 macro_line: mac_reg hex_num eoln
-   60           | TOK_MAC_LOAD string dec_num hex_num eoln
-   61           | TOK_MAC_WATCH string watch_list eoln
-   62           | TOK_MAC_POKE hex_num hex_num eoln
-   63           | TOK_MAC_INSPECT hex_num eoln
-   64           | TOK_MAC_RUNTO hex_num eoln
-   65           | TOK_MAC_TRACE hex_num eoln
-   66           | TOK_MAC_AHEAD eoln
-   67           | TOK_MAC_BLANK eoln
-   68           | TOK_MAC_RUN eoln
-   69           | TOK_MAC_VIEW eoln
-   70           | error_tok eoln
+   57 macro_rec: TOK_MAC_QUIET macro_line
+   58          | macro_line
+   59          | TOK_MAC_QUIET eoln
+   60          | eoln
 
-   71 mac_reg: TOK_MAC_REG
+   61 macro_line: mac_reg hex_num eoln
+   62           | TOK_MAC_LOAD string dec_num hex_num eoln
+   63           | TOK_MAC_WATCH ident watch_list eoln
+   64           | TOK_MAC_POKE hex_num hex_num eoln
+   65           | TOK_MAC_POKE hex_num TOK_PAGE hex_num hex_num eoln
+   66           | TOK_MAC_POKE hex_num ':' hex_num hex_num eoln
+   67           | TOK_MAC_INSPECT hex_num eoln
+   68           | TOK_MAC_RUNTO hex_num eoln
+   69           | TOK_MAC_TRACE hex_num eoln
+   70           | TOK_MAC_AHEAD eoln
+   71           | TOK_MAC_BLANK eoln
+   72           | TOK_MAC_RUN eoln
+   73           | TOK_MAC_VIEW eoln
+   74           | error_tok eoln
 
-   72 watch_list: watch_list ',' watch_span
-   73           | watch_span
+   75 mac_reg: TOK_MAC_REG
 
-   74 watch_span: watch_addr
-   75           | watch_range
+   76 watch_list: watch_list ',' watch_span
+   77           | watch_span
 
-   76 watch_addr: hex_num
+   78 watch_span: watch_addr
+   79           | watch_range
 
-   77 watch_range: hex_num '-' hex_num
+   80 watch_addr: hex_num
 
-   78 sec_varlike: varlike_head eoln var_list
+   81 watch_range: hex_num '-' hex_num
 
-   79 varlike_head: TOK_SEC_VARS
-   80             | TOK_SEC_JOYSTICK
-   81             | TOK_SEC_KEYS
-   82             | TOK_SEC_CAPSLOCK
-   83             | TOK_SEC_NUMLOCK
-   84             | TOK_SEC_SCROLLLOCK
+   82 sec_varlike: varlike_head eoln var_list
 
-   85 var_list: var_list var_rec
-   86         | var_rec
+   83 varlike_head: TOK_SEC_VARS
+   84             | TOK_SEC_JOYSTICK
+   85             | TOK_SEC_KEYS
+   86             | TOK_SEC_CAPSLOCK
+   87             | TOK_SEC_NUMLOCK
+   88             | TOK_SEC_SCROLLLOCK
 
-   87 var_rec: string '=' strnum eoln
-   88        | eoln
-   89        | error_tok eoln
+   89 var_list: var_list var_rec
+   90         | var_rec
 
-   90 sec_unsup: unknown_sec eoln
+   91 var_rec: ident '=' strnum eoln
+   92        | eoln
+   93        | error_tok eoln
 
-   91 unknown_sec: TOK_SEC_DISASM
-   92            | TOK_SEC_VOICES
-   93            | TOK_SEC_UNKNOWN
+   94 sec_unsup: unknown_head eoln
 
-   94 strnum: TOK_NAME
-   95       | TOK_HEX
-   96       | TOK_DEC
-   97       | TOK_DECONLY
+   95 unknown_head: TOK_SEC_DISASM
+   96             | TOK_SEC_VOICES
+   97             | TOK_SEC_UNKNOWN
 
-   98 dec_num: TOK_DEC
-   99        | TOK_DECONLY
+   98 strnum: TOK_NAME
+   99       | TOK_STRING
+  100       | TOK_HEX
+  101       | TOK_DEC
+  102       | TOK_DECONLY
 
-  100 hex_num: TOK_HEX
-  101        | TOK_DEC
+  103 dec_num: TOK_DEC
+  104        | TOK_DECONLY
 
-  102 string: TOK_NAME
-  103       | TOK_HEX
-  104       | TOK_DEC
-  105       | TOK_DECONLY
+  105 hex_num: TOK_HEX
+  106        | TOK_DEC
 
-  106 memattr: TOK_RAM
-  107        | TOK_ROM
-  108        | TOK_WOM
+  107 ident: TOK_NAME
+  108      | TOK_HEX
+  109      | TOK_DEC
+  110      | TOK_DECONLY
 
-  109 eolns: eolns eoln
-  110      | eoln
+  111 string: TOK_NAME
+  112       | TOK_STRING
+  113       | TOK_HEX
+  114       | TOK_DEC
+  115       | TOK_DECONLY
 
-  111 eoln: '\n'
+  116 memattr_tok: TOK_RAM
+  117            | TOK_ROM
+  118            | TOK_WOM
 
-  112 error_tok: error
+  119 eolns: eolns eoln
+  120      | eoln
+
+  121 eoln: '\n'
+
+  122 error_tok: error
 
 
 Terminals, with rules where they appear
 
 $end (0) 0
-'\n' (10) 111
-',' (44) 72
-'-' (45) 19 26 27 34 41 42 49 77
-':' (58) 34
-'=' (61) 26 27 34 41 49 87
-error (256) 112
+'\n' (10) 121
+',' (44) 76
+'-' (45) 19 26 33 40 50 81
+':' (58) 33 66
+'=' (61) 26 33 40 50 91
+error (256) 122
 TOK_SEC_BANKSWITCH (258) 15
 TOK_SEC_MAPPING (259) 22
-TOK_SEC_ECSBANK (260) 30
-TOK_SEC_MEMATTR (261) 37
-TOK_SEC_PRELOAD (262) 45
-TOK_SEC_MACRO (263) 51
-TOK_SEC_VARS (264) 79
-TOK_SEC_JOYSTICK (265) 80
-TOK_SEC_KEYS (266) 81
-TOK_SEC_CAPSLOCK (267) 82
-TOK_SEC_NUMLOCK (268) 83
-TOK_SEC_SCROLLLOCK (269) 84
-TOK_SEC_DISASM (270) 91
-TOK_SEC_VOICES (271) 92
-TOK_SEC_UNKNOWN (272) 93
-TOK_RAM (273) 106
-TOK_ROM (274) 107
-TOK_WOM (275) 108
-TOK_PAGE (276) 27
-TOK_MAC_QUIET (277) 55 57
-TOK_MAC_REG (278) 71
-TOK_MAC_AHEAD (279) 66
-TOK_MAC_BLANK (280) 67
-TOK_MAC_INSPECT (281) 63
-TOK_MAC_LOAD (282) 60
-TOK_MAC_RUN (283) 68
-TOK_MAC_POKE (284) 62
-TOK_MAC_RUNTO (285) 64
-TOK_MAC_TRACE (286) 65
-TOK_MAC_VIEW (287) 69
-TOK_MAC_WATCH (288) 61
-TOK_DECONLY (289) 97 99 105
-TOK_DEC (290) 96 98 101 104
-TOK_HEX (291) 95 100 103
-TOK_NAME (292) 94 102
-TOK_ERROR_BAD (293)
-TOK_ERROR_OOM (294)
+TOK_SEC_ECSBANK (260) 29
+TOK_SEC_MEMATTR (261) 36
+TOK_SEC_PRELOAD (262) 46
+TOK_SEC_MACRO (263) 53
+TOK_SEC_VARS (264) 83
+TOK_SEC_JOYSTICK (265) 84
+TOK_SEC_KEYS (266) 85
+TOK_SEC_CAPSLOCK (267) 86
+TOK_SEC_NUMLOCK (268) 87
+TOK_SEC_SCROLLLOCK (269) 88
+TOK_SEC_DISASM (270) 95
+TOK_SEC_VOICES (271) 96
+TOK_SEC_UNKNOWN (272) 97
+TOK_RAM (273) 116
+TOK_ROM (274) 117
+TOK_WOM (275) 118
+TOK_PAGE (276) 45 65
+TOK_MAC_QUIET (277) 57 59
+TOK_MAC_REG (278) 75
+TOK_MAC_AHEAD (279) 70
+TOK_MAC_BLANK (280) 71
+TOK_MAC_INSPECT (281) 67
+TOK_MAC_LOAD (282) 62
+TOK_MAC_RUN (283) 72
+TOK_MAC_POKE (284) 64 65 66
+TOK_MAC_RUNTO (285) 68
+TOK_MAC_TRACE (286) 69
+TOK_MAC_VIEW (287) 73
+TOK_MAC_WATCH (288) 63
+TOK_DECONLY (289) 102 104 110 115
+TOK_DEC (290) 101 103 106 109 114
+TOK_HEX (291) 100 105 108 113
+TOK_NAME (292) 98 107 111
+TOK_STRING (293) 99 112
+TOK_ERROR_BAD (294)
+TOK_ERROR_OOM (295)
 
 
 Nonterminals, with rules where they appear
 
-$accept (45)
+$accept (46)
     on left: 0
-config_file (46)
+config_file (47)
     on left: 1, on right: 0
-config (47)
+config (48)
     on left: 2 3 4 5 6 7, on right: 1 2 3 4 5
-seed_config (48)
+seed_config (49)
     on left: 8 9, on right: 6
-sec_memspan (49)
+sec_memspan (50)
     on left: 10 11 12 13 14, on right: 2
-bankswitch (50)
+banksw_head (51)
     on left: 15, on right: 16
-sec_banksw (51)
+sec_banksw (52)
     on left: 16, on right: 10
-banksw_list (52)
+banksw_list (53)
     on left: 17 18, on right: 16 17
-banksw_rec (53)
+banksw_rec (54)
     on left: 19 20 21, on right: 17 18
-mapping (54)
+mapping_head (55)
     on left: 22, on right: 23
-sec_mapping (55)
+sec_mapping (56)
     on left: 23, on right: 11
-mapping_list (56)
+mapping_list (57)
     on left: 24 25, on right: 23 24
-mapping_rec (57)
-    on left: 26 27 28 29, on right: 24 25
-ecsbank (58)
-    on left: 30, on right: 31
-sec_ecsbank (59)
-    on left: 31, on right: 12
-ecsbank_list (60)
-    on left: 32 33, on right: 31 32
-ecsbank_rec (61)
-    on left: 34 35 36, on right: 32 33
-memattr (62)
-    on left: 37 106 107 108, on right: 38 41
-sec_memattr (63)
-    on left: 38, on right: 13
-memattr_list (64)
-    on left: 39 40, on right: 38 39
-memattr_rec (65)
-    on left: 41 42 43 44, on right: 39 40
-preload (66)
-    on left: 45, on right: 46
-sec_preload (67)
-    on left: 46, on right: 14
-preload_list (68)
-    on left: 47 48, on right: 46 47
-preload_rec (69)
-    on left: 49 50, on right: 47 48
-macro (70)
-    on left: 51, on right: 52
-sec_macro (71)
-    on left: 52, on right: 3
-macro_list (72)
-    on left: 53 54, on right: 52 53
-macro_rec (73)
-    on left: 55 56 57 58, on right: 53 54
-macro_line (74)
-    on left: 59 60 61 62 63 64 65 66 67 68 69 70, on right: 55 56
-mac_reg (75)
-    on left: 71, on right: 59
-watch_list (76)
-    on left: 72 73, on right: 61 72
-watch_span (77)
-    on left: 74 75, on right: 72 73
-watch_addr (78)
-    on left: 76, on right: 74
-watch_range (79)
-    on left: 77, on right: 75
-sec_varlike (80)
-    on left: 78, on right: 4
-varlike_head (81)
-    on left: 79 80 81 82 83 84, on right: 78
-var_list (82)
-    on left: 85 86, on right: 78 85
-var_rec (83)
-    on left: 87 88 89, on right: 85 86
-sec_unsup (84)
-    on left: 90, on right: 5
-unknown_sec (85)
-    on left: 91 92 93, on right: 90
-strnum (86)
-    on left: 94 95 96 97, on right: 87
-dec_num (87)
-    on left: 98 99, on right: 41 60
-hex_num (88)
-    on left: 100 101, on right: 19 26 27 34 41 42 49 59 60 62 63 64
-    65 76 77
-string (89)
-    on left: 102 103 104 105, on right: 60 61 87
-eolns (90)
-    on left: 109 110, on right: 9 109
-eoln (91)
-    on left: 111, on right: 16 19 20 21 23 26 27 28 29 31 34 35 36
-    38 41 42 43 44 46 49 50 52 57 58 59 60 61 62 63 64 65 66 67 68
-    69 70 78 87 88 89 90 109 110
-error_tok (92)
-    on left: 112, on right: 7 21 29 36 44 50 70 89
+mapping_rec (58)
+    on left: 26 27 28, on right: 24 25
+ecsbank_head (59)
+    on left: 29, on right: 30
+sec_ecsbank (60)
+    on left: 30, on right: 12
+ecsbank_list (61)
+    on left: 31 32, on right: 30 31
+ecsbank_rec (62)
+    on left: 33 34 35, on right: 31 32
+memattr_head (63)
+    on left: 36, on right: 37
+sec_memattr (64)
+    on left: 37, on right: 13
+memattr_list (65)
+    on left: 38 39, on right: 37 38
+memattr_rec (66)
+    on left: 40 41 42, on right: 38 39
+memattr_page (67)
+    on left: 43 44 45, on right: 26 40 44 45
+preload_head (68)
+    on left: 46, on right: 47
+sec_preload (69)
+    on left: 47, on right: 14
+preload_list (70)
+    on left: 48 49, on right: 47 48
+preload_rec (71)
+    on left: 50 51 52, on right: 48 49
+macro_head (72)
+    on left: 53, on right: 54
+sec_macro (73)
+    on left: 54, on right: 3
+macro_list (74)
+    on left: 55 56, on right: 54 55
+macro_rec (75)
+    on left: 57 58 59 60, on right: 55 56
+macro_line (76)
+    on left: 61 62 63 64 65 66 67 68 69 70 71 72 73 74, on right: 57
+    58
+mac_reg (77)
+    on left: 75, on right: 61
+watch_list (78)
+    on left: 76 77, on right: 63 76
+watch_span (79)
+    on left: 78 79, on right: 76 77
+watch_addr (80)
+    on left: 80, on right: 78
+watch_range (81)
+    on left: 81, on right: 79
+sec_varlike (82)
+    on left: 82, on right: 4
+varlike_head (83)
+    on left: 83 84 85 86 87 88, on right: 82
+var_list (84)
+    on left: 89 90, on right: 82 89
+var_rec (85)
+    on left: 91 92 93, on right: 89 90
+sec_unsup (86)
+    on left: 94, on right: 5
+unknown_head (87)
+    on left: 95 96 97, on right: 94
+strnum (88)
+    on left: 98 99 100 101 102, on right: 91
+dec_num (89)
+    on left: 103 104, on right: 44 62
+hex_num (90)
+    on left: 105 106, on right: 19 26 33 40 45 50 61 62 64 65 66 67
+    68 69 80 81
+ident (91)
+    on left: 107 108 109 110, on right: 63 91
+string (92)
+    on left: 111 112 113 114 115, on right: 62
+memattr_tok (93)
+    on left: 116 117 118, on right: 44
+eolns (94)
+    on left: 119 120, on right: 9 119
+eoln (95)
+    on left: 121, on right: 16 19 20 21 23 27 28 30 33 34 35 37 41
+    42 43 47 50 51 52 54 59 60 61 62 63 64 65 66 67 68 69 70 71 72
+    73 74 82 91 92 93 94 119 120
+error_tok (96)
+    on left: 122, on right: 7 21 28 35 42 51 74 93
 
 
-state 0
+State 0
 
     0 $accept: . config_file $end
 
@@ -343,9 +363,6 @@ state 0
     TOK_SEC_DISASM      reduce using rule 8 (seed_config)
     TOK_SEC_VOICES      reduce using rule 8 (seed_config)
     TOK_SEC_UNKNOWN     reduce using rule 8 (seed_config)
-    TOK_RAM             reduce using rule 8 (seed_config)
-    TOK_ROM             reduce using rule 8 (seed_config)
-    TOK_WOM             reduce using rule 8 (seed_config)
 
     config_file  go to state 3
     config       go to state 4
@@ -355,28 +372,28 @@ state 0
     error_tok    go to state 8
 
 
-state 1
+State 1
 
-  112 error_tok: error .
+  122 error_tok: error .
 
-    $default  reduce using rule 112 (error_tok)
-
-
-state 2
-
-  111 eoln: '\n' .
-
-    $default  reduce using rule 111 (eoln)
+    $default  reduce using rule 122 (error_tok)
 
 
-state 3
+State 2
+
+  121 eoln: '\n' .
+
+    $default  reduce using rule 121 (eoln)
+
+
+State 3
 
     0 $accept: config_file . $end
 
     $end  shift, and go to state 9
 
 
-state 4
+State 4
 
     1 config_file: config .
     2 config: config . sec_memspan
@@ -399,491 +416,469 @@ state 4
     TOK_SEC_DISASM      shift, and go to state 22
     TOK_SEC_VOICES      shift, and go to state 23
     TOK_SEC_UNKNOWN     shift, and go to state 24
-    TOK_RAM             shift, and go to state 25
-    TOK_ROM             shift, and go to state 26
-    TOK_WOM             shift, and go to state 27
 
     $default  reduce using rule 1 (config_file)
 
-    sec_memspan   go to state 28
-    bankswitch    go to state 29
-    sec_banksw    go to state 30
-    mapping       go to state 31
-    sec_mapping   go to state 32
-    ecsbank       go to state 33
-    sec_ecsbank   go to state 34
-    memattr       go to state 35
-    sec_memattr   go to state 36
-    preload       go to state 37
-    sec_preload   go to state 38
-    macro         go to state 39
-    sec_macro     go to state 40
-    sec_varlike   go to state 41
-    varlike_head  go to state 42
-    sec_unsup     go to state 43
-    unknown_sec   go to state 44
+    sec_memspan   go to state 25
+    banksw_head   go to state 26
+    sec_banksw    go to state 27
+    mapping_head  go to state 28
+    sec_mapping   go to state 29
+    ecsbank_head  go to state 30
+    sec_ecsbank   go to state 31
+    memattr_head  go to state 32
+    sec_memattr   go to state 33
+    preload_head  go to state 34
+    sec_preload   go to state 35
+    macro_head    go to state 36
+    sec_macro     go to state 37
+    sec_varlike   go to state 38
+    varlike_head  go to state 39
+    sec_unsup     go to state 40
+    unknown_head  go to state 41
 
 
-state 5
+State 5
 
     6 config: seed_config .
 
     $default  reduce using rule 6 (config)
 
 
-state 6
+State 6
 
     9 seed_config: eolns .
-  109 eolns: eolns . eoln
+  119 eolns: eolns . eoln
 
     '\n'  shift, and go to state 2
 
     $default  reduce using rule 9 (seed_config)
 
-    eoln  go to state 45
+    eoln  go to state 42
 
 
-state 7
+State 7
 
-  110 eolns: eoln .
+  120 eolns: eoln .
 
-    $default  reduce using rule 110 (eolns)
+    $default  reduce using rule 120 (eolns)
 
 
-state 8
+State 8
 
     7 config: error_tok .
 
     $default  reduce using rule 7 (config)
 
 
-state 9
+State 9
 
     0 $accept: config_file $end .
 
     $default  accept
 
 
-state 10
+State 10
 
-   15 bankswitch: TOK_SEC_BANKSWITCH .
+   15 banksw_head: TOK_SEC_BANKSWITCH .
 
-    $default  reduce using rule 15 (bankswitch)
-
-
-state 11
-
-   22 mapping: TOK_SEC_MAPPING .
-
-    $default  reduce using rule 22 (mapping)
+    $default  reduce using rule 15 (banksw_head)
 
 
-state 12
+State 11
 
-   30 ecsbank: TOK_SEC_ECSBANK .
+   22 mapping_head: TOK_SEC_MAPPING .
 
-    $default  reduce using rule 30 (ecsbank)
-
-
-state 13
-
-   37 memattr: TOK_SEC_MEMATTR .
-
-    $default  reduce using rule 37 (memattr)
+    $default  reduce using rule 22 (mapping_head)
 
 
-state 14
+State 12
 
-   45 preload: TOK_SEC_PRELOAD .
+   29 ecsbank_head: TOK_SEC_ECSBANK .
 
-    $default  reduce using rule 45 (preload)
-
-
-state 15
-
-   51 macro: TOK_SEC_MACRO .
-
-    $default  reduce using rule 51 (macro)
+    $default  reduce using rule 29 (ecsbank_head)
 
 
-state 16
+State 13
 
-   79 varlike_head: TOK_SEC_VARS .
+   36 memattr_head: TOK_SEC_MEMATTR .
 
-    $default  reduce using rule 79 (varlike_head)
-
-
-state 17
-
-   80 varlike_head: TOK_SEC_JOYSTICK .
-
-    $default  reduce using rule 80 (varlike_head)
+    $default  reduce using rule 36 (memattr_head)
 
 
-state 18
+State 14
 
-   81 varlike_head: TOK_SEC_KEYS .
+   46 preload_head: TOK_SEC_PRELOAD .
 
-    $default  reduce using rule 81 (varlike_head)
-
-
-state 19
-
-   82 varlike_head: TOK_SEC_CAPSLOCK .
-
-    $default  reduce using rule 82 (varlike_head)
+    $default  reduce using rule 46 (preload_head)
 
 
-state 20
+State 15
 
-   83 varlike_head: TOK_SEC_NUMLOCK .
+   53 macro_head: TOK_SEC_MACRO .
+
+    $default  reduce using rule 53 (macro_head)
+
+
+State 16
+
+   83 varlike_head: TOK_SEC_VARS .
 
     $default  reduce using rule 83 (varlike_head)
 
 
-state 21
+State 17
 
-   84 varlike_head: TOK_SEC_SCROLLLOCK .
+   84 varlike_head: TOK_SEC_JOYSTICK .
 
     $default  reduce using rule 84 (varlike_head)
 
 
-state 22
+State 18
 
-   91 unknown_sec: TOK_SEC_DISASM .
+   85 varlike_head: TOK_SEC_KEYS .
 
-    $default  reduce using rule 91 (unknown_sec)
-
-
-state 23
-
-   92 unknown_sec: TOK_SEC_VOICES .
-
-    $default  reduce using rule 92 (unknown_sec)
+    $default  reduce using rule 85 (varlike_head)
 
 
-state 24
+State 19
 
-   93 unknown_sec: TOK_SEC_UNKNOWN .
+   86 varlike_head: TOK_SEC_CAPSLOCK .
 
-    $default  reduce using rule 93 (unknown_sec)
-
-
-state 25
-
-  106 memattr: TOK_RAM .
-
-    $default  reduce using rule 106 (memattr)
+    $default  reduce using rule 86 (varlike_head)
 
 
-state 26
+State 20
 
-  107 memattr: TOK_ROM .
+   87 varlike_head: TOK_SEC_NUMLOCK .
 
-    $default  reduce using rule 107 (memattr)
-
-
-state 27
-
-  108 memattr: TOK_WOM .
-
-    $default  reduce using rule 108 (memattr)
+    $default  reduce using rule 87 (varlike_head)
 
 
-state 28
+State 21
+
+   88 varlike_head: TOK_SEC_SCROLLLOCK .
+
+    $default  reduce using rule 88 (varlike_head)
+
+
+State 22
+
+   95 unknown_head: TOK_SEC_DISASM .
+
+    $default  reduce using rule 95 (unknown_head)
+
+
+State 23
+
+   96 unknown_head: TOK_SEC_VOICES .
+
+    $default  reduce using rule 96 (unknown_head)
+
+
+State 24
+
+   97 unknown_head: TOK_SEC_UNKNOWN .
+
+    $default  reduce using rule 97 (unknown_head)
+
+
+State 25
 
     2 config: config sec_memspan .
 
     $default  reduce using rule 2 (config)
 
 
-state 29
+State 26
 
-   16 sec_banksw: bankswitch . eoln banksw_list
+   16 sec_banksw: banksw_head . eoln banksw_list
 
     '\n'  shift, and go to state 2
 
-    eoln  go to state 46
+    eoln  go to state 43
 
 
-state 30
+State 27
 
    10 sec_memspan: sec_banksw .
 
     $default  reduce using rule 10 (sec_memspan)
 
 
-state 31
+State 28
 
-   23 sec_mapping: mapping . eoln mapping_list
+   23 sec_mapping: mapping_head . eoln mapping_list
 
     '\n'  shift, and go to state 2
 
-    eoln  go to state 47
+    eoln  go to state 44
 
 
-state 32
+State 29
 
    11 sec_memspan: sec_mapping .
 
     $default  reduce using rule 11 (sec_memspan)
 
 
-state 33
+State 30
 
-   31 sec_ecsbank: ecsbank . eoln ecsbank_list
+   30 sec_ecsbank: ecsbank_head . eoln ecsbank_list
 
     '\n'  shift, and go to state 2
 
-    eoln  go to state 48
+    eoln  go to state 45
 
 
-state 34
+State 31
 
    12 sec_memspan: sec_ecsbank .
 
     $default  reduce using rule 12 (sec_memspan)
 
 
-state 35
+State 32
 
-   38 sec_memattr: memattr . eoln memattr_list
+   37 sec_memattr: memattr_head . eoln memattr_list
 
     '\n'  shift, and go to state 2
 
-    eoln  go to state 49
+    eoln  go to state 46
 
 
-state 36
+State 33
 
    13 sec_memspan: sec_memattr .
 
     $default  reduce using rule 13 (sec_memspan)
 
 
-state 37
+State 34
 
-   46 sec_preload: preload . eoln preload_list
+   47 sec_preload: preload_head . eoln preload_list
 
     '\n'  shift, and go to state 2
 
-    eoln  go to state 50
+    eoln  go to state 47
 
 
-state 38
+State 35
 
    14 sec_memspan: sec_preload .
 
     $default  reduce using rule 14 (sec_memspan)
 
 
-state 39
+State 36
 
-   52 sec_macro: macro . eoln macro_list
+   54 sec_macro: macro_head . eoln macro_list
 
     '\n'  shift, and go to state 2
 
-    eoln  go to state 51
+    eoln  go to state 48
 
 
-state 40
+State 37
 
     3 config: config sec_macro .
 
     $default  reduce using rule 3 (config)
 
 
-state 41
+State 38
 
     4 config: config sec_varlike .
 
     $default  reduce using rule 4 (config)
 
 
-state 42
+State 39
 
-   78 sec_varlike: varlike_head . eoln var_list
+   82 sec_varlike: varlike_head . eoln var_list
 
     '\n'  shift, and go to state 2
 
-    eoln  go to state 52
+    eoln  go to state 49
 
 
-state 43
+State 40
 
     5 config: config sec_unsup .
 
     $default  reduce using rule 5 (config)
 
 
-state 44
+State 41
 
-   90 sec_unsup: unknown_sec . eoln
+   94 sec_unsup: unknown_head . eoln
 
     '\n'  shift, and go to state 2
 
-    eoln  go to state 53
+    eoln  go to state 50
 
 
-state 45
+State 42
 
-  109 eolns: eolns eoln .
+  119 eolns: eolns eoln .
 
-    $default  reduce using rule 109 (eolns)
+    $default  reduce using rule 119 (eolns)
 
 
-state 46
+State 43
 
-   16 sec_banksw: bankswitch eoln . banksw_list
+   16 sec_banksw: banksw_head eoln . banksw_list
 
     error    shift, and go to state 1
-    TOK_DEC  shift, and go to state 54
-    TOK_HEX  shift, and go to state 55
+    TOK_DEC  shift, and go to state 51
+    TOK_HEX  shift, and go to state 52
     '\n'     shift, and go to state 2
 
-    banksw_list  go to state 56
-    banksw_rec   go to state 57
-    hex_num      go to state 58
-    eoln         go to state 59
-    error_tok    go to state 60
+    banksw_list  go to state 53
+    banksw_rec   go to state 54
+    hex_num      go to state 55
+    eoln         go to state 56
+    error_tok    go to state 57
 
 
-state 47
+State 44
 
-   23 sec_mapping: mapping eoln . mapping_list
+   23 sec_mapping: mapping_head eoln . mapping_list
 
     error    shift, and go to state 1
-    TOK_DEC  shift, and go to state 54
-    TOK_HEX  shift, and go to state 55
+    TOK_DEC  shift, and go to state 51
+    TOK_HEX  shift, and go to state 52
     '\n'     shift, and go to state 2
 
-    mapping_list  go to state 61
-    mapping_rec   go to state 62
-    hex_num       go to state 63
-    eoln          go to state 64
-    error_tok     go to state 65
+    mapping_list  go to state 58
+    mapping_rec   go to state 59
+    hex_num       go to state 60
+    eoln          go to state 61
+    error_tok     go to state 62
 
 
-state 48
+State 45
 
-   31 sec_ecsbank: ecsbank eoln . ecsbank_list
+   30 sec_ecsbank: ecsbank_head eoln . ecsbank_list
 
     error    shift, and go to state 1
-    TOK_DEC  shift, and go to state 54
-    TOK_HEX  shift, and go to state 55
+    TOK_DEC  shift, and go to state 51
+    TOK_HEX  shift, and go to state 52
     '\n'     shift, and go to state 2
 
-    ecsbank_list  go to state 66
-    ecsbank_rec   go to state 67
-    hex_num       go to state 68
-    eoln          go to state 69
-    error_tok     go to state 70
+    ecsbank_list  go to state 63
+    ecsbank_rec   go to state 64
+    hex_num       go to state 65
+    eoln          go to state 66
+    error_tok     go to state 67
 
 
-state 49
+State 46
 
-   38 sec_memattr: memattr eoln . memattr_list
+   37 sec_memattr: memattr_head eoln . memattr_list
 
     error    shift, and go to state 1
-    TOK_DEC  shift, and go to state 54
-    TOK_HEX  shift, and go to state 55
+    TOK_DEC  shift, and go to state 51
+    TOK_HEX  shift, and go to state 52
     '\n'     shift, and go to state 2
 
-    memattr_list  go to state 71
-    memattr_rec   go to state 72
-    hex_num       go to state 73
-    eoln          go to state 74
-    error_tok     go to state 75
+    memattr_list  go to state 68
+    memattr_rec   go to state 69
+    hex_num       go to state 70
+    eoln          go to state 71
+    error_tok     go to state 72
 
 
-state 50
+State 47
 
-   46 sec_preload: preload eoln . preload_list
+   47 sec_preload: preload_head eoln . preload_list
 
     error    shift, and go to state 1
-    TOK_DEC  shift, and go to state 54
-    TOK_HEX  shift, and go to state 55
+    TOK_DEC  shift, and go to state 51
+    TOK_HEX  shift, and go to state 52
+    '\n'     shift, and go to state 2
 
-    preload_list  go to state 76
-    preload_rec   go to state 77
-    hex_num       go to state 78
-    error_tok     go to state 79
+    preload_list  go to state 73
+    preload_rec   go to state 74
+    hex_num       go to state 75
+    eoln          go to state 76
+    error_tok     go to state 77
 
 
-state 51
+State 48
 
-   52 sec_macro: macro eoln . macro_list
+   54 sec_macro: macro_head eoln . macro_list
 
     error            shift, and go to state 1
-    TOK_MAC_QUIET    shift, and go to state 80
-    TOK_MAC_REG      shift, and go to state 81
-    TOK_MAC_AHEAD    shift, and go to state 82
-    TOK_MAC_BLANK    shift, and go to state 83
-    TOK_MAC_INSPECT  shift, and go to state 84
-    TOK_MAC_LOAD     shift, and go to state 85
-    TOK_MAC_RUN      shift, and go to state 86
-    TOK_MAC_POKE     shift, and go to state 87
-    TOK_MAC_RUNTO    shift, and go to state 88
-    TOK_MAC_TRACE    shift, and go to state 89
-    TOK_MAC_VIEW     shift, and go to state 90
-    TOK_MAC_WATCH    shift, and go to state 91
+    TOK_MAC_QUIET    shift, and go to state 78
+    TOK_MAC_REG      shift, and go to state 79
+    TOK_MAC_AHEAD    shift, and go to state 80
+    TOK_MAC_BLANK    shift, and go to state 81
+    TOK_MAC_INSPECT  shift, and go to state 82
+    TOK_MAC_LOAD     shift, and go to state 83
+    TOK_MAC_RUN      shift, and go to state 84
+    TOK_MAC_POKE     shift, and go to state 85
+    TOK_MAC_RUNTO    shift, and go to state 86
+    TOK_MAC_TRACE    shift, and go to state 87
+    TOK_MAC_VIEW     shift, and go to state 88
+    TOK_MAC_WATCH    shift, and go to state 89
     '\n'             shift, and go to state 2
 
-    macro_list  go to state 92
-    macro_rec   go to state 93
-    macro_line  go to state 94
-    mac_reg     go to state 95
-    eoln        go to state 96
-    error_tok   go to state 97
+    macro_list  go to state 90
+    macro_rec   go to state 91
+    macro_line  go to state 92
+    mac_reg     go to state 93
+    eoln        go to state 94
+    error_tok   go to state 95
 
 
-state 52
+State 49
 
-   78 sec_varlike: varlike_head eoln . var_list
+   82 sec_varlike: varlike_head eoln . var_list
 
     error        shift, and go to state 1
-    TOK_DECONLY  shift, and go to state 98
-    TOK_DEC      shift, and go to state 99
-    TOK_HEX      shift, and go to state 100
-    TOK_NAME     shift, and go to state 101
+    TOK_DECONLY  shift, and go to state 96
+    TOK_DEC      shift, and go to state 97
+    TOK_HEX      shift, and go to state 98
+    TOK_NAME     shift, and go to state 99
     '\n'         shift, and go to state 2
 
-    var_list   go to state 102
-    var_rec    go to state 103
-    string     go to state 104
-    eoln       go to state 105
-    error_tok  go to state 106
+    var_list   go to state 100
+    var_rec    go to state 101
+    ident      go to state 102
+    eoln       go to state 103
+    error_tok  go to state 104
 
 
-state 53
+State 50
 
-   90 sec_unsup: unknown_sec eoln .
+   94 sec_unsup: unknown_head eoln .
 
-    $default  reduce using rule 90 (sec_unsup)
-
-
-state 54
-
-  101 hex_num: TOK_DEC .
-
-    $default  reduce using rule 101 (hex_num)
+    $default  reduce using rule 94 (sec_unsup)
 
 
-state 55
+State 51
 
-  100 hex_num: TOK_HEX .
+  106 hex_num: TOK_DEC .
 
-    $default  reduce using rule 100 (hex_num)
+    $default  reduce using rule 106 (hex_num)
 
 
-state 56
+State 52
 
-   16 sec_banksw: bankswitch eoln banksw_list .
+  105 hex_num: TOK_HEX .
+
+    $default  reduce using rule 105 (hex_num)
+
+
+State 53
+
+   16 sec_banksw: banksw_head eoln banksw_list .
    17 banksw_list: banksw_list . banksw_rec
 
     error    shift, and go to state 1
-    TOK_DEC  shift, and go to state 54
-    TOK_HEX  shift, and go to state 55
+    TOK_DEC  shift, and go to state 51
+    TOK_HEX  shift, and go to state 52
     '\n'     shift, and go to state 2
 
     $end                reduce using rule 16 (sec_banksw)
@@ -902,54 +897,51 @@ state 56
     TOK_SEC_DISASM      reduce using rule 16 (sec_banksw)
     TOK_SEC_VOICES      reduce using rule 16 (sec_banksw)
     TOK_SEC_UNKNOWN     reduce using rule 16 (sec_banksw)
-    TOK_RAM             reduce using rule 16 (sec_banksw)
-    TOK_ROM             reduce using rule 16 (sec_banksw)
-    TOK_WOM             reduce using rule 16 (sec_banksw)
 
-    banksw_rec  go to state 107
-    hex_num     go to state 58
-    eoln        go to state 59
-    error_tok   go to state 60
+    banksw_rec  go to state 105
+    hex_num     go to state 55
+    eoln        go to state 56
+    error_tok   go to state 57
 
 
-state 57
+State 54
 
    18 banksw_list: banksw_rec .
 
     $default  reduce using rule 18 (banksw_list)
 
 
-state 58
+State 55
 
    19 banksw_rec: hex_num . '-' hex_num eoln
 
-    '-'  shift, and go to state 108
+    '-'  shift, and go to state 106
 
 
-state 59
+State 56
 
    20 banksw_rec: eoln .
 
     $default  reduce using rule 20 (banksw_rec)
 
 
-state 60
+State 57
 
    21 banksw_rec: error_tok . eoln
 
     '\n'  shift, and go to state 2
 
-    eoln  go to state 109
+    eoln  go to state 107
 
 
-state 61
+State 58
 
-   23 sec_mapping: mapping eoln mapping_list .
+   23 sec_mapping: mapping_head eoln mapping_list .
    24 mapping_list: mapping_list . mapping_rec
 
     error    shift, and go to state 1
-    TOK_DEC  shift, and go to state 54
-    TOK_HEX  shift, and go to state 55
+    TOK_DEC  shift, and go to state 51
+    TOK_HEX  shift, and go to state 52
     '\n'     shift, and go to state 2
 
     $end                reduce using rule 23 (sec_mapping)
@@ -968,1253 +960,1403 @@ state 61
     TOK_SEC_DISASM      reduce using rule 23 (sec_mapping)
     TOK_SEC_VOICES      reduce using rule 23 (sec_mapping)
     TOK_SEC_UNKNOWN     reduce using rule 23 (sec_mapping)
-    TOK_RAM             reduce using rule 23 (sec_mapping)
-    TOK_ROM             reduce using rule 23 (sec_mapping)
-    TOK_WOM             reduce using rule 23 (sec_mapping)
 
-    mapping_rec  go to state 110
-    hex_num      go to state 63
-    eoln         go to state 64
-    error_tok    go to state 65
+    mapping_rec  go to state 108
+    hex_num      go to state 60
+    eoln         go to state 61
+    error_tok    go to state 62
 
 
-state 62
+State 59
 
    25 mapping_list: mapping_rec .
 
     $default  reduce using rule 25 (mapping_list)
 
 
-state 63
+State 60
 
-   26 mapping_rec: hex_num . '-' hex_num '=' hex_num eoln
-   27            | hex_num . '-' hex_num '=' hex_num TOK_PAGE hex_num eoln
+   26 mapping_rec: hex_num . '-' hex_num '=' hex_num memattr_page
 
-    '-'  shift, and go to state 111
-
-
-state 64
-
-   28 mapping_rec: eoln .
-
-    $default  reduce using rule 28 (mapping_rec)
+    '-'  shift, and go to state 109
 
 
-state 65
+State 61
 
-   29 mapping_rec: error_tok . eoln
+   27 mapping_rec: eoln .
+
+    $default  reduce using rule 27 (mapping_rec)
+
+
+State 62
+
+   28 mapping_rec: error_tok . eoln
 
     '\n'  shift, and go to state 2
 
-    eoln  go to state 112
+    eoln  go to state 110
 
 
-state 66
+State 63
 
-   31 sec_ecsbank: ecsbank eoln ecsbank_list .
-   32 ecsbank_list: ecsbank_list . ecsbank_rec
+   30 sec_ecsbank: ecsbank_head eoln ecsbank_list .
+   31 ecsbank_list: ecsbank_list . ecsbank_rec
 
     error    shift, and go to state 1
-    TOK_DEC  shift, and go to state 54
-    TOK_HEX  shift, and go to state 55
+    TOK_DEC  shift, and go to state 51
+    TOK_HEX  shift, and go to state 52
     '\n'     shift, and go to state 2
 
-    $end                reduce using rule 31 (sec_ecsbank)
-    TOK_SEC_BANKSWITCH  reduce using rule 31 (sec_ecsbank)
-    TOK_SEC_MAPPING     reduce using rule 31 (sec_ecsbank)
-    TOK_SEC_ECSBANK     reduce using rule 31 (sec_ecsbank)
-    TOK_SEC_MEMATTR     reduce using rule 31 (sec_ecsbank)
-    TOK_SEC_PRELOAD     reduce using rule 31 (sec_ecsbank)
-    TOK_SEC_MACRO       reduce using rule 31 (sec_ecsbank)
-    TOK_SEC_VARS        reduce using rule 31 (sec_ecsbank)
-    TOK_SEC_JOYSTICK    reduce using rule 31 (sec_ecsbank)
-    TOK_SEC_KEYS        reduce using rule 31 (sec_ecsbank)
-    TOK_SEC_CAPSLOCK    reduce using rule 31 (sec_ecsbank)
-    TOK_SEC_NUMLOCK     reduce using rule 31 (sec_ecsbank)
-    TOK_SEC_SCROLLLOCK  reduce using rule 31 (sec_ecsbank)
-    TOK_SEC_DISASM      reduce using rule 31 (sec_ecsbank)
-    TOK_SEC_VOICES      reduce using rule 31 (sec_ecsbank)
-    TOK_SEC_UNKNOWN     reduce using rule 31 (sec_ecsbank)
-    TOK_RAM             reduce using rule 31 (sec_ecsbank)
-    TOK_ROM             reduce using rule 31 (sec_ecsbank)
-    TOK_WOM             reduce using rule 31 (sec_ecsbank)
+    $end                reduce using rule 30 (sec_ecsbank)
+    TOK_SEC_BANKSWITCH  reduce using rule 30 (sec_ecsbank)
+    TOK_SEC_MAPPING     reduce using rule 30 (sec_ecsbank)
+    TOK_SEC_ECSBANK     reduce using rule 30 (sec_ecsbank)
+    TOK_SEC_MEMATTR     reduce using rule 30 (sec_ecsbank)
+    TOK_SEC_PRELOAD     reduce using rule 30 (sec_ecsbank)
+    TOK_SEC_MACRO       reduce using rule 30 (sec_ecsbank)
+    TOK_SEC_VARS        reduce using rule 30 (sec_ecsbank)
+    TOK_SEC_JOYSTICK    reduce using rule 30 (sec_ecsbank)
+    TOK_SEC_KEYS        reduce using rule 30 (sec_ecsbank)
+    TOK_SEC_CAPSLOCK    reduce using rule 30 (sec_ecsbank)
+    TOK_SEC_NUMLOCK     reduce using rule 30 (sec_ecsbank)
+    TOK_SEC_SCROLLLOCK  reduce using rule 30 (sec_ecsbank)
+    TOK_SEC_DISASM      reduce using rule 30 (sec_ecsbank)
+    TOK_SEC_VOICES      reduce using rule 30 (sec_ecsbank)
+    TOK_SEC_UNKNOWN     reduce using rule 30 (sec_ecsbank)
 
-    ecsbank_rec  go to state 113
-    hex_num      go to state 68
-    eoln         go to state 69
-    error_tok    go to state 70
+    ecsbank_rec  go to state 111
+    hex_num      go to state 65
+    eoln         go to state 66
+    error_tok    go to state 67
 
 
-state 67
+State 64
 
-   33 ecsbank_list: ecsbank_rec .
+   32 ecsbank_list: ecsbank_rec .
 
-    $default  reduce using rule 33 (ecsbank_list)
-
-
-state 68
-
-   34 ecsbank_rec: hex_num . ':' hex_num '-' hex_num '=' hex_num eoln
-
-    ':'  shift, and go to state 114
+    $default  reduce using rule 32 (ecsbank_list)
 
 
-state 69
+State 65
 
-   35 ecsbank_rec: eoln .
+   33 ecsbank_rec: hex_num . ':' hex_num '-' hex_num '=' hex_num eoln
 
-    $default  reduce using rule 35 (ecsbank_rec)
+    ':'  shift, and go to state 112
 
 
-state 70
+State 66
 
-   36 ecsbank_rec: error_tok . eoln
+   34 ecsbank_rec: eoln .
+
+    $default  reduce using rule 34 (ecsbank_rec)
+
+
+State 67
+
+   35 ecsbank_rec: error_tok . eoln
 
     '\n'  shift, and go to state 2
 
-    eoln  go to state 115
+    eoln  go to state 113
 
 
-state 71
+State 68
 
-   38 sec_memattr: memattr eoln memattr_list .
-   39 memattr_list: memattr_list . memattr_rec
+   37 sec_memattr: memattr_head eoln memattr_list .
+   38 memattr_list: memattr_list . memattr_rec
 
     error    shift, and go to state 1
-    TOK_DEC  shift, and go to state 54
-    TOK_HEX  shift, and go to state 55
+    TOK_DEC  shift, and go to state 51
+    TOK_HEX  shift, and go to state 52
     '\n'     shift, and go to state 2
 
-    $end                reduce using rule 38 (sec_memattr)
-    TOK_SEC_BANKSWITCH  reduce using rule 38 (sec_memattr)
-    TOK_SEC_MAPPING     reduce using rule 38 (sec_memattr)
-    TOK_SEC_ECSBANK     reduce using rule 38 (sec_memattr)
-    TOK_SEC_MEMATTR     reduce using rule 38 (sec_memattr)
-    TOK_SEC_PRELOAD     reduce using rule 38 (sec_memattr)
-    TOK_SEC_MACRO       reduce using rule 38 (sec_memattr)
-    TOK_SEC_VARS        reduce using rule 38 (sec_memattr)
-    TOK_SEC_JOYSTICK    reduce using rule 38 (sec_memattr)
-    TOK_SEC_KEYS        reduce using rule 38 (sec_memattr)
-    TOK_SEC_CAPSLOCK    reduce using rule 38 (sec_memattr)
-    TOK_SEC_NUMLOCK     reduce using rule 38 (sec_memattr)
-    TOK_SEC_SCROLLLOCK  reduce using rule 38 (sec_memattr)
-    TOK_SEC_DISASM      reduce using rule 38 (sec_memattr)
-    TOK_SEC_VOICES      reduce using rule 38 (sec_memattr)
-    TOK_SEC_UNKNOWN     reduce using rule 38 (sec_memattr)
-    TOK_RAM             reduce using rule 38 (sec_memattr)
-    TOK_ROM             reduce using rule 38 (sec_memattr)
-    TOK_WOM             reduce using rule 38 (sec_memattr)
+    $end                reduce using rule 37 (sec_memattr)
+    TOK_SEC_BANKSWITCH  reduce using rule 37 (sec_memattr)
+    TOK_SEC_MAPPING     reduce using rule 37 (sec_memattr)
+    TOK_SEC_ECSBANK     reduce using rule 37 (sec_memattr)
+    TOK_SEC_MEMATTR     reduce using rule 37 (sec_memattr)
+    TOK_SEC_PRELOAD     reduce using rule 37 (sec_memattr)
+    TOK_SEC_MACRO       reduce using rule 37 (sec_memattr)
+    TOK_SEC_VARS        reduce using rule 37 (sec_memattr)
+    TOK_SEC_JOYSTICK    reduce using rule 37 (sec_memattr)
+    TOK_SEC_KEYS        reduce using rule 37 (sec_memattr)
+    TOK_SEC_CAPSLOCK    reduce using rule 37 (sec_memattr)
+    TOK_SEC_NUMLOCK     reduce using rule 37 (sec_memattr)
+    TOK_SEC_SCROLLLOCK  reduce using rule 37 (sec_memattr)
+    TOK_SEC_DISASM      reduce using rule 37 (sec_memattr)
+    TOK_SEC_VOICES      reduce using rule 37 (sec_memattr)
+    TOK_SEC_UNKNOWN     reduce using rule 37 (sec_memattr)
 
-    memattr_rec  go to state 116
-    hex_num      go to state 73
-    eoln         go to state 74
-    error_tok    go to state 75
+    memattr_rec  go to state 114
+    hex_num      go to state 70
+    eoln         go to state 71
+    error_tok    go to state 72
 
 
-state 72
+State 69
 
-   40 memattr_list: memattr_rec .
+   39 memattr_list: memattr_rec .
 
-    $default  reduce using rule 40 (memattr_list)
-
-
-state 73
-
-   41 memattr_rec: hex_num . '-' hex_num '=' memattr dec_num eoln
-   42            | hex_num . '-' hex_num eoln
-
-    '-'  shift, and go to state 117
+    $default  reduce using rule 39 (memattr_list)
 
 
-state 74
+State 70
 
-   43 memattr_rec: eoln .
+   40 memattr_rec: hex_num . '-' hex_num '=' memattr_page
 
-    $default  reduce using rule 43 (memattr_rec)
+    '-'  shift, and go to state 115
 
 
-state 75
+State 71
 
-   44 memattr_rec: error_tok . eoln
+   41 memattr_rec: eoln .
+
+    $default  reduce using rule 41 (memattr_rec)
+
+
+State 72
+
+   42 memattr_rec: error_tok . eoln
 
     '\n'  shift, and go to state 2
 
-    eoln  go to state 118
+    eoln  go to state 116
 
 
-state 76
+State 73
 
-   46 sec_preload: preload eoln preload_list .
-   47 preload_list: preload_list . preload_rec
+   47 sec_preload: preload_head eoln preload_list .
+   48 preload_list: preload_list . preload_rec
 
     error    shift, and go to state 1
-    TOK_DEC  shift, and go to state 54
-    TOK_HEX  shift, and go to state 55
+    TOK_DEC  shift, and go to state 51
+    TOK_HEX  shift, and go to state 52
+    '\n'     shift, and go to state 2
 
-    $end                reduce using rule 46 (sec_preload)
-    TOK_SEC_BANKSWITCH  reduce using rule 46 (sec_preload)
-    TOK_SEC_MAPPING     reduce using rule 46 (sec_preload)
-    TOK_SEC_ECSBANK     reduce using rule 46 (sec_preload)
-    TOK_SEC_MEMATTR     reduce using rule 46 (sec_preload)
-    TOK_SEC_PRELOAD     reduce using rule 46 (sec_preload)
-    TOK_SEC_MACRO       reduce using rule 46 (sec_preload)
-    TOK_SEC_VARS        reduce using rule 46 (sec_preload)
-    TOK_SEC_JOYSTICK    reduce using rule 46 (sec_preload)
-    TOK_SEC_KEYS        reduce using rule 46 (sec_preload)
-    TOK_SEC_CAPSLOCK    reduce using rule 46 (sec_preload)
-    TOK_SEC_NUMLOCK     reduce using rule 46 (sec_preload)
-    TOK_SEC_SCROLLLOCK  reduce using rule 46 (sec_preload)
-    TOK_SEC_DISASM      reduce using rule 46 (sec_preload)
-    TOK_SEC_VOICES      reduce using rule 46 (sec_preload)
-    TOK_SEC_UNKNOWN     reduce using rule 46 (sec_preload)
-    TOK_RAM             reduce using rule 46 (sec_preload)
-    TOK_ROM             reduce using rule 46 (sec_preload)
-    TOK_WOM             reduce using rule 46 (sec_preload)
+    $end                reduce using rule 47 (sec_preload)
+    TOK_SEC_BANKSWITCH  reduce using rule 47 (sec_preload)
+    TOK_SEC_MAPPING     reduce using rule 47 (sec_preload)
+    TOK_SEC_ECSBANK     reduce using rule 47 (sec_preload)
+    TOK_SEC_MEMATTR     reduce using rule 47 (sec_preload)
+    TOK_SEC_PRELOAD     reduce using rule 47 (sec_preload)
+    TOK_SEC_MACRO       reduce using rule 47 (sec_preload)
+    TOK_SEC_VARS        reduce using rule 47 (sec_preload)
+    TOK_SEC_JOYSTICK    reduce using rule 47 (sec_preload)
+    TOK_SEC_KEYS        reduce using rule 47 (sec_preload)
+    TOK_SEC_CAPSLOCK    reduce using rule 47 (sec_preload)
+    TOK_SEC_NUMLOCK     reduce using rule 47 (sec_preload)
+    TOK_SEC_SCROLLLOCK  reduce using rule 47 (sec_preload)
+    TOK_SEC_DISASM      reduce using rule 47 (sec_preload)
+    TOK_SEC_VOICES      reduce using rule 47 (sec_preload)
+    TOK_SEC_UNKNOWN     reduce using rule 47 (sec_preload)
 
-    preload_rec  go to state 119
-    hex_num      go to state 78
-    error_tok    go to state 79
-
-
-state 77
-
-   48 preload_list: preload_rec .
-
-    $default  reduce using rule 48 (preload_list)
+    preload_rec  go to state 117
+    hex_num      go to state 75
+    eoln         go to state 76
+    error_tok    go to state 77
 
 
-state 78
+State 74
 
-   49 preload_rec: hex_num . '-' hex_num '=' hex_num eoln
+   49 preload_list: preload_rec .
 
-    '-'  shift, and go to state 120
+    $default  reduce using rule 49 (preload_list)
 
 
-state 79
+State 75
 
-   50 preload_rec: error_tok . eoln
+   50 preload_rec: hex_num . '-' hex_num '=' hex_num eoln
+
+    '-'  shift, and go to state 118
+
+
+State 76
+
+   52 preload_rec: eoln .
+
+    $default  reduce using rule 52 (preload_rec)
+
+
+State 77
+
+   51 preload_rec: error_tok . eoln
 
     '\n'  shift, and go to state 2
 
-    eoln  go to state 121
+    eoln  go to state 119
 
 
-state 80
+State 78
 
-   55 macro_rec: TOK_MAC_QUIET . macro_line
-   57          | TOK_MAC_QUIET . eoln
+   57 macro_rec: TOK_MAC_QUIET . macro_line
+   59          | TOK_MAC_QUIET . eoln
 
     error            shift, and go to state 1
-    TOK_MAC_REG      shift, and go to state 81
-    TOK_MAC_AHEAD    shift, and go to state 82
-    TOK_MAC_BLANK    shift, and go to state 83
-    TOK_MAC_INSPECT  shift, and go to state 84
-    TOK_MAC_LOAD     shift, and go to state 85
-    TOK_MAC_RUN      shift, and go to state 86
-    TOK_MAC_POKE     shift, and go to state 87
-    TOK_MAC_RUNTO    shift, and go to state 88
-    TOK_MAC_TRACE    shift, and go to state 89
-    TOK_MAC_VIEW     shift, and go to state 90
-    TOK_MAC_WATCH    shift, and go to state 91
+    TOK_MAC_REG      shift, and go to state 79
+    TOK_MAC_AHEAD    shift, and go to state 80
+    TOK_MAC_BLANK    shift, and go to state 81
+    TOK_MAC_INSPECT  shift, and go to state 82
+    TOK_MAC_LOAD     shift, and go to state 83
+    TOK_MAC_RUN      shift, and go to state 84
+    TOK_MAC_POKE     shift, and go to state 85
+    TOK_MAC_RUNTO    shift, and go to state 86
+    TOK_MAC_TRACE    shift, and go to state 87
+    TOK_MAC_VIEW     shift, and go to state 88
+    TOK_MAC_WATCH    shift, and go to state 89
     '\n'             shift, and go to state 2
 
-    macro_line  go to state 122
-    mac_reg     go to state 95
-    eoln        go to state 123
-    error_tok   go to state 97
+    macro_line  go to state 120
+    mac_reg     go to state 93
+    eoln        go to state 121
+    error_tok   go to state 95
 
 
-state 81
+State 79
 
-   71 mac_reg: TOK_MAC_REG .
+   75 mac_reg: TOK_MAC_REG .
 
-    $default  reduce using rule 71 (mac_reg)
-
-
-state 82
-
-   66 macro_line: TOK_MAC_AHEAD . eoln
-
-    '\n'  shift, and go to state 2
-
-    eoln  go to state 124
+    $default  reduce using rule 75 (mac_reg)
 
 
-state 83
+State 80
 
-   67 macro_line: TOK_MAC_BLANK . eoln
+   70 macro_line: TOK_MAC_AHEAD . eoln
 
     '\n'  shift, and go to state 2
 
-    eoln  go to state 125
+    eoln  go to state 122
 
 
-state 84
+State 81
 
-   63 macro_line: TOK_MAC_INSPECT . hex_num eoln
-
-    TOK_DEC  shift, and go to state 54
-    TOK_HEX  shift, and go to state 55
-
-    hex_num  go to state 126
-
-
-state 85
-
-   60 macro_line: TOK_MAC_LOAD . string dec_num hex_num eoln
-
-    TOK_DECONLY  shift, and go to state 98
-    TOK_DEC      shift, and go to state 99
-    TOK_HEX      shift, and go to state 100
-    TOK_NAME     shift, and go to state 101
-
-    string  go to state 127
-
-
-state 86
-
-   68 macro_line: TOK_MAC_RUN . eoln
+   71 macro_line: TOK_MAC_BLANK . eoln
 
     '\n'  shift, and go to state 2
 
-    eoln  go to state 128
+    eoln  go to state 123
 
 
-state 87
+State 82
 
-   62 macro_line: TOK_MAC_POKE . hex_num hex_num eoln
+   67 macro_line: TOK_MAC_INSPECT . hex_num eoln
 
-    TOK_DEC  shift, and go to state 54
-    TOK_HEX  shift, and go to state 55
+    TOK_DEC  shift, and go to state 51
+    TOK_HEX  shift, and go to state 52
 
-    hex_num  go to state 129
-
-
-state 88
-
-   64 macro_line: TOK_MAC_RUNTO . hex_num eoln
-
-    TOK_DEC  shift, and go to state 54
-    TOK_HEX  shift, and go to state 55
-
-    hex_num  go to state 130
+    hex_num  go to state 124
 
 
-state 89
+State 83
 
-   65 macro_line: TOK_MAC_TRACE . hex_num eoln
+   62 macro_line: TOK_MAC_LOAD . string dec_num hex_num eoln
 
-    TOK_DEC  shift, and go to state 54
-    TOK_HEX  shift, and go to state 55
+    TOK_DECONLY  shift, and go to state 125
+    TOK_DEC      shift, and go to state 126
+    TOK_HEX      shift, and go to state 127
+    TOK_NAME     shift, and go to state 128
+    TOK_STRING   shift, and go to state 129
 
-    hex_num  go to state 131
+    string  go to state 130
 
 
-state 90
+State 84
 
-   69 macro_line: TOK_MAC_VIEW . eoln
+   72 macro_line: TOK_MAC_RUN . eoln
 
     '\n'  shift, and go to state 2
 
-    eoln  go to state 132
+    eoln  go to state 131
 
 
-state 91
+State 85
 
-   61 macro_line: TOK_MAC_WATCH . string watch_list eoln
+   64 macro_line: TOK_MAC_POKE . hex_num hex_num eoln
+   65           | TOK_MAC_POKE . hex_num TOK_PAGE hex_num hex_num eoln
+   66           | TOK_MAC_POKE . hex_num ':' hex_num hex_num eoln
 
-    TOK_DECONLY  shift, and go to state 98
-    TOK_DEC      shift, and go to state 99
-    TOK_HEX      shift, and go to state 100
-    TOK_NAME     shift, and go to state 101
+    TOK_DEC  shift, and go to state 51
+    TOK_HEX  shift, and go to state 52
 
-    string  go to state 133
+    hex_num  go to state 132
 
 
-state 92
+State 86
 
-   52 sec_macro: macro eoln macro_list .
-   53 macro_list: macro_list . macro_rec
+   68 macro_line: TOK_MAC_RUNTO . hex_num eoln
+
+    TOK_DEC  shift, and go to state 51
+    TOK_HEX  shift, and go to state 52
+
+    hex_num  go to state 133
+
+
+State 87
+
+   69 macro_line: TOK_MAC_TRACE . hex_num eoln
+
+    TOK_DEC  shift, and go to state 51
+    TOK_HEX  shift, and go to state 52
+
+    hex_num  go to state 134
+
+
+State 88
+
+   73 macro_line: TOK_MAC_VIEW . eoln
+
+    '\n'  shift, and go to state 2
+
+    eoln  go to state 135
+
+
+State 89
+
+   63 macro_line: TOK_MAC_WATCH . ident watch_list eoln
+
+    TOK_DECONLY  shift, and go to state 96
+    TOK_DEC      shift, and go to state 97
+    TOK_HEX      shift, and go to state 98
+    TOK_NAME     shift, and go to state 99
+
+    ident  go to state 136
+
+
+State 90
+
+   54 sec_macro: macro_head eoln macro_list .
+   55 macro_list: macro_list . macro_rec
 
     error            shift, and go to state 1
-    TOK_MAC_QUIET    shift, and go to state 80
-    TOK_MAC_REG      shift, and go to state 81
-    TOK_MAC_AHEAD    shift, and go to state 82
-    TOK_MAC_BLANK    shift, and go to state 83
-    TOK_MAC_INSPECT  shift, and go to state 84
-    TOK_MAC_LOAD     shift, and go to state 85
-    TOK_MAC_RUN      shift, and go to state 86
-    TOK_MAC_POKE     shift, and go to state 87
-    TOK_MAC_RUNTO    shift, and go to state 88
-    TOK_MAC_TRACE    shift, and go to state 89
-    TOK_MAC_VIEW     shift, and go to state 90
-    TOK_MAC_WATCH    shift, and go to state 91
+    TOK_MAC_QUIET    shift, and go to state 78
+    TOK_MAC_REG      shift, and go to state 79
+    TOK_MAC_AHEAD    shift, and go to state 80
+    TOK_MAC_BLANK    shift, and go to state 81
+    TOK_MAC_INSPECT  shift, and go to state 82
+    TOK_MAC_LOAD     shift, and go to state 83
+    TOK_MAC_RUN      shift, and go to state 84
+    TOK_MAC_POKE     shift, and go to state 85
+    TOK_MAC_RUNTO    shift, and go to state 86
+    TOK_MAC_TRACE    shift, and go to state 87
+    TOK_MAC_VIEW     shift, and go to state 88
+    TOK_MAC_WATCH    shift, and go to state 89
     '\n'             shift, and go to state 2
 
-    $end                reduce using rule 52 (sec_macro)
-    TOK_SEC_BANKSWITCH  reduce using rule 52 (sec_macro)
-    TOK_SEC_MAPPING     reduce using rule 52 (sec_macro)
-    TOK_SEC_ECSBANK     reduce using rule 52 (sec_macro)
-    TOK_SEC_MEMATTR     reduce using rule 52 (sec_macro)
-    TOK_SEC_PRELOAD     reduce using rule 52 (sec_macro)
-    TOK_SEC_MACRO       reduce using rule 52 (sec_macro)
-    TOK_SEC_VARS        reduce using rule 52 (sec_macro)
-    TOK_SEC_JOYSTICK    reduce using rule 52 (sec_macro)
-    TOK_SEC_KEYS        reduce using rule 52 (sec_macro)
-    TOK_SEC_CAPSLOCK    reduce using rule 52 (sec_macro)
-    TOK_SEC_NUMLOCK     reduce using rule 52 (sec_macro)
-    TOK_SEC_SCROLLLOCK  reduce using rule 52 (sec_macro)
-    TOK_SEC_DISASM      reduce using rule 52 (sec_macro)
-    TOK_SEC_VOICES      reduce using rule 52 (sec_macro)
-    TOK_SEC_UNKNOWN     reduce using rule 52 (sec_macro)
-    TOK_RAM             reduce using rule 52 (sec_macro)
-    TOK_ROM             reduce using rule 52 (sec_macro)
-    TOK_WOM             reduce using rule 52 (sec_macro)
+    $end                reduce using rule 54 (sec_macro)
+    TOK_SEC_BANKSWITCH  reduce using rule 54 (sec_macro)
+    TOK_SEC_MAPPING     reduce using rule 54 (sec_macro)
+    TOK_SEC_ECSBANK     reduce using rule 54 (sec_macro)
+    TOK_SEC_MEMATTR     reduce using rule 54 (sec_macro)
+    TOK_SEC_PRELOAD     reduce using rule 54 (sec_macro)
+    TOK_SEC_MACRO       reduce using rule 54 (sec_macro)
+    TOK_SEC_VARS        reduce using rule 54 (sec_macro)
+    TOK_SEC_JOYSTICK    reduce using rule 54 (sec_macro)
+    TOK_SEC_KEYS        reduce using rule 54 (sec_macro)
+    TOK_SEC_CAPSLOCK    reduce using rule 54 (sec_macro)
+    TOK_SEC_NUMLOCK     reduce using rule 54 (sec_macro)
+    TOK_SEC_SCROLLLOCK  reduce using rule 54 (sec_macro)
+    TOK_SEC_DISASM      reduce using rule 54 (sec_macro)
+    TOK_SEC_VOICES      reduce using rule 54 (sec_macro)
+    TOK_SEC_UNKNOWN     reduce using rule 54 (sec_macro)
 
-    macro_rec   go to state 134
-    macro_line  go to state 94
-    mac_reg     go to state 95
-    eoln        go to state 96
-    error_tok   go to state 97
+    macro_rec   go to state 137
+    macro_line  go to state 92
+    mac_reg     go to state 93
+    eoln        go to state 94
+    error_tok   go to state 95
 
 
-state 93
+State 91
 
-   54 macro_list: macro_rec .
+   56 macro_list: macro_rec .
 
-    $default  reduce using rule 54 (macro_list)
-
-
-state 94
-
-   56 macro_rec: macro_line .
-
-    $default  reduce using rule 56 (macro_rec)
+    $default  reduce using rule 56 (macro_list)
 
 
-state 95
+State 92
 
-   59 macro_line: mac_reg . hex_num eoln
-
-    TOK_DEC  shift, and go to state 54
-    TOK_HEX  shift, and go to state 55
-
-    hex_num  go to state 135
-
-
-state 96
-
-   58 macro_rec: eoln .
+   58 macro_rec: macro_line .
 
     $default  reduce using rule 58 (macro_rec)
 
 
-state 97
+State 93
 
-   70 macro_line: error_tok . eoln
+   61 macro_line: mac_reg . hex_num eoln
 
-    '\n'  shift, and go to state 2
+    TOK_DEC  shift, and go to state 51
+    TOK_HEX  shift, and go to state 52
 
-    eoln  go to state 136
-
-
-state 98
-
-  105 string: TOK_DECONLY .
-
-    $default  reduce using rule 105 (string)
+    hex_num  go to state 138
 
 
-state 99
+State 94
 
-  104 string: TOK_DEC .
+   60 macro_rec: eoln .
 
-    $default  reduce using rule 104 (string)
-
-
-state 100
-
-  103 string: TOK_HEX .
-
-    $default  reduce using rule 103 (string)
+    $default  reduce using rule 60 (macro_rec)
 
 
-state 101
+State 95
 
-  102 string: TOK_NAME .
-
-    $default  reduce using rule 102 (string)
-
-
-state 102
-
-   78 sec_varlike: varlike_head eoln var_list .
-   85 var_list: var_list . var_rec
-
-    error        shift, and go to state 1
-    TOK_DECONLY  shift, and go to state 98
-    TOK_DEC      shift, and go to state 99
-    TOK_HEX      shift, and go to state 100
-    TOK_NAME     shift, and go to state 101
-    '\n'         shift, and go to state 2
-
-    $end                reduce using rule 78 (sec_varlike)
-    TOK_SEC_BANKSWITCH  reduce using rule 78 (sec_varlike)
-    TOK_SEC_MAPPING     reduce using rule 78 (sec_varlike)
-    TOK_SEC_ECSBANK     reduce using rule 78 (sec_varlike)
-    TOK_SEC_MEMATTR     reduce using rule 78 (sec_varlike)
-    TOK_SEC_PRELOAD     reduce using rule 78 (sec_varlike)
-    TOK_SEC_MACRO       reduce using rule 78 (sec_varlike)
-    TOK_SEC_VARS        reduce using rule 78 (sec_varlike)
-    TOK_SEC_JOYSTICK    reduce using rule 78 (sec_varlike)
-    TOK_SEC_KEYS        reduce using rule 78 (sec_varlike)
-    TOK_SEC_CAPSLOCK    reduce using rule 78 (sec_varlike)
-    TOK_SEC_NUMLOCK     reduce using rule 78 (sec_varlike)
-    TOK_SEC_SCROLLLOCK  reduce using rule 78 (sec_varlike)
-    TOK_SEC_DISASM      reduce using rule 78 (sec_varlike)
-    TOK_SEC_VOICES      reduce using rule 78 (sec_varlike)
-    TOK_SEC_UNKNOWN     reduce using rule 78 (sec_varlike)
-    TOK_RAM             reduce using rule 78 (sec_varlike)
-    TOK_ROM             reduce using rule 78 (sec_varlike)
-    TOK_WOM             reduce using rule 78 (sec_varlike)
-
-    var_rec    go to state 137
-    string     go to state 104
-    eoln       go to state 105
-    error_tok  go to state 106
-
-
-state 103
-
-   86 var_list: var_rec .
-
-    $default  reduce using rule 86 (var_list)
-
-
-state 104
-
-   87 var_rec: string . '=' strnum eoln
-
-    '='  shift, and go to state 138
-
-
-state 105
-
-   88 var_rec: eoln .
-
-    $default  reduce using rule 88 (var_rec)
-
-
-state 106
-
-   89 var_rec: error_tok . eoln
+   74 macro_line: error_tok . eoln
 
     '\n'  shift, and go to state 2
 
     eoln  go to state 139
 
 
-state 107
+State 96
+
+  110 ident: TOK_DECONLY .
+
+    $default  reduce using rule 110 (ident)
+
+
+State 97
+
+  109 ident: TOK_DEC .
+
+    $default  reduce using rule 109 (ident)
+
+
+State 98
+
+  108 ident: TOK_HEX .
+
+    $default  reduce using rule 108 (ident)
+
+
+State 99
+
+  107 ident: TOK_NAME .
+
+    $default  reduce using rule 107 (ident)
+
+
+State 100
+
+   82 sec_varlike: varlike_head eoln var_list .
+   89 var_list: var_list . var_rec
+
+    error        shift, and go to state 1
+    TOK_DECONLY  shift, and go to state 96
+    TOK_DEC      shift, and go to state 97
+    TOK_HEX      shift, and go to state 98
+    TOK_NAME     shift, and go to state 99
+    '\n'         shift, and go to state 2
+
+    $end                reduce using rule 82 (sec_varlike)
+    TOK_SEC_BANKSWITCH  reduce using rule 82 (sec_varlike)
+    TOK_SEC_MAPPING     reduce using rule 82 (sec_varlike)
+    TOK_SEC_ECSBANK     reduce using rule 82 (sec_varlike)
+    TOK_SEC_MEMATTR     reduce using rule 82 (sec_varlike)
+    TOK_SEC_PRELOAD     reduce using rule 82 (sec_varlike)
+    TOK_SEC_MACRO       reduce using rule 82 (sec_varlike)
+    TOK_SEC_VARS        reduce using rule 82 (sec_varlike)
+    TOK_SEC_JOYSTICK    reduce using rule 82 (sec_varlike)
+    TOK_SEC_KEYS        reduce using rule 82 (sec_varlike)
+    TOK_SEC_CAPSLOCK    reduce using rule 82 (sec_varlike)
+    TOK_SEC_NUMLOCK     reduce using rule 82 (sec_varlike)
+    TOK_SEC_SCROLLLOCK  reduce using rule 82 (sec_varlike)
+    TOK_SEC_DISASM      reduce using rule 82 (sec_varlike)
+    TOK_SEC_VOICES      reduce using rule 82 (sec_varlike)
+    TOK_SEC_UNKNOWN     reduce using rule 82 (sec_varlike)
+
+    var_rec    go to state 140
+    ident      go to state 102
+    eoln       go to state 103
+    error_tok  go to state 104
+
+
+State 101
+
+   90 var_list: var_rec .
+
+    $default  reduce using rule 90 (var_list)
+
+
+State 102
+
+   91 var_rec: ident . '=' strnum eoln
+
+    '='  shift, and go to state 141
+
+
+State 103
+
+   92 var_rec: eoln .
+
+    $default  reduce using rule 92 (var_rec)
+
+
+State 104
+
+   93 var_rec: error_tok . eoln
+
+    '\n'  shift, and go to state 2
+
+    eoln  go to state 142
+
+
+State 105
 
    17 banksw_list: banksw_list banksw_rec .
 
     $default  reduce using rule 17 (banksw_list)
 
 
-state 108
+State 106
 
    19 banksw_rec: hex_num '-' . hex_num eoln
 
-    TOK_DEC  shift, and go to state 54
-    TOK_HEX  shift, and go to state 55
+    TOK_DEC  shift, and go to state 51
+    TOK_HEX  shift, and go to state 52
 
-    hex_num  go to state 140
+    hex_num  go to state 143
 
 
-state 109
+State 107
 
    21 banksw_rec: error_tok eoln .
 
     $default  reduce using rule 21 (banksw_rec)
 
 
-state 110
+State 108
 
    24 mapping_list: mapping_list mapping_rec .
 
     $default  reduce using rule 24 (mapping_list)
 
 
-state 111
+State 109
 
-   26 mapping_rec: hex_num '-' . hex_num '=' hex_num eoln
-   27            | hex_num '-' . hex_num '=' hex_num TOK_PAGE hex_num eoln
+   26 mapping_rec: hex_num '-' . hex_num '=' hex_num memattr_page
 
-    TOK_DEC  shift, and go to state 54
-    TOK_HEX  shift, and go to state 55
-
-    hex_num  go to state 141
-
-
-state 112
-
-   29 mapping_rec: error_tok eoln .
-
-    $default  reduce using rule 29 (mapping_rec)
-
-
-state 113
-
-   32 ecsbank_list: ecsbank_list ecsbank_rec .
-
-    $default  reduce using rule 32 (ecsbank_list)
-
-
-state 114
-
-   34 ecsbank_rec: hex_num ':' . hex_num '-' hex_num '=' hex_num eoln
-
-    TOK_DEC  shift, and go to state 54
-    TOK_HEX  shift, and go to state 55
-
-    hex_num  go to state 142
-
-
-state 115
-
-   36 ecsbank_rec: error_tok eoln .
-
-    $default  reduce using rule 36 (ecsbank_rec)
-
-
-state 116
-
-   39 memattr_list: memattr_list memattr_rec .
-
-    $default  reduce using rule 39 (memattr_list)
-
-
-state 117
-
-   41 memattr_rec: hex_num '-' . hex_num '=' memattr dec_num eoln
-   42            | hex_num '-' . hex_num eoln
-
-    TOK_DEC  shift, and go to state 54
-    TOK_HEX  shift, and go to state 55
-
-    hex_num  go to state 143
-
-
-state 118
-
-   44 memattr_rec: error_tok eoln .
-
-    $default  reduce using rule 44 (memattr_rec)
-
-
-state 119
-
-   47 preload_list: preload_list preload_rec .
-
-    $default  reduce using rule 47 (preload_list)
-
-
-state 120
-
-   49 preload_rec: hex_num '-' . hex_num '=' hex_num eoln
-
-    TOK_DEC  shift, and go to state 54
-    TOK_HEX  shift, and go to state 55
+    TOK_DEC  shift, and go to state 51
+    TOK_HEX  shift, and go to state 52
 
     hex_num  go to state 144
 
 
-state 121
+State 110
 
-   50 preload_rec: error_tok eoln .
+   28 mapping_rec: error_tok eoln .
 
-    $default  reduce using rule 50 (preload_rec)
-
-
-state 122
-
-   55 macro_rec: TOK_MAC_QUIET macro_line .
-
-    $default  reduce using rule 55 (macro_rec)
+    $default  reduce using rule 28 (mapping_rec)
 
 
-state 123
+State 111
 
-   57 macro_rec: TOK_MAC_QUIET eoln .
+   31 ecsbank_list: ecsbank_list ecsbank_rec .
+
+    $default  reduce using rule 31 (ecsbank_list)
+
+
+State 112
+
+   33 ecsbank_rec: hex_num ':' . hex_num '-' hex_num '=' hex_num eoln
+
+    TOK_DEC  shift, and go to state 51
+    TOK_HEX  shift, and go to state 52
+
+    hex_num  go to state 145
+
+
+State 113
+
+   35 ecsbank_rec: error_tok eoln .
+
+    $default  reduce using rule 35 (ecsbank_rec)
+
+
+State 114
+
+   38 memattr_list: memattr_list memattr_rec .
+
+    $default  reduce using rule 38 (memattr_list)
+
+
+State 115
+
+   40 memattr_rec: hex_num '-' . hex_num '=' memattr_page
+
+    TOK_DEC  shift, and go to state 51
+    TOK_HEX  shift, and go to state 52
+
+    hex_num  go to state 146
+
+
+State 116
+
+   42 memattr_rec: error_tok eoln .
+
+    $default  reduce using rule 42 (memattr_rec)
+
+
+State 117
+
+   48 preload_list: preload_list preload_rec .
+
+    $default  reduce using rule 48 (preload_list)
+
+
+State 118
+
+   50 preload_rec: hex_num '-' . hex_num '=' hex_num eoln
+
+    TOK_DEC  shift, and go to state 51
+    TOK_HEX  shift, and go to state 52
+
+    hex_num  go to state 147
+
+
+State 119
+
+   51 preload_rec: error_tok eoln .
+
+    $default  reduce using rule 51 (preload_rec)
+
+
+State 120
+
+   57 macro_rec: TOK_MAC_QUIET macro_line .
 
     $default  reduce using rule 57 (macro_rec)
 
 
-state 124
+State 121
 
-   66 macro_line: TOK_MAC_AHEAD eoln .
+   59 macro_rec: TOK_MAC_QUIET eoln .
 
-    $default  reduce using rule 66 (macro_line)
-
-
-state 125
-
-   67 macro_line: TOK_MAC_BLANK eoln .
-
-    $default  reduce using rule 67 (macro_line)
+    $default  reduce using rule 59 (macro_rec)
 
 
-state 126
+State 122
 
-   63 macro_line: TOK_MAC_INSPECT hex_num . eoln
-
-    '\n'  shift, and go to state 2
-
-    eoln  go to state 145
-
-
-state 127
-
-   60 macro_line: TOK_MAC_LOAD string . dec_num hex_num eoln
-
-    TOK_DECONLY  shift, and go to state 146
-    TOK_DEC      shift, and go to state 147
-
-    dec_num  go to state 148
-
-
-state 128
-
-   68 macro_line: TOK_MAC_RUN eoln .
-
-    $default  reduce using rule 68 (macro_line)
-
-
-state 129
-
-   62 macro_line: TOK_MAC_POKE hex_num . hex_num eoln
-
-    TOK_DEC  shift, and go to state 54
-    TOK_HEX  shift, and go to state 55
-
-    hex_num  go to state 149
-
-
-state 130
-
-   64 macro_line: TOK_MAC_RUNTO hex_num . eoln
-
-    '\n'  shift, and go to state 2
-
-    eoln  go to state 150
-
-
-state 131
-
-   65 macro_line: TOK_MAC_TRACE hex_num . eoln
-
-    '\n'  shift, and go to state 2
-
-    eoln  go to state 151
-
-
-state 132
-
-   69 macro_line: TOK_MAC_VIEW eoln .
-
-    $default  reduce using rule 69 (macro_line)
-
-
-state 133
-
-   61 macro_line: TOK_MAC_WATCH string . watch_list eoln
-
-    TOK_DEC  shift, and go to state 54
-    TOK_HEX  shift, and go to state 55
-
-    watch_list   go to state 152
-    watch_span   go to state 153
-    watch_addr   go to state 154
-    watch_range  go to state 155
-    hex_num      go to state 156
-
-
-state 134
-
-   53 macro_list: macro_list macro_rec .
-
-    $default  reduce using rule 53 (macro_list)
-
-
-state 135
-
-   59 macro_line: mac_reg hex_num . eoln
-
-    '\n'  shift, and go to state 2
-
-    eoln  go to state 157
-
-
-state 136
-
-   70 macro_line: error_tok eoln .
+   70 macro_line: TOK_MAC_AHEAD eoln .
 
     $default  reduce using rule 70 (macro_line)
 
 
-state 137
+State 123
 
-   85 var_list: var_list var_rec .
+   71 macro_line: TOK_MAC_BLANK eoln .
 
-    $default  reduce using rule 85 (var_list)
-
-
-state 138
-
-   87 var_rec: string '=' . strnum eoln
-
-    TOK_DECONLY  shift, and go to state 158
-    TOK_DEC      shift, and go to state 159
-    TOK_HEX      shift, and go to state 160
-    TOK_NAME     shift, and go to state 161
-
-    strnum  go to state 162
+    $default  reduce using rule 71 (macro_line)
 
 
-state 139
+State 124
 
-   89 var_rec: error_tok eoln .
+   67 macro_line: TOK_MAC_INSPECT hex_num . eoln
 
-    $default  reduce using rule 89 (var_rec)
+    '\n'  shift, and go to state 2
+
+    eoln  go to state 148
 
 
-state 140
+State 125
+
+  115 string: TOK_DECONLY .
+
+    $default  reduce using rule 115 (string)
+
+
+State 126
+
+  114 string: TOK_DEC .
+
+    $default  reduce using rule 114 (string)
+
+
+State 127
+
+  113 string: TOK_HEX .
+
+    $default  reduce using rule 113 (string)
+
+
+State 128
+
+  111 string: TOK_NAME .
+
+    $default  reduce using rule 111 (string)
+
+
+State 129
+
+  112 string: TOK_STRING .
+
+    $default  reduce using rule 112 (string)
+
+
+State 130
+
+   62 macro_line: TOK_MAC_LOAD string . dec_num hex_num eoln
+
+    TOK_DECONLY  shift, and go to state 149
+    TOK_DEC      shift, and go to state 150
+
+    dec_num  go to state 151
+
+
+State 131
+
+   72 macro_line: TOK_MAC_RUN eoln .
+
+    $default  reduce using rule 72 (macro_line)
+
+
+State 132
+
+   64 macro_line: TOK_MAC_POKE hex_num . hex_num eoln
+   65           | TOK_MAC_POKE hex_num . TOK_PAGE hex_num hex_num eoln
+   66           | TOK_MAC_POKE hex_num . ':' hex_num hex_num eoln
+
+    TOK_PAGE  shift, and go to state 152
+    TOK_DEC   shift, and go to state 51
+    TOK_HEX   shift, and go to state 52
+    ':'       shift, and go to state 153
+
+    hex_num  go to state 154
+
+
+State 133
+
+   68 macro_line: TOK_MAC_RUNTO hex_num . eoln
+
+    '\n'  shift, and go to state 2
+
+    eoln  go to state 155
+
+
+State 134
+
+   69 macro_line: TOK_MAC_TRACE hex_num . eoln
+
+    '\n'  shift, and go to state 2
+
+    eoln  go to state 156
+
+
+State 135
+
+   73 macro_line: TOK_MAC_VIEW eoln .
+
+    $default  reduce using rule 73 (macro_line)
+
+
+State 136
+
+   63 macro_line: TOK_MAC_WATCH ident . watch_list eoln
+
+    TOK_DEC  shift, and go to state 51
+    TOK_HEX  shift, and go to state 52
+
+    watch_list   go to state 157
+    watch_span   go to state 158
+    watch_addr   go to state 159
+    watch_range  go to state 160
+    hex_num      go to state 161
+
+
+State 137
+
+   55 macro_list: macro_list macro_rec .
+
+    $default  reduce using rule 55 (macro_list)
+
+
+State 138
+
+   61 macro_line: mac_reg hex_num . eoln
+
+    '\n'  shift, and go to state 2
+
+    eoln  go to state 162
+
+
+State 139
+
+   74 macro_line: error_tok eoln .
+
+    $default  reduce using rule 74 (macro_line)
+
+
+State 140
+
+   89 var_list: var_list var_rec .
+
+    $default  reduce using rule 89 (var_list)
+
+
+State 141
+
+   91 var_rec: ident '=' . strnum eoln
+
+    TOK_DECONLY  shift, and go to state 163
+    TOK_DEC      shift, and go to state 164
+    TOK_HEX      shift, and go to state 165
+    TOK_NAME     shift, and go to state 166
+    TOK_STRING   shift, and go to state 167
+
+    strnum  go to state 168
+
+
+State 142
+
+   93 var_rec: error_tok eoln .
+
+    $default  reduce using rule 93 (var_rec)
+
+
+State 143
 
    19 banksw_rec: hex_num '-' hex_num . eoln
 
     '\n'  shift, and go to state 2
 
-    eoln  go to state 163
+    eoln  go to state 169
 
 
-state 141
+State 144
 
-   26 mapping_rec: hex_num '-' hex_num . '=' hex_num eoln
-   27            | hex_num '-' hex_num . '=' hex_num TOK_PAGE hex_num eoln
+   26 mapping_rec: hex_num '-' hex_num . '=' hex_num memattr_page
 
-    '='  shift, and go to state 164
+    '='  shift, and go to state 170
 
 
-state 142
+State 145
 
-   34 ecsbank_rec: hex_num ':' hex_num . '-' hex_num '=' hex_num eoln
+   33 ecsbank_rec: hex_num ':' hex_num . '-' hex_num '=' hex_num eoln
 
-    '-'  shift, and go to state 165
+    '-'  shift, and go to state 171
 
 
-state 143
+State 146
 
-   41 memattr_rec: hex_num '-' hex_num . '=' memattr dec_num eoln
-   42            | hex_num '-' hex_num . eoln
+   40 memattr_rec: hex_num '-' hex_num . '=' memattr_page
 
-    '='   shift, and go to state 166
-    '\n'  shift, and go to state 2
+    '='  shift, and go to state 172
 
-    eoln  go to state 167
 
+State 147
 
-state 144
+   50 preload_rec: hex_num '-' hex_num . '=' hex_num eoln
 
-   49 preload_rec: hex_num '-' hex_num . '=' hex_num eoln
+    '='  shift, and go to state 173
 
-    '='  shift, and go to state 168
 
+State 148
 
-state 145
+   67 macro_line: TOK_MAC_INSPECT hex_num eoln .
 
-   63 macro_line: TOK_MAC_INSPECT hex_num eoln .
+    $default  reduce using rule 67 (macro_line)
 
-    $default  reduce using rule 63 (macro_line)
 
+State 149
 
-state 146
+  104 dec_num: TOK_DECONLY .
 
-   99 dec_num: TOK_DECONLY .
+    $default  reduce using rule 104 (dec_num)
 
-    $default  reduce using rule 99 (dec_num)
 
+State 150
 
-state 147
+  103 dec_num: TOK_DEC .
 
-   98 dec_num: TOK_DEC .
+    $default  reduce using rule 103 (dec_num)
 
-    $default  reduce using rule 98 (dec_num)
 
+State 151
 
-state 148
+   62 macro_line: TOK_MAC_LOAD string dec_num . hex_num eoln
 
-   60 macro_line: TOK_MAC_LOAD string dec_num . hex_num eoln
+    TOK_DEC  shift, and go to state 51
+    TOK_HEX  shift, and go to state 52
 
-    TOK_DEC  shift, and go to state 54
-    TOK_HEX  shift, and go to state 55
+    hex_num  go to state 174
 
-    hex_num  go to state 169
 
+State 152
 
-state 149
+   65 macro_line: TOK_MAC_POKE hex_num TOK_PAGE . hex_num hex_num eoln
 
-   62 macro_line: TOK_MAC_POKE hex_num hex_num . eoln
+    TOK_DEC  shift, and go to state 51
+    TOK_HEX  shift, and go to state 52
 
-    '\n'  shift, and go to state 2
+    hex_num  go to state 175
 
-    eoln  go to state 170
 
+State 153
 
-state 150
+   66 macro_line: TOK_MAC_POKE hex_num ':' . hex_num hex_num eoln
 
-   64 macro_line: TOK_MAC_RUNTO hex_num eoln .
+    TOK_DEC  shift, and go to state 51
+    TOK_HEX  shift, and go to state 52
 
-    $default  reduce using rule 64 (macro_line)
+    hex_num  go to state 176
 
 
-state 151
+State 154
 
-   65 macro_line: TOK_MAC_TRACE hex_num eoln .
-
-    $default  reduce using rule 65 (macro_line)
-
-
-state 152
-
-   61 macro_line: TOK_MAC_WATCH string watch_list . eoln
-   72 watch_list: watch_list . ',' watch_span
-
-    ','   shift, and go to state 171
-    '\n'  shift, and go to state 2
-
-    eoln  go to state 172
-
-
-state 153
-
-   73 watch_list: watch_span .
-
-    $default  reduce using rule 73 (watch_list)
-
-
-state 154
-
-   74 watch_span: watch_addr .
-
-    $default  reduce using rule 74 (watch_span)
-
-
-state 155
-
-   75 watch_span: watch_range .
-
-    $default  reduce using rule 75 (watch_span)
-
-
-state 156
-
-   76 watch_addr: hex_num .
-   77 watch_range: hex_num . '-' hex_num
-
-    '-'  shift, and go to state 173
-
-    $default  reduce using rule 76 (watch_addr)
-
-
-state 157
-
-   59 macro_line: mac_reg hex_num eoln .
-
-    $default  reduce using rule 59 (macro_line)
-
-
-state 158
-
-   97 strnum: TOK_DECONLY .
-
-    $default  reduce using rule 97 (strnum)
-
-
-state 159
-
-   96 strnum: TOK_DEC .
-
-    $default  reduce using rule 96 (strnum)
-
-
-state 160
-
-   95 strnum: TOK_HEX .
-
-    $default  reduce using rule 95 (strnum)
-
-
-state 161
-
-   94 strnum: TOK_NAME .
-
-    $default  reduce using rule 94 (strnum)
-
-
-state 162
-
-   87 var_rec: string '=' strnum . eoln
+   64 macro_line: TOK_MAC_POKE hex_num hex_num . eoln
 
     '\n'  shift, and go to state 2
 
-    eoln  go to state 174
+    eoln  go to state 177
 
 
-state 163
+State 155
+
+   68 macro_line: TOK_MAC_RUNTO hex_num eoln .
+
+    $default  reduce using rule 68 (macro_line)
+
+
+State 156
+
+   69 macro_line: TOK_MAC_TRACE hex_num eoln .
+
+    $default  reduce using rule 69 (macro_line)
+
+
+State 157
+
+   63 macro_line: TOK_MAC_WATCH ident watch_list . eoln
+   76 watch_list: watch_list . ',' watch_span
+
+    ','   shift, and go to state 178
+    '\n'  shift, and go to state 2
+
+    eoln  go to state 179
+
+
+State 158
+
+   77 watch_list: watch_span .
+
+    $default  reduce using rule 77 (watch_list)
+
+
+State 159
+
+   78 watch_span: watch_addr .
+
+    $default  reduce using rule 78 (watch_span)
+
+
+State 160
+
+   79 watch_span: watch_range .
+
+    $default  reduce using rule 79 (watch_span)
+
+
+State 161
+
+   80 watch_addr: hex_num .
+   81 watch_range: hex_num . '-' hex_num
+
+    '-'  shift, and go to state 180
+
+    $default  reduce using rule 80 (watch_addr)
+
+
+State 162
+
+   61 macro_line: mac_reg hex_num eoln .
+
+    $default  reduce using rule 61 (macro_line)
+
+
+State 163
+
+  102 strnum: TOK_DECONLY .
+
+    $default  reduce using rule 102 (strnum)
+
+
+State 164
+
+  101 strnum: TOK_DEC .
+
+    $default  reduce using rule 101 (strnum)
+
+
+State 165
+
+  100 strnum: TOK_HEX .
+
+    $default  reduce using rule 100 (strnum)
+
+
+State 166
+
+   98 strnum: TOK_NAME .
+
+    $default  reduce using rule 98 (strnum)
+
+
+State 167
+
+   99 strnum: TOK_STRING .
+
+    $default  reduce using rule 99 (strnum)
+
+
+State 168
+
+   91 var_rec: ident '=' strnum . eoln
+
+    '\n'  shift, and go to state 2
+
+    eoln  go to state 181
+
+
+State 169
 
    19 banksw_rec: hex_num '-' hex_num eoln .
 
     $default  reduce using rule 19 (banksw_rec)
 
 
-state 164
+State 170
 
-   26 mapping_rec: hex_num '-' hex_num '=' . hex_num eoln
-   27            | hex_num '-' hex_num '=' . hex_num TOK_PAGE hex_num eoln
+   26 mapping_rec: hex_num '-' hex_num '=' . hex_num memattr_page
 
-    TOK_DEC  shift, and go to state 54
-    TOK_HEX  shift, and go to state 55
+    TOK_DEC  shift, and go to state 51
+    TOK_HEX  shift, and go to state 52
 
-    hex_num  go to state 175
-
-
-state 165
-
-   34 ecsbank_rec: hex_num ':' hex_num '-' . hex_num '=' hex_num eoln
-
-    TOK_DEC  shift, and go to state 54
-    TOK_HEX  shift, and go to state 55
-
-    hex_num  go to state 176
+    hex_num  go to state 182
 
 
-state 166
+State 171
 
-   41 memattr_rec: hex_num '-' hex_num '=' . memattr dec_num eoln
+   33 ecsbank_rec: hex_num ':' hex_num '-' . hex_num '=' hex_num eoln
 
-    TOK_SEC_MEMATTR  shift, and go to state 13
-    TOK_RAM          shift, and go to state 25
-    TOK_ROM          shift, and go to state 26
-    TOK_WOM          shift, and go to state 27
+    TOK_DEC  shift, and go to state 51
+    TOK_HEX  shift, and go to state 52
 
-    memattr  go to state 177
+    hex_num  go to state 183
 
 
-state 167
+State 172
 
-   42 memattr_rec: hex_num '-' hex_num eoln .
+   40 memattr_rec: hex_num '-' hex_num '=' . memattr_page
 
-    $default  reduce using rule 42 (memattr_rec)
+    TOK_RAM   shift, and go to state 184
+    TOK_ROM   shift, and go to state 185
+    TOK_WOM   shift, and go to state 186
+    TOK_PAGE  shift, and go to state 187
+    '\n'      shift, and go to state 2
 
-
-state 168
-
-   49 preload_rec: hex_num '-' hex_num '=' . hex_num eoln
-
-    TOK_DEC  shift, and go to state 54
-    TOK_HEX  shift, and go to state 55
-
-    hex_num  go to state 178
+    memattr_page  go to state 188
+    memattr_tok   go to state 189
+    eoln          go to state 190
 
 
-state 169
+State 173
 
-   60 macro_line: TOK_MAC_LOAD string dec_num hex_num . eoln
+   50 preload_rec: hex_num '-' hex_num '=' . hex_num eoln
+
+    TOK_DEC  shift, and go to state 51
+    TOK_HEX  shift, and go to state 52
+
+    hex_num  go to state 191
+
+
+State 174
+
+   62 macro_line: TOK_MAC_LOAD string dec_num hex_num . eoln
 
     '\n'  shift, and go to state 2
 
-    eoln  go to state 179
+    eoln  go to state 192
 
 
-state 170
+State 175
 
-   62 macro_line: TOK_MAC_POKE hex_num hex_num eoln .
+   65 macro_line: TOK_MAC_POKE hex_num TOK_PAGE hex_num . hex_num eoln
+
+    TOK_DEC  shift, and go to state 51
+    TOK_HEX  shift, and go to state 52
+
+    hex_num  go to state 193
+
+
+State 176
+
+   66 macro_line: TOK_MAC_POKE hex_num ':' hex_num . hex_num eoln
+
+    TOK_DEC  shift, and go to state 51
+    TOK_HEX  shift, and go to state 52
+
+    hex_num  go to state 194
+
+
+State 177
+
+   64 macro_line: TOK_MAC_POKE hex_num hex_num eoln .
+
+    $default  reduce using rule 64 (macro_line)
+
+
+State 178
+
+   76 watch_list: watch_list ',' . watch_span
+
+    TOK_DEC  shift, and go to state 51
+    TOK_HEX  shift, and go to state 52
+
+    watch_span   go to state 195
+    watch_addr   go to state 159
+    watch_range  go to state 160
+    hex_num      go to state 161
+
+
+State 179
+
+   63 macro_line: TOK_MAC_WATCH ident watch_list eoln .
+
+    $default  reduce using rule 63 (macro_line)
+
+
+State 180
+
+   81 watch_range: hex_num '-' . hex_num
+
+    TOK_DEC  shift, and go to state 51
+    TOK_HEX  shift, and go to state 52
+
+    hex_num  go to state 196
+
+
+State 181
+
+   91 var_rec: ident '=' strnum eoln .
+
+    $default  reduce using rule 91 (var_rec)
+
+
+State 182
+
+   26 mapping_rec: hex_num '-' hex_num '=' hex_num . memattr_page
+
+    TOK_RAM   shift, and go to state 184
+    TOK_ROM   shift, and go to state 185
+    TOK_WOM   shift, and go to state 186
+    TOK_PAGE  shift, and go to state 187
+    '\n'      shift, and go to state 2
+
+    memattr_page  go to state 197
+    memattr_tok   go to state 189
+    eoln          go to state 190
+
+
+State 183
+
+   33 ecsbank_rec: hex_num ':' hex_num '-' hex_num . '=' hex_num eoln
+
+    '='  shift, and go to state 198
+
+
+State 184
+
+  116 memattr_tok: TOK_RAM .
+
+    $default  reduce using rule 116 (memattr_tok)
+
+
+State 185
+
+  117 memattr_tok: TOK_ROM .
+
+    $default  reduce using rule 117 (memattr_tok)
+
+
+State 186
+
+  118 memattr_tok: TOK_WOM .
+
+    $default  reduce using rule 118 (memattr_tok)
+
+
+State 187
+
+   45 memattr_page: TOK_PAGE . hex_num memattr_page
+
+    TOK_DEC  shift, and go to state 51
+    TOK_HEX  shift, and go to state 52
+
+    hex_num  go to state 199
+
+
+State 188
+
+   40 memattr_rec: hex_num '-' hex_num '=' memattr_page .
+
+    $default  reduce using rule 40 (memattr_rec)
+
+
+State 189
+
+   44 memattr_page: memattr_tok . dec_num memattr_page
+
+    TOK_DECONLY  shift, and go to state 149
+    TOK_DEC      shift, and go to state 150
+
+    dec_num  go to state 200
+
+
+State 190
+
+   43 memattr_page: eoln .
+
+    $default  reduce using rule 43 (memattr_page)
+
+
+State 191
+
+   50 preload_rec: hex_num '-' hex_num '=' hex_num . eoln
+
+    '\n'  shift, and go to state 2
+
+    eoln  go to state 201
+
+
+State 192
+
+   62 macro_line: TOK_MAC_LOAD string dec_num hex_num eoln .
 
     $default  reduce using rule 62 (macro_line)
 
 
-state 171
+State 193
 
-   72 watch_list: watch_list ',' . watch_span
-
-    TOK_DEC  shift, and go to state 54
-    TOK_HEX  shift, and go to state 55
-
-    watch_span   go to state 180
-    watch_addr   go to state 154
-    watch_range  go to state 155
-    hex_num      go to state 156
-
-
-state 172
-
-   61 macro_line: TOK_MAC_WATCH string watch_list eoln .
-
-    $default  reduce using rule 61 (macro_line)
-
-
-state 173
-
-   77 watch_range: hex_num '-' . hex_num
-
-    TOK_DEC  shift, and go to state 54
-    TOK_HEX  shift, and go to state 55
-
-    hex_num  go to state 181
-
-
-state 174
-
-   87 var_rec: string '=' strnum eoln .
-
-    $default  reduce using rule 87 (var_rec)
-
-
-state 175
-
-   26 mapping_rec: hex_num '-' hex_num '=' hex_num . eoln
-   27            | hex_num '-' hex_num '=' hex_num . TOK_PAGE hex_num eoln
-
-    TOK_PAGE  shift, and go to state 182
-    '\n'      shift, and go to state 2
-
-    eoln  go to state 183
-
-
-state 176
-
-   34 ecsbank_rec: hex_num ':' hex_num '-' hex_num . '=' hex_num eoln
-
-    '='  shift, and go to state 184
-
-
-state 177
-
-   41 memattr_rec: hex_num '-' hex_num '=' memattr . dec_num eoln
-
-    TOK_DECONLY  shift, and go to state 146
-    TOK_DEC      shift, and go to state 147
-
-    dec_num  go to state 185
-
-
-state 178
-
-   49 preload_rec: hex_num '-' hex_num '=' hex_num . eoln
+   65 macro_line: TOK_MAC_POKE hex_num TOK_PAGE hex_num hex_num . eoln
 
     '\n'  shift, and go to state 2
 
-    eoln  go to state 186
+    eoln  go to state 202
 
 
-state 179
+State 194
 
-   60 macro_line: TOK_MAC_LOAD string dec_num hex_num eoln .
+   66 macro_line: TOK_MAC_POKE hex_num ':' hex_num hex_num . eoln
 
-    $default  reduce using rule 60 (macro_line)
+    '\n'  shift, and go to state 2
 
-
-state 180
-
-   72 watch_list: watch_list ',' watch_span .
-
-    $default  reduce using rule 72 (watch_list)
+    eoln  go to state 203
 
 
-state 181
+State 195
 
-   77 watch_range: hex_num '-' hex_num .
+   76 watch_list: watch_list ',' watch_span .
 
-    $default  reduce using rule 77 (watch_range)
-
-
-state 182
-
-   27 mapping_rec: hex_num '-' hex_num '=' hex_num TOK_PAGE . hex_num eoln
-
-    TOK_DEC  shift, and go to state 54
-    TOK_HEX  shift, and go to state 55
-
-    hex_num  go to state 187
+    $default  reduce using rule 76 (watch_list)
 
 
-state 183
+State 196
 
-   26 mapping_rec: hex_num '-' hex_num '=' hex_num eoln .
+   81 watch_range: hex_num '-' hex_num .
+
+    $default  reduce using rule 81 (watch_range)
+
+
+State 197
+
+   26 mapping_rec: hex_num '-' hex_num '=' hex_num memattr_page .
 
     $default  reduce using rule 26 (mapping_rec)
 
 
-state 184
+State 198
 
-   34 ecsbank_rec: hex_num ':' hex_num '-' hex_num '=' . hex_num eoln
+   33 ecsbank_rec: hex_num ':' hex_num '-' hex_num '=' . hex_num eoln
 
-    TOK_DEC  shift, and go to state 54
-    TOK_HEX  shift, and go to state 55
+    TOK_DEC  shift, and go to state 51
+    TOK_HEX  shift, and go to state 52
 
-    hex_num  go to state 188
+    hex_num  go to state 204
 
 
-state 185
+State 199
 
-   41 memattr_rec: hex_num '-' hex_num '=' memattr dec_num . eoln
+   45 memattr_page: TOK_PAGE hex_num . memattr_page
+
+    TOK_RAM   shift, and go to state 184
+    TOK_ROM   shift, and go to state 185
+    TOK_WOM   shift, and go to state 186
+    TOK_PAGE  shift, and go to state 187
+    '\n'      shift, and go to state 2
+
+    memattr_page  go to state 205
+    memattr_tok   go to state 189
+    eoln          go to state 190
+
+
+State 200
+
+   44 memattr_page: memattr_tok dec_num . memattr_page
+
+    TOK_RAM   shift, and go to state 184
+    TOK_ROM   shift, and go to state 185
+    TOK_WOM   shift, and go to state 186
+    TOK_PAGE  shift, and go to state 187
+    '\n'      shift, and go to state 2
+
+    memattr_page  go to state 206
+    memattr_tok   go to state 189
+    eoln          go to state 190
+
+
+State 201
+
+   50 preload_rec: hex_num '-' hex_num '=' hex_num eoln .
+
+    $default  reduce using rule 50 (preload_rec)
+
+
+State 202
+
+   65 macro_line: TOK_MAC_POKE hex_num TOK_PAGE hex_num hex_num eoln .
+
+    $default  reduce using rule 65 (macro_line)
+
+
+State 203
+
+   66 macro_line: TOK_MAC_POKE hex_num ':' hex_num hex_num eoln .
+
+    $default  reduce using rule 66 (macro_line)
+
+
+State 204
+
+   33 ecsbank_rec: hex_num ':' hex_num '-' hex_num '=' hex_num . eoln
 
     '\n'  shift, and go to state 2
 
-    eoln  go to state 189
+    eoln  go to state 207
 
 
-state 186
+State 205
 
-   49 preload_rec: hex_num '-' hex_num '=' hex_num eoln .
+   45 memattr_page: TOK_PAGE hex_num memattr_page .
 
-    $default  reduce using rule 49 (preload_rec)
-
-
-state 187
-
-   27 mapping_rec: hex_num '-' hex_num '=' hex_num TOK_PAGE hex_num . eoln
-
-    '\n'  shift, and go to state 2
-
-    eoln  go to state 190
+    $default  reduce using rule 45 (memattr_page)
 
 
-state 188
+State 206
 
-   34 ecsbank_rec: hex_num ':' hex_num '-' hex_num '=' hex_num . eoln
+   44 memattr_page: memattr_tok dec_num memattr_page .
 
-    '\n'  shift, and go to state 2
-
-    eoln  go to state 191
+    $default  reduce using rule 44 (memattr_page)
 
 
-state 189
+State 207
 
-   41 memattr_rec: hex_num '-' hex_num '=' memattr dec_num eoln .
+   33 ecsbank_rec: hex_num ':' hex_num '-' hex_num '=' hex_num eoln .
 
-    $default  reduce using rule 41 (memattr_rec)
-
-
-state 190
-
-   27 mapping_rec: hex_num '-' hex_num '=' hex_num TOK_PAGE hex_num eoln .
-
-    $default  reduce using rule 27 (mapping_rec)
-
-
-state 191
-
-   34 ecsbank_rec: hex_num ':' hex_num '-' hex_num '=' hex_num eoln .
-
-    $default  reduce using rule 34 (ecsbank_rec)
+    $default  reduce using rule 33 (ecsbank_rec)

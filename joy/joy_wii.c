@@ -1,9 +1,9 @@
 /*------------------------------------------------------------------------------------
 * Hi, this file converts direct wii controller inputs to SDL events,
 * so it's possible to use and configure easily controllers, with sticks included.
-* 
+*
 * Thanks to:
-* 
+*
 *        http://www.devsgen.com/wiki/doku.php/tutoriels:wii:manette_manette_virtuelle
 *        http://www.lazyfoo.net/SDL_tutorials/index.php
 *        and obviously Jow Zbiciak and jzintv
@@ -42,14 +42,14 @@
 //************************************************
 // NUNCHUK defines
 //************************************************
-   
+
 #define NUNCHUK_X_TOLERANCE 10
 #define NUNCHUK_Y_TOLERANCE 10
 
 //************************************************
 // Classic controller defines
 //************************************************
-   
+
 //Left pad defines
 
 #define CLASSIC_LEFT_X_TOLERANCE 10
@@ -107,11 +107,11 @@ int getAngleIndex(int x, int y)
   {
      if               (4*y <   x) return 0;
      if (4*y >=   x && 2*y <   x) return 1;
-     if (2*y >=   x && 4*y < 3*x) return 2;	 
+     if (2*y >=   x && 4*y < 3*x) return 2;
      if (4*y >= 3*x &&   y <   x) return 3;
-     if (  y >=   x && 3*y < 4*x) return 4;	 
+     if (  y >=   x && 3*y < 4*x) return 4;
      if (3*y >= 4*x &&   y < 2*x) return 5;
-     if (  y >= 2*x &&   y < 4*x) return 6;	 
+     if (  y >= 2*x &&   y < 4*x) return 6;
      if (  y >= 4*x)              return 7;
   }
   else if (
@@ -121,11 +121,11 @@ int getAngleIndex(int x, int y)
   {
      if                  (y >-4*x) return 8;
      if (  y <= -4*x &&   y >-2*x) return 9;
-     if (  y <= -2*x && 3*y >-4*x) return 10;	 
+     if (  y <= -2*x && 3*y >-4*x) return 10;
      if (3*y <= -4*x &&   y >  -x) return 11;
-     if (  y <=   -x && 4*y >-3*x) return 12;	 
+     if (  y <=   -x && 4*y >-3*x) return 12;
      if (4*y <= -3*x && 2*y >  -x) return 13;
-     if (2*y <=   -x && 4*y >  -x) return 14;	 
+     if (2*y <=   -x && 4*y >  -x) return 14;
      if (4*y <=   -x)              return 15;
   }
     else if (
@@ -135,11 +135,11 @@ int getAngleIndex(int x, int y)
   {
      if                (4*y >   x) return 16;
      if ( 4*y <=   x && 2*y >   x) return 17;
-     if ( 2*y <=   x && 4*y > 3*x) return 18;	 
+     if ( 2*y <=   x && 4*y > 3*x) return 18;
      if ( 4*y <= 3*x &&   y >   x) return 19;
-     if (   y <=   x && 3*y > 4*x) return 20;	 
+     if (   y <=   x && 3*y > 4*x) return 20;
      if ( 3*y <= 4*x &&   y > 2*x) return 21;
-     if (   y <= 2*x &&   y > 4*x) return 22;	 
+     if (   y <= 2*x &&   y > 4*x) return 22;
      if (   y <= 4*x)              return 23;
   }
     else if (
@@ -149,11 +149,11 @@ int getAngleIndex(int x, int y)
   {
      if                   (y <-4*x) return 24;
      if (   y >=-4*x &&    y <-2*x) return 25;
-     if (   y >=-2*x &&  3*y <-4*x) return 26;	 
+     if (   y >=-2*x &&  3*y <-4*x) return 26;
      if ( 3*y >=-4*x &&    y <  -x) return 27;
-     if (   y >=  -x &&  4*y <-3*x) return 28;	 
+     if (   y >=  -x &&  4*y <-3*x) return 28;
      if ( 4*y >=-3*x &&  2*y <   x) return 29;
-     if ( 2*y >=   x &&  4*y <   x) return 30;	 
+     if ( 2*y >=   x &&  4*y <   x) return 30;
      if ( 4*y >=   x)               return 31;
   }
   return -1;
@@ -277,7 +277,7 @@ void getWiimoteAndNunchukPadInput()
    int virtualJoyIndex=0;
    int physicalJoyIndex=0;
    SDL_Event keyDownEvent[MAX_EVENTS_PER_CYCLE];
-   
+
    //************************************************
    // Buttons PRESSED
    //************************************************
@@ -291,23 +291,23 @@ void getWiimoteAndNunchukPadInput()
       }
       pressed = buttonsDown[physicalJoyIndex];
       int keyDownIndex=0;
-      
+
       if (pressed & WPAD_BUTTON_2)
       {
          keyDownEvent[keyDownIndex].jbutton.which=virtualJoyIndex;
          keyDownEvent[keyDownIndex].jbutton.type=SDL_JOYBUTTONDOWN;
          keyDownEvent[keyDownIndex].jbutton.button=JOY_BTN_09;
-         SDL_PushEvent(&keyDownEvent[keyDownIndex++]); 
+         SDL_PushEvent(&keyDownEvent[keyDownIndex++]);
       }
-      
+
       if (pressed & WPAD_BUTTON_1)
       {
          keyDownEvent[keyDownIndex].jbutton.which=virtualJoyIndex;
          keyDownEvent[keyDownIndex].jbutton.type=SDL_JOYBUTTONDOWN;
          keyDownEvent[keyDownIndex].jbutton.button=JOY_BTN_10;
-         SDL_PushEvent(&keyDownEvent[keyDownIndex++]); 
+         SDL_PushEvent(&keyDownEvent[keyDownIndex++]);
       }
-      
+
       if (pressed & WPAD_BUTTON_A)
       {
          keyDownEvent[keyDownIndex].jbutton.which=virtualJoyIndex;
@@ -315,55 +315,55 @@ void getWiimoteAndNunchukPadInput()
          keyDownEvent[keyDownIndex].jbutton.button=JOY_BTN_11;
          SDL_PushEvent(&keyDownEvent[keyDownIndex++]);
       }
-      
+
       if (pressed & WPAD_BUTTON_PLUS)
       {
          keyDownEvent[keyDownIndex].key.which=virtualJoyIndex;
          keyDownEvent[keyDownIndex].key.type=SDL_KEYDOWN;
          keyDownEvent[keyDownIndex].key.keysym.sym=SDLK_F12;
-         SDL_PushEvent(&keyDownEvent[keyDownIndex++]); 
+         SDL_PushEvent(&keyDownEvent[keyDownIndex++]);
       }
-      
+
       if (pressed & WPAD_BUTTON_HOME)
       {
          keyDownEvent[keyDownIndex].key.which=virtualJoyIndex;
          keyDownEvent[keyDownIndex].key.type=SDL_KEYDOWN;
          keyDownEvent[keyDownIndex].key.keysym.sym=SDLK_F1;
-         SDL_PushEvent(&keyDownEvent[keyDownIndex++]); 
+         SDL_PushEvent(&keyDownEvent[keyDownIndex++]);
       }
-      
+
       if (pressed & WPAD_BUTTON_MINUS)
       {
          keyDownEvent[keyDownIndex].jbutton.which=virtualJoyIndex;
          keyDownEvent[keyDownIndex].jbutton.type=SDL_JOYBUTTONDOWN;
          keyDownEvent[keyDownIndex].jbutton.button=JOY_BTN_13;
-         SDL_PushEvent(&keyDownEvent[keyDownIndex++]);	  
+         SDL_PushEvent(&keyDownEvent[keyDownIndex++]);
       }
-      
+
       if (pressed & WPAD_BUTTON_B)
       {
          keyDownEvent[keyDownIndex].jbutton.which=virtualJoyIndex;
          keyDownEvent[keyDownIndex].jbutton.type=SDL_JOYBUTTONDOWN;
          keyDownEvent[keyDownIndex].jbutton.button=JOY_BTN_02;
-         SDL_PushEvent(&keyDownEvent[keyDownIndex++]); 
+         SDL_PushEvent(&keyDownEvent[keyDownIndex++]);
       }
-      
+
       if (pressed & WPAD_NUNCHUK_BUTTON_C)
       {
          keyDownEvent[keyDownIndex].jbutton.which=virtualJoyIndex;
          keyDownEvent[keyDownIndex].jbutton.type=SDL_JOYBUTTONDOWN;
          keyDownEvent[keyDownIndex].jbutton.button=JOY_BTN_00;
-         SDL_PushEvent(&keyDownEvent[keyDownIndex++]);  
+         SDL_PushEvent(&keyDownEvent[keyDownIndex++]);
       }
-      
+
       if (pressed & WPAD_NUNCHUK_BUTTON_Z)
       {
          keyDownEvent[keyDownIndex].jbutton.which=virtualJoyIndex;
          keyDownEvent[keyDownIndex].jbutton.type=SDL_JOYBUTTONDOWN;
          keyDownEvent[keyDownIndex].jbutton.button=JOY_BTN_01;
-         SDL_PushEvent(&keyDownEvent[keyDownIndex++]); 
+         SDL_PushEvent(&keyDownEvent[keyDownIndex++]);
       }
-      
+
       //************************************************
       // Buttons PRESSED --> D-Pads
       //************************************************
@@ -371,20 +371,20 @@ void getWiimoteAndNunchukPadInput()
       int x=0;
       int y=0;
       int angleIndex=0;
-      
+
       if (pressed & WPAD_BUTTON_RIGHT)y=1000;
       if (pressed & WPAD_BUTTON_DOWN) x=1000;
       if (pressed & WPAD_BUTTON_LEFT) y=-1000;
       if (pressed & WPAD_BUTTON_UP)   x=-1000;
-         
+
       angleIndex = getAngleIndex(x,y);
-      
+
       SDL_Event hatEvent;
       hatEvent.type = SDL_JOYHATMOTION;
       hatEvent.jhat.which=virtualJoyIndex;
       hatEvent.jhat.hat = 0;
       hatEvent.jhat.value = SDL_HAT_CENTERED;
-     
+
       if ((x!=0) || (y!=0))
       {
           getHatEvent(&hatEvent, angleIndex);
@@ -398,25 +398,25 @@ void getWiimoteAndNunchukPadInput()
       //************************************************
       // Buttons HELD --> D-Pads
       //************************************************
-      
+
       pressed = buttonsHeld[physicalJoyIndex];
       int x=0;
       int y=0;
       int angleIndex=0;
-      
+
       if (pressed & WPAD_BUTTON_RIGHT)y=1000;
       if (pressed & WPAD_BUTTON_DOWN) x=1000;
       if (pressed & WPAD_BUTTON_LEFT) y=-1000;
       if (pressed & WPAD_BUTTON_UP)   x=-1000;
-         
+
       angleIndex = getAngleIndex(x,y);
-      
+
       SDL_Event hatEvent;
       hatEvent.type = SDL_JOYHATMOTION;
       hatEvent.jhat.which=virtualJoyIndex;
       hatEvent.jhat.hat = 0;
       hatEvent.jhat.value = SDL_HAT_CENTERED;
-     
+
       if ((x!=0) || (y!=0))
       {
           getHatEvent(&hatEvent, angleIndex);
@@ -426,31 +426,31 @@ void getWiimoteAndNunchukPadInput()
         SDL_PushEvent(&hatEvent);
         lastHatSent[virtualJoyIndex] = hatEvent.jhat.value;
       }
-      
+
       //************************************************
       // Buttons RELEASED
       //************************************************
-      
+
       pressed = buttonsUp[physicalJoyIndex];
       int keyUpIndex=0;
       SDL_Event keyUpEvent[MAX_EVENTS_PER_CYCLE];
-      
+
       if (pressed & WPAD_BUTTON_2)
       {
          keyUpEvent[keyUpIndex].jbutton.which=virtualJoyIndex;
          keyUpEvent[keyUpIndex].jbutton.type=SDL_JOYBUTTONUP;
          keyUpEvent[keyUpIndex].jbutton.button=JOY_BTN_09;
-         SDL_PushEvent(&keyUpEvent[keyUpIndex++]); 
+         SDL_PushEvent(&keyUpEvent[keyUpIndex++]);
       }
-      
+
       if (pressed & WPAD_BUTTON_1)
       {
          keyUpEvent[keyUpIndex].jbutton.which=virtualJoyIndex;
          keyUpEvent[keyUpIndex].jbutton.type=SDL_JOYBUTTONUP;
          keyUpEvent[keyUpIndex].jbutton.button=JOY_BTN_10;
-         SDL_PushEvent(&keyUpEvent[keyUpIndex++]); 
+         SDL_PushEvent(&keyUpEvent[keyUpIndex++]);
       }
-      
+
       if (pressed & WPAD_BUTTON_A)
       {
          keyUpEvent[keyUpIndex].jbutton.which=virtualJoyIndex;
@@ -458,47 +458,47 @@ void getWiimoteAndNunchukPadInput()
          keyUpEvent[keyUpIndex].jbutton.button=JOY_BTN_11;
          SDL_PushEvent(&keyUpEvent[keyUpIndex++]);
       }
-      
+
       if (pressed & WPAD_BUTTON_PLUS)
       {
          keyUpEvent[keyUpIndex].key.which=virtualJoyIndex;
          keyUpEvent[keyUpIndex].key.type=SDL_KEYUP;
          keyUpEvent[keyUpIndex].key.keysym.sym=SDLK_F12;
-         SDL_PushEvent(&keyUpEvent[keyUpIndex++]); 
+         SDL_PushEvent(&keyUpEvent[keyUpIndex++]);
       }
-      
+
       if (pressed & WPAD_BUTTON_HOME)
       {
          keyUpEvent[keyUpIndex].key.which=virtualJoyIndex;
          keyUpEvent[keyUpIndex].key.type=SDL_KEYUP;
          keyUpEvent[keyUpIndex].key.keysym.sym=SDLK_F1;
-         SDL_PushEvent(&keyUpEvent[keyUpIndex++]); 
+         SDL_PushEvent(&keyUpEvent[keyUpIndex++]);
       }
-      
+
       if (pressed & WPAD_BUTTON_MINUS)
       {
          keyUpEvent[keyUpIndex].jbutton.which=virtualJoyIndex;
          keyUpEvent[keyUpIndex].jbutton.type=SDL_JOYBUTTONUP;
          keyUpEvent[keyUpIndex].jbutton.button=JOY_BTN_13;
-         SDL_PushEvent(&keyUpEvent[keyUpIndex++]);	  
+         SDL_PushEvent(&keyUpEvent[keyUpIndex++]);
       }
-      
+
       if (pressed & WPAD_BUTTON_B)
       {
          keyUpEvent[keyUpIndex].jbutton.which=virtualJoyIndex;
          keyUpEvent[keyUpIndex].jbutton.type=SDL_JOYBUTTONUP;
          keyUpEvent[keyUpIndex].jbutton.button=JOY_BTN_02;
-         SDL_PushEvent(&keyUpEvent[keyUpIndex++]); 
+         SDL_PushEvent(&keyUpEvent[keyUpIndex++]);
       }
-      
+
       if (pressed & WPAD_NUNCHUK_BUTTON_C )
       {
          keyUpEvent[keyUpIndex].jbutton.which=virtualJoyIndex;
          keyUpEvent[keyUpIndex].jbutton.type=SDL_JOYBUTTONUP;
          keyUpEvent[keyUpIndex].jbutton.button=JOY_BTN_00;
-         SDL_PushEvent(&keyUpEvent[keyUpIndex++]); 
+         SDL_PushEvent(&keyUpEvent[keyUpIndex++]);
       }
-      
+
       if (pressed & WPAD_NUNCHUK_BUTTON_Z)
       {
          keyUpEvent[keyUpIndex].jbutton.which=virtualJoyIndex;
@@ -506,38 +506,38 @@ void getWiimoteAndNunchukPadInput()
          keyUpEvent[keyUpIndex].jbutton.button=JOY_BTN_01;
          SDL_PushEvent(&keyUpEvent[keyUpIndex++]);
       }
-      
+
       //************************************************
       // Stick --> JoyAXIS
       //************************************************
-      
+
       struct expansion_t ext;
       WPAD_Expansion(physicalJoyIndex, &ext);
-      
+
       x = ext.nunchuk.js.pos.x-ext.nunchuk.js.center.x;
       y = ext.nunchuk.js.pos.y-ext.nunchuk.js.center.y;
       angleIndex = getAngleIndex(x,y);
-        
+
       SDL_Event xevent;
       xevent.type = SDL_JOYAXISMOTION;
       xevent.jaxis.which=virtualJoyIndex;
       xevent.jaxis.axis=0;
-      
+
       SDL_Event yevent;
       yevent.type = SDL_JOYAXISMOTION;
       yevent.jaxis.which=virtualJoyIndex;
       yevent.jaxis.axis = 1;
-      
+
       getSDLJoyAxisEvent(&xevent, &yevent, angleIndex);
-      
-      if ( 
+
+      if (
           (x < NUNCHUK_X_TOLERANCE) &&
           (x > -NUNCHUK_X_TOLERANCE)
          )
       {
          xevent.jaxis.value = 0;
       }
-       
+
       if (
           (y < NUNCHUK_Y_TOLERANCE) &&
           (y > -NUNCHUK_Y_TOLERANCE)
@@ -547,20 +547,20 @@ void getWiimoteAndNunchukPadInput()
       }
       if (ext.type & WPAD_EXP_NUNCHUK)
       {
-        SDL_PushEvent(&xevent); 
+        SDL_PushEvent(&xevent);
         SDL_PushEvent(&yevent);
-      }      
+      }
    }
 }
 
-void getClassicControllerPadInput() 
+void getClassicControllerPadInput()
 {
    u32 pressed;
    int dpadPressed=0;
    int virtualJoyIndex=0;
    int physicalJoyIndex=0;
    SDL_Event keyDownEvent[MAX_EVENTS_PER_CYCLE];
-   
+
    //************************************************
    // Buttons PRESSED
    //************************************************
@@ -574,23 +574,23 @@ void getClassicControllerPadInput()
       }
       pressed = buttonsDown[physicalJoyIndex];
       int keyDownIndex=0;
-      
+
       if (pressed & WPAD_CLASSIC_BUTTON_A)
       {
          keyDownEvent[keyDownIndex].jbutton.which=virtualJoyIndex;
          keyDownEvent[keyDownIndex].jbutton.type=SDL_JOYBUTTONDOWN;
          keyDownEvent[keyDownIndex].jbutton.button=JOY_BTN_09;
-         SDL_PushEvent(&keyDownEvent[keyDownIndex++]); 
+         SDL_PushEvent(&keyDownEvent[keyDownIndex++]);
       }
-      
+
       if (pressed & WPAD_CLASSIC_BUTTON_Y)
       {
          keyDownEvent[keyDownIndex].jbutton.which=virtualJoyIndex;
          keyDownEvent[keyDownIndex].jbutton.type=SDL_JOYBUTTONDOWN;
          keyDownEvent[keyDownIndex].jbutton.button=JOY_BTN_10;
-         SDL_PushEvent(&keyDownEvent[keyDownIndex++]); 
+         SDL_PushEvent(&keyDownEvent[keyDownIndex++]);
       }
-      
+
       if (pressed & WPAD_CLASSIC_BUTTON_X)
       {
          keyDownEvent[keyDownIndex].jbutton.which=virtualJoyIndex;
@@ -598,7 +598,7 @@ void getClassicControllerPadInput()
          keyDownEvent[keyDownIndex].jbutton.button=JOY_BTN_11;
          SDL_PushEvent(&keyDownEvent[keyDownIndex++]);
       }
-      
+
       if (pressed & WPAD_CLASSIC_BUTTON_B)
       {
          keyDownEvent[keyDownIndex].jbutton.which=virtualJoyIndex;
@@ -606,67 +606,67 @@ void getClassicControllerPadInput()
          keyDownEvent[keyDownIndex].jbutton.button=JOY_BTN_12;
          SDL_PushEvent(&keyDownEvent[keyDownIndex++]);
       }
-      
+
       if (pressed & WPAD_CLASSIC_BUTTON_PLUS)
       {
          keyDownEvent[keyDownIndex].key.which=virtualJoyIndex;
          keyDownEvent[keyDownIndex].key.type=SDL_KEYDOWN;
          keyDownEvent[keyDownIndex].key.keysym.sym=SDLK_F12;
-         SDL_PushEvent(&keyDownEvent[keyDownIndex++]); 
+         SDL_PushEvent(&keyDownEvent[keyDownIndex++]);
       }
-      
+
       if (pressed & WPAD_CLASSIC_BUTTON_HOME)
       {
          keyDownEvent[keyDownIndex].key.which=virtualJoyIndex;
          keyDownEvent[keyDownIndex].key.type=SDL_KEYDOWN;
          keyDownEvent[keyDownIndex].key.keysym.sym=SDLK_F1;
-         SDL_PushEvent(&keyDownEvent[keyDownIndex++]); 
+         SDL_PushEvent(&keyDownEvent[keyDownIndex++]);
       }
-      
+
       if (pressed & WPAD_CLASSIC_BUTTON_MINUS)
       {
          keyDownEvent[keyDownIndex].jbutton.which=virtualJoyIndex;
          keyDownEvent[keyDownIndex].jbutton.type=SDL_JOYBUTTONDOWN;
          keyDownEvent[keyDownIndex].jbutton.button=JOY_BTN_13;
-         SDL_PushEvent(&keyDownEvent[keyDownIndex++]);	  
+         SDL_PushEvent(&keyDownEvent[keyDownIndex++]);
       }
-      
+
       if (pressed & WPAD_CLASSIC_BUTTON_ZR)
       {
          keyDownEvent[keyDownIndex].jbutton.which=virtualJoyIndex;
          keyDownEvent[keyDownIndex].jbutton.type=SDL_JOYBUTTONDOWN;
          keyDownEvent[keyDownIndex].jbutton.button=JOY_BTN_02;
-         SDL_PushEvent(&keyDownEvent[keyDownIndex++]); 
+         SDL_PushEvent(&keyDownEvent[keyDownIndex++]);
       }
-      
+
       if (pressed & WPAD_CLASSIC_BUTTON_FULL_R)
       {
          keyDownEvent[keyDownIndex].jbutton.which=virtualJoyIndex;
          keyDownEvent[keyDownIndex].jbutton.type=SDL_JOYBUTTONDOWN;
          keyDownEvent[keyDownIndex].jbutton.button=JOY_BTN_00;
-         SDL_PushEvent(&keyDownEvent[keyDownIndex++]);  
+         SDL_PushEvent(&keyDownEvent[keyDownIndex++]);
       }
-      
+
       if (pressed & WPAD_CLASSIC_BUTTON_ZL)
       {
          keyDownEvent[keyDownIndex].jbutton.which=virtualJoyIndex;
          keyDownEvent[keyDownIndex].jbutton.type=SDL_JOYBUTTONDOWN;
          keyDownEvent[keyDownIndex].jbutton.button=JOY_BTN_01;
-         SDL_PushEvent(&keyDownEvent[keyDownIndex++]); 
+         SDL_PushEvent(&keyDownEvent[keyDownIndex++]);
       }
-      
+
       if (pressed & WPAD_CLASSIC_BUTTON_FULL_L)
       {
          keyDownEvent[keyDownIndex].jbutton.which=virtualJoyIndex;
          keyDownEvent[keyDownIndex].jbutton.type=SDL_JOYBUTTONDOWN;
          keyDownEvent[keyDownIndex].jbutton.button=JOY_BTN_00;
-         SDL_PushEvent(&keyDownEvent[keyDownIndex++]); 
+         SDL_PushEvent(&keyDownEvent[keyDownIndex++]);
       }
-      
+
       //************************************************
       // Buttons PRESSED --> D-Pads
       //************************************************
-     
+
       if (pressed & WPAD_CLASSIC_BUTTON_RIGHT)
       {
          keyDownEvent[keyDownIndex].type = SDL_JOYAXISMOTION;
@@ -676,7 +676,7 @@ void getClassicControllerPadInput()
          SDL_PushEvent(&keyDownEvent[keyDownIndex++]);
          dpadPressed=1;
       }
-      
+
       if (pressed & WPAD_CLASSIC_BUTTON_DOWN)
       {
          keyDownEvent[keyDownIndex].type = SDL_JOYAXISMOTION;
@@ -684,9 +684,9 @@ void getClassicControllerPadInput()
          keyDownEvent[keyDownIndex].jaxis.which=virtualJoyIndex;
          keyDownEvent[keyDownIndex].jaxis.value=10000;
          SDL_PushEvent(&keyDownEvent[keyDownIndex++]);
-         dpadPressed=1;      
+         dpadPressed=1;
       }
-       
+
       if (pressed & WPAD_CLASSIC_BUTTON_LEFT)
       {
          keyDownEvent[keyDownIndex].type = SDL_JOYAXISMOTION;
@@ -694,9 +694,9 @@ void getClassicControllerPadInput()
          keyDownEvent[keyDownIndex].jaxis.which=virtualJoyIndex;
          keyDownEvent[keyDownIndex].jaxis.value=-10000;
          SDL_PushEvent(&keyDownEvent[keyDownIndex++]);
-         dpadPressed=1;      
+         dpadPressed=1;
       }
-       
+
       if (pressed & WPAD_CLASSIC_BUTTON_UP)
       {
          keyDownEvent[keyDownIndex].type = SDL_JOYAXISMOTION;
@@ -704,27 +704,27 @@ void getClassicControllerPadInput()
          keyDownEvent[keyDownIndex].jaxis.which=virtualJoyIndex;
          keyDownEvent[keyDownIndex].jaxis.value=-10000;
          SDL_PushEvent(&keyDownEvent[keyDownIndex++]);
-         dpadPressed=1;      
+         dpadPressed=1;
       }
-     
+
       //************************************************
       // Buttons Held --> D-Pads
       //************************************************
-      
+
       pressed = buttonsHeld[physicalJoyIndex];
       int keyHeldIndex=0;
       SDL_Event keyHeldEvent[MAX_EVENTS_PER_CYCLE];
-      
+
       if (pressed & WPAD_CLASSIC_BUTTON_RIGHT)
       {
          keyHeldEvent[keyHeldIndex].type = SDL_JOYAXISMOTION;
          keyHeldEvent[keyHeldIndex].jaxis.axis = 0;
          keyHeldEvent[keyHeldIndex].jaxis.which=virtualJoyIndex;
          keyHeldEvent[keyHeldIndex].jaxis.value=10000;
-         SDL_PushEvent(&keyHeldEvent[keyHeldIndex++]);  
+         SDL_PushEvent(&keyHeldEvent[keyHeldIndex++]);
          dpadPressed=1;
       }
-    
+
       if (pressed & WPAD_CLASSIC_BUTTON_DOWN)
       {
          keyHeldEvent[keyHeldIndex].type = SDL_JOYAXISMOTION;
@@ -734,7 +734,7 @@ void getClassicControllerPadInput()
          SDL_PushEvent(&keyHeldEvent[keyHeldIndex++]);
          dpadPressed=1;
       }
-      
+
       if (pressed & WPAD_CLASSIC_BUTTON_LEFT)
       {
          keyHeldEvent[keyHeldIndex].type = SDL_JOYAXISMOTION;
@@ -742,9 +742,9 @@ void getClassicControllerPadInput()
          keyHeldEvent[keyHeldIndex].jaxis.which=virtualJoyIndex;
          keyHeldEvent[keyHeldIndex].jaxis.value=-10000;
          SDL_PushEvent(&keyHeldEvent[keyHeldIndex++]);
-         dpadPressed=1;         
+         dpadPressed=1;
       }
-    
+
       if (pressed & WPAD_CLASSIC_BUTTON_UP)
       {
          keyHeldEvent[keyHeldIndex].type = SDL_JOYAXISMOTION;
@@ -752,33 +752,33 @@ void getClassicControllerPadInput()
          keyHeldEvent[keyHeldIndex].jaxis.which=virtualJoyIndex;
          keyHeldEvent[keyHeldIndex].jaxis.value=-10000;
          SDL_PushEvent(&keyHeldEvent[keyHeldIndex++]);
-         dpadPressed=1;         
+         dpadPressed=1;
       }
-      
+
       //************************************************
       // Buttons RELEASED
       //************************************************
-      
+
       pressed = buttonsUp[physicalJoyIndex];
       int keyUpIndex=0;
       SDL_Event keyUpEvent[MAX_EVENTS_PER_CYCLE];
-      
+
       if (pressed & WPAD_CLASSIC_BUTTON_A)
       {
          keyUpEvent[keyUpIndex].jbutton.which=virtualJoyIndex;
          keyUpEvent[keyUpIndex].jbutton.type=SDL_JOYBUTTONUP;
          keyUpEvent[keyUpIndex].jbutton.button=JOY_BTN_09;
-         SDL_PushEvent(&keyUpEvent[keyUpIndex++]); 
+         SDL_PushEvent(&keyUpEvent[keyUpIndex++]);
       }
-      
+
       if (pressed & WPAD_CLASSIC_BUTTON_Y)
       {
          keyUpEvent[keyUpIndex].jbutton.which=virtualJoyIndex;
          keyUpEvent[keyUpIndex].jbutton.type=SDL_JOYBUTTONUP;
          keyUpEvent[keyUpIndex].jbutton.button=JOY_BTN_10;
-         SDL_PushEvent(&keyUpEvent[keyUpIndex++]); 
+         SDL_PushEvent(&keyUpEvent[keyUpIndex++]);
       }
-      
+
       if (pressed & WPAD_CLASSIC_BUTTON_X)
       {
          keyUpEvent[keyUpIndex].jbutton.which=virtualJoyIndex;
@@ -786,55 +786,55 @@ void getClassicControllerPadInput()
          keyUpEvent[keyUpIndex].jbutton.button=JOY_BTN_11;
          SDL_PushEvent(&keyUpEvent[keyUpIndex++]);
       }
-      
+
       if (pressed & WPAD_CLASSIC_BUTTON_B)
       {
          keyUpEvent[keyUpIndex].jbutton.which=virtualJoyIndex;
          keyUpEvent[keyUpIndex].jbutton.type=SDL_JOYBUTTONUP;
          keyUpEvent[keyUpIndex].jbutton.button=JOY_BTN_12;
-         SDL_PushEvent(&keyUpEvent[keyUpIndex++]); 
+         SDL_PushEvent(&keyUpEvent[keyUpIndex++]);
       }
-      
+
       if (pressed & WPAD_CLASSIC_BUTTON_PLUS)
       {
          keyUpEvent[keyUpIndex].key.which=virtualJoyIndex;
          keyUpEvent[keyUpIndex].key.type=SDL_KEYUP;
          keyUpEvent[keyUpIndex].key.keysym.sym=SDLK_F12;
-         SDL_PushEvent(&keyUpEvent[keyUpIndex++]); 
+         SDL_PushEvent(&keyUpEvent[keyUpIndex++]);
       }
-      
+
       if (pressed & WPAD_CLASSIC_BUTTON_HOME)
       {
          keyUpEvent[keyUpIndex].key.which=virtualJoyIndex;
          keyUpEvent[keyUpIndex].key.type=SDL_KEYUP;
          keyUpEvent[keyUpIndex].key.keysym.sym=SDLK_F1;
-         SDL_PushEvent(&keyUpEvent[keyUpIndex++]); 
+         SDL_PushEvent(&keyUpEvent[keyUpIndex++]);
       }
-      
+
       if (pressed & WPAD_CLASSIC_BUTTON_MINUS)
       {
          keyUpEvent[keyUpIndex].jbutton.which=virtualJoyIndex;
          keyUpEvent[keyUpIndex].jbutton.type=SDL_JOYBUTTONUP;
          keyUpEvent[keyUpIndex].jbutton.button=JOY_BTN_13;
-         SDL_PushEvent(&keyUpEvent[keyUpIndex++]);	  
+         SDL_PushEvent(&keyUpEvent[keyUpIndex++]);
       }
-      
+
       if (pressed & WPAD_CLASSIC_BUTTON_ZR)
       {
          keyUpEvent[keyUpIndex].jbutton.which=virtualJoyIndex;
          keyUpEvent[keyUpIndex].jbutton.type=SDL_JOYBUTTONUP;
          keyUpEvent[keyUpIndex].jbutton.button=JOY_BTN_02;
-         SDL_PushEvent(&keyUpEvent[keyUpIndex++]); 
+         SDL_PushEvent(&keyUpEvent[keyUpIndex++]);
       }
-      
+
       if (pressed & WPAD_CLASSIC_BUTTON_FULL_R )
       {
          keyUpEvent[keyUpIndex].jbutton.which=virtualJoyIndex;
          keyUpEvent[keyUpIndex].jbutton.type=SDL_JOYBUTTONUP;
          keyUpEvent[keyUpIndex].jbutton.button=JOY_BTN_00;
-         SDL_PushEvent(&keyUpEvent[keyUpIndex++]); 
+         SDL_PushEvent(&keyUpEvent[keyUpIndex++]);
       }
-      
+
       if (pressed & WPAD_CLASSIC_BUTTON_ZL)
       {
          keyUpEvent[keyUpIndex].jbutton.which=virtualJoyIndex;
@@ -842,19 +842,19 @@ void getClassicControllerPadInput()
          keyUpEvent[keyUpIndex].jbutton.button=JOY_BTN_01;
          SDL_PushEvent(&keyUpEvent[keyUpIndex++]);
       }
-      
+
       if (pressed & WPAD_CLASSIC_BUTTON_FULL_L)
       {
          keyUpEvent[keyUpIndex].jbutton.which=virtualJoyIndex;
          keyUpEvent[keyUpIndex].jbutton.type=SDL_JOYBUTTONUP;
          keyUpEvent[keyUpIndex].jbutton.button=JOY_BTN_00;
-         SDL_PushEvent(&keyUpEvent[keyUpIndex++]);  
+         SDL_PushEvent(&keyUpEvent[keyUpIndex++]);
       }
-      
+
       //************************************************
       // Buttons RELEASED --> D-Pads
       //************************************************
-      
+
       if (pressed & WPAD_CLASSIC_BUTTON_RIGHT)
       {
          keyUpEvent[keyUpIndex].type = SDL_JOYAXISMOTION;
@@ -864,7 +864,7 @@ void getClassicControllerPadInput()
          SDL_PushEvent(&keyUpEvent[keyUpIndex++]);
          dpadPressed=1;
       }
-    
+
       if (pressed & WPAD_CLASSIC_BUTTON_DOWN)
       {
          keyUpEvent[keyUpIndex].type = SDL_JOYAXISMOTION;
@@ -874,7 +874,7 @@ void getClassicControllerPadInput()
          SDL_PushEvent(&keyUpEvent[keyUpIndex++]);
          dpadPressed=1;
       }
-    
+
       if (pressed & WPAD_CLASSIC_BUTTON_LEFT)
       {
          keyUpEvent[keyUpIndex].type = SDL_JOYAXISMOTION;
@@ -884,7 +884,7 @@ void getClassicControllerPadInput()
          SDL_PushEvent(&keyUpEvent[keyUpIndex++]);
          dpadPressed=1;
       }
-    
+
       if (pressed & WPAD_CLASSIC_BUTTON_UP)
       {
          keyUpEvent[keyUpIndex].type = SDL_JOYAXISMOTION;
@@ -903,33 +903,33 @@ void getClassicControllerPadInput()
       struct expansion_t ext;
       int angleIndex = 0;
       WPAD_Expansion(physicalJoyIndex, &ext);
-      
+
       if (!dpadPressed)
       {
          x = ext.classic.ljs.pos.x-DEFAULT_CLASSIC_LEFT_X_CENTER;
          y = ext.classic.ljs.pos.y-DEFAULT_CLASSIC_LEFT_Y_CENTER;
          angleIndex = getAngleIndex(x,y);
-        
+
          SDL_Event xevent;
          xevent.type = SDL_JOYAXISMOTION;
          xevent.jaxis.which=virtualJoyIndex;
          xevent.jaxis.axis = 0;
-         
+
          SDL_Event yevent;
          yevent.type = SDL_JOYAXISMOTION;
          yevent.jaxis.which=virtualJoyIndex;
          yevent.jaxis.axis = 1;
-         
+
          getSDLJoyAxisEvent(&xevent, &yevent, angleIndex);
-         
-         if ( 
+
+         if (
              (x < CLASSIC_LEFT_X_TOLERANCE) &&
              (x > -CLASSIC_LEFT_X_TOLERANCE)
              )
          {
             xevent.jaxis.value = 0;
          }
-          
+
          if (
              (y < CLASSIC_LEFT_Y_TOLERANCE) &&
              (y > -CLASSIC_LEFT_Y_TOLERANCE)
@@ -939,27 +939,27 @@ void getClassicControllerPadInput()
          }
          if (ext.type & WPAD_EXP_CLASSIC)
          {
-            SDL_PushEvent(&xevent); 
+            SDL_PushEvent(&xevent);
             SDL_PushEvent(&yevent);
-         }           
+         }
       }
-     
-      
+
+
       //************************************************
       // Right stick --> HAT
       //************************************************
-      
+
       x = ext.classic.rjs.pos.x-DEFAULT_CLASSIC_RIGHT_X_CENTER;
       y = ext.classic.rjs.pos.y-DEFAULT_CLASSIC_RIGHT_Y_CENTER;
       angleIndex = getAngleIndex(x,y);
-      
+
       SDL_Event hatEvent;
       hatEvent.type = SDL_JOYHATMOTION;
       hatEvent.jhat.which=virtualJoyIndex;
       hatEvent.jhat.hat = 0;
       hatEvent.jhat.value = SDL_HAT_CENTERED;
-     
-      if ( 
+
+      if (
           (x > CLASSIC_RIGHT_X_TOLERANCE) ||
           (x < -CLASSIC_RIGHT_X_TOLERANCE)||
           (y > CLASSIC_RIGHT_Y_TOLERANCE) ||
@@ -976,14 +976,14 @@ void getClassicControllerPadInput()
    }
 }
 
-void getGamecubePadInput() 
+void getGamecubePadInput()
 {
    u32 pressed;
    int dpadPressed = 0;
    int virtualJoyIndex=0;
    int physicalJoyIndex=0;
    SDL_Event keyDownEvent[MAX_EVENTS_PER_CYCLE];
-   
+
    //************************************************
    // Buttons PRESSED
    //************************************************
@@ -997,23 +997,23 @@ void getGamecubePadInput()
       }
       pressed = PAD_ButtonsDown(physicalJoyIndex);
       int keyDownIndex=0;
-      
+
       if (pressed & PAD_BUTTON_A)
       {
          keyDownEvent[keyDownIndex].jbutton.which=virtualJoyIndex;
          keyDownEvent[keyDownIndex].jbutton.type=SDL_JOYBUTTONDOWN;
          keyDownEvent[keyDownIndex].jbutton.button=JOY_BTN_09;
-         SDL_PushEvent(&keyDownEvent[keyDownIndex++]); 
+         SDL_PushEvent(&keyDownEvent[keyDownIndex++]);
       }
-      
+
       if (pressed & PAD_BUTTON_Y)
       {
          keyDownEvent[keyDownIndex].jbutton.which=virtualJoyIndex;
          keyDownEvent[keyDownIndex].jbutton.type=SDL_JOYBUTTONDOWN;
          keyDownEvent[keyDownIndex].jbutton.button=JOY_BTN_10;
-         SDL_PushEvent(&keyDownEvent[keyDownIndex++]); 
+         SDL_PushEvent(&keyDownEvent[keyDownIndex++]);
       }
-      
+
       if (pressed & PAD_BUTTON_X)
       {
          keyDownEvent[keyDownIndex].jbutton.which=virtualJoyIndex;
@@ -1021,7 +1021,7 @@ void getGamecubePadInput()
          keyDownEvent[keyDownIndex].jbutton.button=JOY_BTN_11;
          SDL_PushEvent(&keyDownEvent[keyDownIndex++]);
       }
-      
+
       if (pressed & PAD_BUTTON_B)
       {
          keyDownEvent[keyDownIndex].jbutton.which=virtualJoyIndex;
@@ -1029,43 +1029,43 @@ void getGamecubePadInput()
          keyDownEvent[keyDownIndex].jbutton.button=JOY_BTN_12;
          SDL_PushEvent(&keyDownEvent[keyDownIndex++]);
       }
-      
+
       if (pressed & PAD_BUTTON_START)
       {
          keyDownEvent[keyDownIndex].key.which=virtualJoyIndex;
          keyDownEvent[keyDownIndex].key.type=SDL_KEYDOWN;
          keyDownEvent[keyDownIndex].key.keysym.sym=SDLK_F1;
-         SDL_PushEvent(&keyDownEvent[keyDownIndex++]); 
+         SDL_PushEvent(&keyDownEvent[keyDownIndex++]);
       }
-      
+
       if (pressed & PAD_TRIGGER_R)
       {
          keyDownEvent[keyDownIndex].jbutton.which=virtualJoyIndex;
          keyDownEvent[keyDownIndex].jbutton.type=SDL_JOYBUTTONDOWN;
          keyDownEvent[keyDownIndex].jbutton.button=JOY_BTN_02;
-         SDL_PushEvent(&keyDownEvent[keyDownIndex++]); 
+         SDL_PushEvent(&keyDownEvent[keyDownIndex++]);
       }
-      
+
       if (pressed & PAD_TRIGGER_Z)
       {
          keyDownEvent[keyDownIndex].jbutton.which=virtualJoyIndex;
          keyDownEvent[keyDownIndex].jbutton.type=SDL_JOYBUTTONDOWN;
          keyDownEvent[keyDownIndex].jbutton.button=JOY_BTN_00;
-         SDL_PushEvent(&keyDownEvent[keyDownIndex++]);  
+         SDL_PushEvent(&keyDownEvent[keyDownIndex++]);
       }
-      
+
       if (pressed & PAD_TRIGGER_L)
       {
          keyDownEvent[keyDownIndex].jbutton.which=virtualJoyIndex;
          keyDownEvent[keyDownIndex].jbutton.type=SDL_JOYBUTTONDOWN;
          keyDownEvent[keyDownIndex].jbutton.button=JOY_BTN_01;
-         SDL_PushEvent(&keyDownEvent[keyDownIndex++]); 
+         SDL_PushEvent(&keyDownEvent[keyDownIndex++]);
       }
-      
+
       //************************************************
       // Buttons PRESSED --> D-Pads
       //************************************************
-      
+
        if (
           (pressed & PAD_BUTTON_RIGHT)
          )
@@ -1078,7 +1078,7 @@ void getGamecubePadInput()
          SDL_PushEvent(&keyDownEvent[keyDownIndex++]);
          dpadPressed=1;
       }
-      
+
       if (
           (pressed & PAD_BUTTON_DOWN)
          )
@@ -1089,9 +1089,9 @@ void getGamecubePadInput()
          keyDownEvent[keyDownIndex].jaxis.which=virtualJoyIndex;
          keyDownEvent[keyDownIndex].jaxis.value=10000;
          SDL_PushEvent(&keyDownEvent[keyDownIndex++]);
-         dpadPressed=1;      
+         dpadPressed=1;
       }
-       
+
       if (
           (pressed & PAD_BUTTON_LEFT)
          )
@@ -1102,9 +1102,9 @@ void getGamecubePadInput()
          keyDownEvent[keyDownIndex].jaxis.which=virtualJoyIndex;
          keyDownEvent[keyDownIndex].jaxis.value=-10000;
          SDL_PushEvent(&keyDownEvent[keyDownIndex++]);
-         dpadPressed=1;      
+         dpadPressed=1;
       }
-       
+
       if (
           (pressed & PAD_BUTTON_UP)
          )
@@ -1115,18 +1115,18 @@ void getGamecubePadInput()
          keyDownEvent[keyDownIndex].jaxis.which=virtualJoyIndex;
          keyDownEvent[keyDownIndex].jaxis.value=-10000;
          SDL_PushEvent(&keyDownEvent[keyDownIndex++]);
-         dpadPressed=1;      
+         dpadPressed=1;
       }
-      
+
       //************************************************
       // Buttons Held --> D-Pads
       //************************************************
-      
+
 
       pressed = PAD_ButtonsHeld(physicalJoyIndex);
       int keyHeldIndex=0;
       SDL_Event keyHeldEvent[MAX_EVENTS_PER_CYCLE];
-      
+
       if (
           (pressed & PAD_BUTTON_RIGHT)
          )
@@ -1136,10 +1136,10 @@ void getGamecubePadInput()
          keyHeldEvent[keyHeldIndex].jaxis.axis = 0;
          keyHeldEvent[keyHeldIndex].jaxis.which=virtualJoyIndex;
          keyHeldEvent[keyHeldIndex].jaxis.value=10000;
-         SDL_PushEvent(&keyHeldEvent[keyHeldIndex++]);  
+         SDL_PushEvent(&keyHeldEvent[keyHeldIndex++]);
          dpadPressed=1;
       }
-    
+
       if (
           (pressed & PAD_BUTTON_DOWN)
          )
@@ -1152,7 +1152,7 @@ void getGamecubePadInput()
          SDL_PushEvent(&keyHeldEvent[keyHeldIndex++]);
          dpadPressed=1;
       }
-      
+
       if (
           (pressed & PAD_BUTTON_LEFT)
          )
@@ -1163,9 +1163,9 @@ void getGamecubePadInput()
          keyHeldEvent[keyHeldIndex].jaxis.which=virtualJoyIndex;
          keyHeldEvent[keyHeldIndex].jaxis.value=-10000;
          SDL_PushEvent(&keyHeldEvent[keyHeldIndex++]);
-         dpadPressed=1;         
+         dpadPressed=1;
       }
-    
+
       if (
           (pressed & PAD_BUTTON_UP)
          )
@@ -1176,33 +1176,33 @@ void getGamecubePadInput()
          keyHeldEvent[keyHeldIndex].jaxis.which=virtualJoyIndex;
          keyHeldEvent[keyHeldIndex].jaxis.value=-10000;
          SDL_PushEvent(&keyHeldEvent[keyHeldIndex++]);
-         dpadPressed=1;         
+         dpadPressed=1;
       }
-      
+
       //************************************************
       // Buttons RELEASED
       //************************************************
-      
+
       pressed = PAD_ButtonsUp(physicalJoyIndex);
       int keyUpIndex=0;
       SDL_Event keyUpEvent[MAX_EVENTS_PER_CYCLE];
-      
+
       if (pressed & PAD_BUTTON_A)
       {
          keyUpEvent[keyUpIndex].jbutton.which=virtualJoyIndex;
          keyUpEvent[keyUpIndex].jbutton.type=SDL_JOYBUTTONUP;
          keyUpEvent[keyUpIndex].jbutton.button=JOY_BTN_09;
-         SDL_PushEvent(&keyUpEvent[keyUpIndex++]); 
+         SDL_PushEvent(&keyUpEvent[keyUpIndex++]);
       }
-      
+
       if (pressed & PAD_BUTTON_Y)
       {
          keyUpEvent[keyUpIndex].jbutton.which=virtualJoyIndex;
          keyUpEvent[keyUpIndex].jbutton.type=SDL_JOYBUTTONUP;
          keyUpEvent[keyUpIndex].jbutton.button=JOY_BTN_10;
-         SDL_PushEvent(&keyUpEvent[keyUpIndex++]); 
+         SDL_PushEvent(&keyUpEvent[keyUpIndex++]);
       }
-      
+
       if (pressed & PAD_BUTTON_X)
       {
          keyUpEvent[keyUpIndex].jbutton.which=virtualJoyIndex;
@@ -1210,31 +1210,31 @@ void getGamecubePadInput()
          keyUpEvent[keyUpIndex].jbutton.button=JOY_BTN_11;
          SDL_PushEvent(&keyUpEvent[keyUpIndex++]);
       }
-      
+
       if (pressed & PAD_BUTTON_B)
       {
          keyUpEvent[keyUpIndex].jbutton.which=virtualJoyIndex;
          keyUpEvent[keyUpIndex].jbutton.type=SDL_JOYBUTTONUP;
          keyUpEvent[keyUpIndex].jbutton.button=JOY_BTN_12;
-         SDL_PushEvent(&keyUpEvent[keyUpIndex++]); 
+         SDL_PushEvent(&keyUpEvent[keyUpIndex++]);
       }
-      
+
       if (pressed & PAD_TRIGGER_R)
       {
          keyUpEvent[keyUpIndex].jbutton.which=virtualJoyIndex;
          keyUpEvent[keyUpIndex].jbutton.type=SDL_JOYBUTTONUP;
          keyUpEvent[keyUpIndex].jbutton.button=JOY_BTN_02;
-         SDL_PushEvent(&keyUpEvent[keyUpIndex++]); 
+         SDL_PushEvent(&keyUpEvent[keyUpIndex++]);
       }
-      
+
       if (pressed & PAD_TRIGGER_Z)
       {
          keyUpEvent[keyUpIndex].jbutton.which=virtualJoyIndex;
          keyUpEvent[keyUpIndex].jbutton.type=SDL_JOYBUTTONUP;
          keyUpEvent[keyUpIndex].jbutton.button=JOY_BTN_00;
-         SDL_PushEvent(&keyUpEvent[keyUpIndex++]); 
+         SDL_PushEvent(&keyUpEvent[keyUpIndex++]);
       }
-      
+
       if (pressed & PAD_TRIGGER_L)
       {
          keyUpEvent[keyUpIndex].jbutton.which=virtualJoyIndex;
@@ -1242,11 +1242,11 @@ void getGamecubePadInput()
          keyUpEvent[keyUpIndex].jbutton.button=JOY_BTN_01;
          SDL_PushEvent(&keyUpEvent[keyUpIndex++]);
       }
-      
+
       //************************************************
       // Buttons RELEASED --> D-Pads
       //************************************************
-      
+
       if (
           (pressed & PAD_BUTTON_RIGHT)
          )
@@ -1259,7 +1259,7 @@ void getGamecubePadInput()
          SDL_PushEvent(&keyUpEvent[keyUpIndex++]);
          dpadPressed=1;
       }
-    
+
       if (
           (pressed & PAD_BUTTON_DOWN)
          )
@@ -1272,7 +1272,7 @@ void getGamecubePadInput()
          SDL_PushEvent(&keyUpEvent[keyUpIndex++]);
          dpadPressed=1;
       }
-    
+
       if (
           (pressed & PAD_BUTTON_LEFT)
          )
@@ -1285,7 +1285,7 @@ void getGamecubePadInput()
          SDL_PushEvent(&keyUpEvent[keyUpIndex++]);
          dpadPressed=1;
       }
-    
+
       if (
           (pressed & PAD_BUTTON_UP)
          )
@@ -1298,7 +1298,7 @@ void getGamecubePadInput()
          SDL_PushEvent(&keyUpEvent[keyUpIndex++]);
          dpadPressed=1;
       }
-      
+
       //************************************************
       // Left stick --> JoyAXIS
       //************************************************
@@ -1307,36 +1307,36 @@ void getGamecubePadInput()
       int angleIndex = 0;
       s8 X1=0, Y1=0, X2=0, Y2=0;
       X1 = PAD_StickX(physicalJoyIndex);
-      Y1 = PAD_StickY(physicalJoyIndex);	
+      Y1 = PAD_StickY(physicalJoyIndex);
       X2 = PAD_SubStickX(physicalJoyIndex);
       Y2 = PAD_SubStickY(physicalJoyIndex);
-      
+
       if (!dpadPressed)
       {
          x = X1-DEFAULT_GC_LEFT_X_CENTER;
          y = Y1-DEFAULT_GC_LEFT_Y_CENTER;
          angleIndex = getAngleIndex(x,y);
-           
+
          SDL_Event xevent;
          xevent.type = SDL_JOYAXISMOTION;
          xevent.jaxis.which=virtualJoyIndex;
          xevent.jaxis.axis = 0;
-         
+
          SDL_Event yevent;
          yevent.type = SDL_JOYAXISMOTION;
          yevent.jaxis.which=virtualJoyIndex;
          yevent.jaxis.axis = 1;
-         
+
          getSDLJoyAxisEvent(&xevent, &yevent, angleIndex);
-         
-         if ( 
+
+         if (
              (x < GC_LEFT_X_TOLERANCE) &&
              (x > -GC_LEFT_X_TOLERANCE)
              )
          {
             xevent.jaxis.value = 0;
          }
-          
+
          if (
              (y < GC_LEFT_Y_TOLERANCE) &&
              (y > -GC_LEFT_Y_TOLERANCE)
@@ -1344,26 +1344,26 @@ void getGamecubePadInput()
          {
             yevent.jaxis.value = 0;
          }
-         
-         SDL_PushEvent(&xevent); 
-         SDL_PushEvent(&yevent); 
+
+         SDL_PushEvent(&xevent);
+         SDL_PushEvent(&yevent);
       }
-      
+
       //************************************************
       // Right stick --> HAT
       //************************************************
-      
+
       x = X2-DEFAULT_GC_RIGHT_X_CENTER;
       y = Y2-DEFAULT_GC_RIGHT_Y_CENTER;
       angleIndex = getAngleIndex(x,y);
-      
+
       SDL_Event hatEvent;
       hatEvent.type = SDL_JOYHATMOTION;
       hatEvent.jhat.which=virtualJoyIndex;
       hatEvent.jhat.hat = 0;
       hatEvent.jhat.value = SDL_HAT_CENTERED;
-      
-      if ( 
+
+      if (
           (x > GC_RIGHT_X_TOLERANCE) ||
           (x < -GC_RIGHT_X_TOLERANCE)||
           (y > GC_RIGHT_Y_TOLERANCE) ||

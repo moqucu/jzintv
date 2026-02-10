@@ -1,23 +1,6 @@
 /* ======================================================================== */
 /*  "Watches" values in an ECScable-enabled program.                        */
-/* ------------------------------------------------------------------------ */
-/*  This program is free software; you can redistribute it and/or modify    */
-/*  it under the terms of the GNU General Public License as published by    */
-/*  the Free Software Foundation; either version 2 of the License, or       */
-/*  (at your option) any later version.                                     */
-/*                                                                          */
-/*  This program is distributed in the hope that it will be useful,         */
-/*  but WITHOUT ANY WARRANTY; without even the implied warranty of          */
-/*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
-/*  General Public License for more details.                                */
-/*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
-/* ------------------------------------------------------------------------ */
-/*                 Copyright (c) 2001-+Inf, Joseph Zbiciak                  */
 /* ======================================================================== */
-
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -27,18 +10,16 @@
 #include "config.h"
 #include "util/ecscable.h"
 
-
-
 int comp_int(const void *a, const void *b)
 {
     return *((const int*)a) - *((const int*)b);
 }
 
 volatile int please_die = 0;
- 
+
 void die(int x)
 {
-    UNUSED(x); 
+    UNUSED(x);
 
     if (please_die > 2)
     {
@@ -55,7 +36,7 @@ int main(int argc, char *argv[])
     int i, lo, hi, tot;
     ecscable_t ec;
     int addr[32];
-    uint_16 data[32];
+    uint16_t data[32];
 
     if (argc < 2)
     {
@@ -96,7 +77,7 @@ usage:
             } else
             {
                 printf("[%.4X-%.4X] ", addr[lo], addr[hi]);
-                ec_download(&ec, addr[lo], addr[hi] - addr[lo] + 1, 
+                ec_download(&ec, addr[lo], addr[hi] - addr[lo] + 1,
                             data + lo, 16, 0);
                 if (please_die) exit(0);
                 while (lo < i)
@@ -123,9 +104,9 @@ usage:
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                 Copyright (c) 2001-+Inf, Joseph Zbiciak                  */
 /* ======================================================================== */

@@ -18,11 +18,15 @@ R=../rom
 ##############################################################################
 P           = export PATH;
 
-SDL_CFLAGS := $(shell sdl-config --cflags)
-SDL_LFLAGS := $(shell sdl-config --libs) #-lSDL_haa
+SVN_REV := $(shell (svn info -R || :) | grep "Last Changed Rev:" | cut -d' ' -f4 | sort -n | tail -1)
+SVN_DTY := $(shell echo $$( (svn status || :) | grep -v '^?' | wc -l ) )
 
-# Set "X" to be the executable extension
-X =        
+SDL1_CFLAGS := $(shell sdl-config --cflags)
+SDL1_LFLAGS := $(shell sdl-config --libs) #-lSDL_haa
+
+# Set "X" to be the executable extension, and "O" to be the object extension.
+X = 
+O = o
 
 # Set "RM" to be the remove/delete command
 RM = rm -f 
@@ -32,18 +36,6 @@ RM = rm -f
 		   -Wmissing-declarations -Wmissing-prototypes 		\
 		   -Wstrict-prototypes
  WARNXX  = -Wall -W -Wshadow -Wpointer-arith -Wcast-qual 
-
-
-#WARN    = -W -Wall -ansi -Wbad-function-cast -Wcast-align \
-		   -Wcast-qual -Wchar-subscripts -Winline \
-		   -Wmissing-prototypes -Wnested-externs -Wpointer-arith \
-		   -Wshadow -Wstrict-prototypes -Wwrite-strings \
-	   -Dlinux
-
-#WARNXX  = -W -Wall -ansi -Wcast-align \
- 		   -Wcast-qual -Wchar-subscripts -Winline \
- 		   -Wpointer-arith -Wredundant-decls -Wshadow -Wwrite-strings \
- 	   -Dlinux
 
 
  CC  = $(P) gcc-4.2 -std=c99
@@ -57,12 +49,12 @@ RM = rm -f
 
 #DEF_FLAGS += -DDIRECT_INTV2PC
 #DEF_FLAGS += -DNEED_INOUT
- DEF_FLAGS += -Dlinux -DN900 -mcpu=cortex-a8 -march=armv7-a -mfpu=neon -mtune=cortex-a8
+ DEF_FLAGS += -DN900 -mcpu=cortex-a8 -march=armv7-a -mfpu=neon -mtune=cortex-a8
 
 #OPT_FLAGS = -ggdb 
 #OPT_FLAGS = -O
 #OPT_FLAGS = -O2 -ggdb
- OPT_FLAGS = -O6 -fomit-frame-pointer -fprefetch-loop-arrays
+ OPT_FLAGS = -O3 -fomit-frame-pointer -fprefetch-loop-arrays
 #OPT_FLAGS = -O2 -pg -ggdb -DLOCAL=
 #OPT_FLAGS = -tpp6 -axMiKW -ip -vec_report3 -opt_report -ansi_alias -restrict -DHAVE_RESTRICT -align -O3 -Ob1 # -ipo # intel icc flags
 
@@ -72,29 +64,28 @@ CXXFLAGS = $(OPT_FLAGS) $(WARNXX) -I. -I.. $(DEF_FLAGS) $(EXTRA)
 LFLAGS   = -L../lib 
 
 
-OBJS=jzintv.o
-PROG=$(B)/jzintv
-TOCLEAN=$(B)/jzintv core
+OBJS      = jzintv.$(O)
+PROG_SDL1 = $(B)/jzintv
+TOCLEAN   = $(B)/jzintv core
 
-#PROGS=$(PROG)
-
-CFLAGS += $(SDL_CFLAGS) 
-LFLAGS += $(SDL_LFLAGS)
+CFLAGS += $(SDL1_CFLAGS) 
+LFLAGS += $(SDL1_LFLAGS)
 
 ##############################################################################
 ## Generic build-rules
 ##############################################################################
 
-all: $(OBJS) $(PROG)
+all: build
 
-$(PROG): $(OBJS)
-	$(CC) -o $(PROG) $(OBJS) $(CFLAGS) $(LFLAGS)
+$(PROG_SDL1): $(OBJS) $(OBJS_SDL1)
+	$(CC) -o $(PROG) $(OBJS) $(OBJS_SDL1) $(CFLAGS) $(LFLAGS)
 
 clean:
 	$(RM) $(OBJS) 
+	$(RM) $(OBJS_SDL1) 
 	$(RM) $(TOCLEAN)
 
-%.o: %.c
+%.$(O): %.c
 	$(CC) -o $@ $(CFLAGS) -c $<
 
 %.s: %.c
@@ -104,9 +95,8 @@ clean:
 ## Linux-specific stuff
 ##############################################################################
 
-
 #GFX_OVER = _n900
-OBJS += pads/pads_cgc_linux.o
+OBJS += pads/pads_cgc_linux.$(O)
 
 ##############################################################################
 ## Makefile.common includes all the subMakefiles and such

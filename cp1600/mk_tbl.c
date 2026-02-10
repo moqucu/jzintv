@@ -4,10 +4,9 @@
  *
  *  Author:         J. Zbiciak
  *
- *  $Id: mk_tbl.c,v 1.12 1999/10/10 08:44:27 im14u2c Exp $
  *
  * ============================================================================
- * 
+ *
  *  Makes a redundantly coded table in "N" bits.
  *
  *  Takes a description of the form "0xxx1010xxx entry", and expands out all
@@ -29,12 +28,6 @@
 
 
 #include "config.h"
-
-#ifdef macintosh
-# include "console.h"
-# include "SIOUX.h"
-#endif
-
 
 #define MAX_BITS  (20)
 #define MAX_ENTRY (1024)
@@ -81,7 +74,7 @@ void expand_dc(char *tbl[], char *pattern, char *entry, int bits)
     /*  positions.  Also, build a bit mask for the bits that aren't DC's.   */
     /* -------------------------------------------------------------------- */
     for (len = num_dc = 0, s = pattern; *s=='1' || *s=='0' || *s=='x'; s++)
-    {   
+    {
         pat <<= 1;
         pat  |= *s == '1';
 
@@ -141,12 +134,12 @@ void expand_dc(char *tbl[], char *pattern, char *entry, int bits)
  */
 char * grab_quoted_string
 (
-    char *in, 
+    char *in,
     char *out,
     int   max_len
 )
 {
-    char *s, *es; 
+    char *s, *es;
     int   p;
 
     s  = in;
@@ -180,7 +173,7 @@ char * grab_quoted_string
                 case 'r' : p = '\r'; break;
                 case 't' : p = '\t'; break;
                 case 'v' : p = '\v'; break;
-                case 'x' : 
+                case 'x' :
                 {
                     int x1, x2;
 
@@ -215,7 +208,7 @@ char * grab_quoted_string
                     /* just return whatever character that was escaped */
             }
         }
-                    
+
         *es++ = p;
 
         if (es - out >= max_len)
@@ -238,13 +231,13 @@ char * grab_quoted_string
  *
  *  [space] [decimal number][, "default entry"] [space] [# comment]
  *
- *  Return: 
+ *  Return:
  *   --  0 if the line was complete
  *   --  1 if the line was empty/comments
  *   -- -1 if the line was invalid
  * ===========================================================================
  */
-int 
+int
 decode_bits_line
 (
     char  *input,
@@ -263,7 +256,7 @@ decode_bits_line
     /* -------------------------------------------------------------------- */
     s = input;
     while (*s && isspace(*s)) s++;
-    
+
     /* -------------------------------------------------------------------- */
     /*  If we stopped at a # or NUL, just return that this is a comment.    */
     /* -------------------------------------------------------------------- */
@@ -287,17 +280,17 @@ decode_bits_line
     }
 
     *bits = val;
-    
+
     /* -------------------------------------------------------------------- */
     /*  Next, look for any whitespace, skipping it.  If we run into end of  */
     /*  string, stop here, returning what we have.  Otherwise, look for the */
     /*  whitespace-comma-whitespace-quote sequence that preceeds a string.  */
     /* -------------------------------------------------------------------- */
     while (*s && isspace(*s)) s++;
-    if (!*s || *s == '\n' || *s == '#') 
+    if (!*s || *s == '\n' || *s == '#')
     {
         strncpy(entry,"NULL,",max_entry);
-        return 0; 
+        return 0;
     }
     if (*s++ != ',') return -1;
 
@@ -331,7 +324,7 @@ decode_bits_line
  *  .prolog [space] "[C-style string]" [space] # [space] [cmt]
  *  .epilog [space] "[C-style string]" [space] # [space] [cmt]
  *
- *  Return: 
+ *  Return:
  *   --  0 if the line was complete
  *   --  1 if the line was empty/comments
  *   --  2 if the line was a .prolog directive
@@ -339,7 +332,7 @@ decode_bits_line
  *   -- -1 if the line was invalid
  * ===========================================================================
  */
-int 
+int
 decode_dc_line
 (
     char  *input,
@@ -395,12 +388,12 @@ decode_dc_line
             }
         }
 
-        if (ps == pattern) 
+        if (ps == pattern)
             return -1;  /* we didn't find a pattern! */
 
         *ps++ = 0;
     }
-    
+
     /* -------------------------------------------------------------------- */
     /*  Next, look for any whitespace, skipping it.  The character after    */
     /*  the (optional) whitespace must be a comma if this isn't a           */
@@ -434,7 +427,7 @@ decode_dc_line
 
 /*
  * ===========================================================================
- *  GETLINE  -- Reads a line of input.  Handles 'Unix-style' files on 
+ *  GETLINE  -- Reads a line of input.  Handles 'Unix-style' files on
  *              non-Unix platforms (eg. DOS, Mac).  Note:  this only works
  *              on files, not redirected input.
  * ===========================================================================
@@ -455,7 +448,7 @@ char *getline(char *buf, size_t len, FILE *f)
     r_len = fread(buf, 1, len - 1, f);      /* Fill the buffer.             */
     if (r_len <= 0) return NULL;            /* Abort on error or EOF.       */
     buf[r_len] = '\0';                      /* Guarantee NUL termination.   */
-    
+
     /* -------------------------------------------------------------------- */
     /*  Now scan the string looking for 'LF' or 'CR' as our EOL marker.     */
     /* -------------------------------------------------------------------- */
@@ -529,14 +522,6 @@ int main(int argc, char *argv[])
     char *prolog_string = NULL;
     char *epilog_string = NULL;
 
-#ifdef macintosh                                                            
-    /* -------------------------------------------------------------------- */
-    /*  On Macintosh, we need to play some games to get command-line args.  */
-    /* -------------------------------------------------------------------- */
-    argc = ccommand( &argv );
-    SIOUXSettings.asktosaveonclose = 0;
-#endif
-
     /* -------------------------------------------------------------------- */
     /*  Check to see that we've been given the appropriate number of args.  */
     /* -------------------------------------------------------------------- */
@@ -561,7 +546,7 @@ int main(int argc, char *argv[])
     /*  Read the table size in bits from the file.  Complain if we can't    */
     /*  find it, or if its value is out of range.                           */
     /* -------------------------------------------------------------------- */
-    while (getline(buf, sizeof(buf)-1, i_file) && 
+    while (getline(buf, sizeof(buf)-1, i_file) &&
             (i = decode_bits_line(buf, &bits, d_entry, MAX_ENTRY)) )
     {
 
@@ -580,7 +565,7 @@ int main(int argc, char *argv[])
         fprintf(stderr,"Bit size %d is out of range\n", bits);
         exit(1);
     }
-    
+
 
     /* -------------------------------------------------------------------- */
     /*  Now that we have the table size, allocate the table and set all of  */
@@ -679,9 +664,9 @@ int main(int argc, char *argv[])
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                 Copyright (c) 1998-1999, Joseph Zbiciak                  */
 /* ======================================================================== */

@@ -11,8 +11,8 @@ as published by the Free Software Foundation; either version 2
 of the License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of 
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the 
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
@@ -54,7 +54,7 @@ class LList
         int DeleteLastNode();
         int GetNumNodes() {return m_iNum;}
         void Empty();
-        int IsEmpty() {return (m_iNum == 0);}   
+        int IsEmpty() {return (m_iNum == 0);}
 
         void push(T);
         T pop();
@@ -113,14 +113,14 @@ int LList<T>::AddNode(T &add)
     {
         return LIST_OUT_OF_MEMORY;
     }
-    
+
     if (n != NULL)
     {
         while (n->next != NULL)
         {
             n = n->next;
         }
-    
+
         n->next = newNode;
     }
     else
@@ -221,7 +221,7 @@ int LList<T>::DeleteNode(int num)
 
         i++;
         parent = n;
-        n = n->next;    
+        n = n->next;
     }
 
     if (n == NULL)  // Should never happen
@@ -304,7 +304,7 @@ template <class T>
 T LList<T>::peek()
 {
     T data, *pData;
-    
+
     pData = GetLastNode();
 
     if (pData != NULL)

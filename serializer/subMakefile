@@ -2,6 +2,7 @@
 ## subMakefile for the serializer
 ##############################################################################
 
-serializer/serializer.o: serializer/serializer.c serializer/serializer.h serializer/subMakefile
+serializer/serializer.$(O): serializer/serializer.c serializer/serializer.h
+serializer/serializer.$(O): serializer/subMakefile
 
-OBJS+=serializer/serializer.o
+OBJS += serializer/serializer.$(O)

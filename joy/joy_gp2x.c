@@ -3,16 +3,16 @@
  *  Title:    Input support for GP2X
  *  Author:   J. Zbiciak
  * ============================================================================
- *  
+ *
  * ============================================================================
  */
 
 #include "config.h"
-#include "sdl.h"
+#include "sdl_jzintv.h"
 #include "periph/periph.h"
 #include "pads/pads.h"
 #include "event/event.h"
-#include "event/event_tbl.h"
+#include "event/event_tbl_sdl.h"
 #include "joy/joy.h"
 
 int gp2x_joystick_mode = 0;
@@ -33,17 +33,17 @@ int joy_init(int verbose, char *cfg[])
     return 0;
 }
 
-static uint_8 gp2x_down[8] = { UP, UP, UP, UP, UP, UP, UP, UP };
-static uint_8 virt_down[8] = { UP, UP, UP, UP, UP, UP, UP, UP };
-static uint_8 virt_next[8] = { UP, UP, UP, UP, UP, UP, UP, UP };
+static uint8_t gp2x_down[8] = { UP, UP, UP, UP, UP, UP, UP, UP };
+static uint8_t virt_down[8] = { UP, UP, UP, UP, UP, UP, UP, UP };
+static uint8_t virt_next[8] = { UP, UP, UP, UP, UP, UP, UP, UP };
 
 
 /* ======================================================================== */
 /*  JOY_DECODE_EVENT -- Pull apart an SDL_EVENT and turn it into our        */
 /*                      internal event numbers.                             */
 /* ======================================================================== */
-void joy_decode_event(SDL_Event *ev, int *ev_updn, uint_32 *ev_num,
-                                     int *ex_updn, uint_32 *ex_num)
+void joy_decode_event(SDL_Event *ev, int *ev_updn, uint32_t *ev_num,
+                                     int *ex_updn, uint32_t *ex_num)
 {
     int gp2x, i, vdn = -1, vup = -1;
 

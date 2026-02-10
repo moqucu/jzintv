@@ -1,6 +1,7 @@
-
 #ifndef ICARTTAG_H_
 #define ICARTTAG_H_ 1
+
+#include "config.h"
 
 /* ======================================================================== */
 /*  ICT_TYPE_T   -- Defined cartridge tag types.                            */
@@ -10,43 +11,43 @@ typedef enum ict_type_t
     /* -------------------------------------------------------------------- */
     /*  General Game Information tag ID #'s.                                */
     /* -------------------------------------------------------------------- */
-    ICT_IGNORE      = 0x00,     ICT_RSVD_10     = 0x10, 
-    ICT_TITLE       = 0x01,     ICT_RSVD_11     = 0x11, 
-    ICT_PUBLISHER   = 0x02,     ICT_RSVD_12     = 0x12, 
-    ICT_CREDITS     = 0x03,     ICT_RSVD_13     = 0x13, 
-    ICT_INFOURLS    = 0x04,     ICT_RSVD_14     = 0x14, 
-    ICT_RLSDATE     = 0x05,     ICT_RSVD_15     = 0x15, 
-    ICT_ATTRIBS     = 0x06,     ICT_RSVD_16     = 0x16, 
-    ICT_BINDINGS    = 0x07,     ICT_RSVD_17     = 0x17, 
-    ICT_RSVD_08     = 0x08,     ICT_RSVD_18     = 0x18,     
-    ICT_RSVD_09     = 0x09,     ICT_RSVD_19     = 0x19,     
-    ICT_RSVD_0A     = 0x0A,     ICT_RSVD_1A     = 0x1A,     
-    ICT_RSVD_0B     = 0x0B,     ICT_RSVD_1B     = 0x1B,     
-    ICT_RSVD_0C     = 0x0C,     ICT_RSVD_1C     = 0x1C,     
-    ICT_RSVD_0D     = 0x0D,     ICT_RSVD_1D     = 0x1D,     
-    ICT_RSVD_0E     = 0x0E,     ICT_RSVD_1E     = 0x1E,     
-    ICT_RSVD_0F     = 0x0F,     ICT_RSVD_1F     = 0x1F,     
+    ICT_IGNORE          = 0x00,     ICT_RSVD_10     = 0x10,
+    ICT_FULL_TITLE      = 0x01,     ICT_RSVD_11     = 0x11,
+    ICT_PUBLISHER       = 0x02,     ICT_RSVD_12     = 0x12,
+    ICT_CREDITS         = 0x03,     ICT_RSVD_13     = 0x13,
+    ICT_INFOURL         = 0x04,     ICT_RSVD_14     = 0x14,
+    ICT_RELEASE_DATE    = 0x05,     ICT_RSVD_15     = 0x15,
+    ICT_COMPAT          = 0x06,     ICT_RSVD_16     = 0x16,
+    ICT_BINDINGS        = 0x07,     ICT_RSVD_17     = 0x17,
+    ICT_SHORT_TITLE     = 0x08,     ICT_RSVD_18     = 0x18,
+    ICT_LICENSE         = 0x09,     ICT_RSVD_19     = 0x19,
+    ICT_DESCRIPTION     = 0x0A,     ICT_RSVD_1A     = 0x1A,
+    ICT_BUILD_DATE      = 0x0B,     ICT_RSVD_1B     = 0x1B,
+    ICT_VERSION         = 0x0C,     ICT_RSVD_1C     = 0x1C,
+    ICT_RSVD_0D         = 0x0D,     ICT_RSVD_1D     = 0x1D,
+    ICT_RSVD_0E         = 0x0E,     ICT_RSVD_1E     = 0x1E,
+    ICT_RSVD_0F         = 0x0F,     ICT_RSVD_1F     = 0x1F,
 
     /* -------------------------------------------------------------------- */
     /*  Debugging Information tag ID #'s.                                   */
     /* -------------------------------------------------------------------- */
-    ICT_SYMTAB      = 0x20,     ICT_RSVD_30     = 0x30,
-    ICT_MEMATTR     = 0x21,     ICT_RSVD_31     = 0x31,
-    ICT_LINEMAP     = 0x22,     ICT_RSVD_32     = 0x32,
-    ICT_RSVD_23     = 0x23,     ICT_RSVD_33     = 0x33,
-    ICT_RSVD_24     = 0x24,     ICT_RSVD_34     = 0x34,
-    ICT_RSVD_25     = 0x25,     ICT_RSVD_35     = 0x35,
-    ICT_RSVD_26     = 0x26,     ICT_RSVD_36     = 0x36,
-    ICT_RSVD_27     = 0x27,     ICT_RSVD_37     = 0x37,
-    ICT_RSVD_28     = 0x28,     ICT_RSVD_38     = 0x38,
-    ICT_RSVD_29     = 0x29,     ICT_RSVD_39     = 0x39,
-    ICT_RSVD_2A     = 0x2A,     ICT_RSVD_3A     = 0x3A,
-    ICT_RSVD_2B     = 0x2B,     ICT_RSVD_3B     = 0x3B,
-    ICT_RSVD_2C     = 0x2C,     ICT_RSVD_3C     = 0x3C,
-    ICT_RSVD_2D     = 0x2D,     ICT_RSVD_3D     = 0x3D,
-    ICT_RSVD_2E     = 0x2E,     ICT_RSVD_3E     = 0x3E,
-    ICT_RSVD_2F     = 0x2F,     ICT_RSVD_3F     = 0x3F,
-    
+    ICT_SYMTAB          = 0x20,     ICT_RSVD_30     = 0x30,
+    ICT_MEMATTR         = 0x21,     ICT_RSVD_31     = 0x31,
+    ICT_LINEMAP         = 0x22,     ICT_RSVD_32     = 0x32,
+    ICT_RSVD_23         = 0x23,     ICT_RSVD_33     = 0x33,
+    ICT_RSVD_24         = 0x24,     ICT_RSVD_34     = 0x34,
+    ICT_RSVD_25         = 0x25,     ICT_RSVD_35     = 0x35,
+    ICT_RSVD_26         = 0x26,     ICT_RSVD_36     = 0x36,
+    ICT_RSVD_27         = 0x27,     ICT_RSVD_37     = 0x37,
+    ICT_RSVD_28         = 0x28,     ICT_RSVD_38     = 0x38,
+    ICT_RSVD_29         = 0x29,     ICT_RSVD_39     = 0x39,
+    ICT_RSVD_2A         = 0x2A,     ICT_RSVD_3A     = 0x3A,
+    ICT_RSVD_2B         = 0x2B,     ICT_RSVD_3B     = 0x3B,
+    ICT_RSVD_2C         = 0x2C,     ICT_RSVD_3C     = 0x3C,
+    ICT_RSVD_2D         = 0x2D,     ICT_RSVD_3D     = 0x3D,
+    ICT_RSVD_2E         = 0x2E,     ICT_RSVD_3E     = 0x3E,
+    ICT_RSVD_2F         = 0x2F,     ICT_RSVD_3F     = 0x3F,
+
     /* -------------------------------------------------------------------- */
     /*  RESERVED:  0x40-0xEF                                                */
     /* -------------------------------------------------------------------- */
@@ -117,175 +118,263 @@ typedef enum ict_type_t
 /* ======================================================================== */
 /*  Flag bitfields used by many of the tag types.                           */
 /* ======================================================================== */
-#define ICT_CRED_PROG       (0x01)
-#define ICT_CRED_GAMEART    (0x02)
-#define ICT_CRED_MUSIC      (0x04)
-#define ICT_CRED_SFX        (0x08)
-#define ICT_CRED_VOICE      (0x10)
-#define ICT_CRED_DOCS       (0x20)
-#define ICT_CRED_CONCEPT    (0x40)
-#define ICT_CRED_BOXART     (0x80)
+typedef struct ict_credbit_t
+{
+    union
+    {
+        uint8_t raw[1];
+        struct
+        {
+            BFE(uint8_t author              : 1,
+            BFE(uint8_t game_art            : 1,
+            BFE(uint8_t music               : 1,
+            BFE(uint8_t sound_effects       : 1,
+            BFE(uint8_t voices              : 1,
+            BFE(uint8_t documentation       : 1,
+            BFE(uint8_t game_concept        : 1,
+                uint8_t box_art             : 1)))))));
+        } s;
+    } u;
+} ict_credbit_t;
 
-#define ICT_CMPT_KEYBD      (0x000003)
-#define ICT_CMPT_VOICE      (0x00000C)
-#define ICT_CMPT_4CTRL      (0x000030)
-#define ICT_CMPT_ECS        (0x0000C0)
-#define ICT_CMPT_INTY2      (0x000300)
-#define ICT_CMPT_RSVD5      (0x000C00)
-#define ICT_CMPT_RSVD6      (0x003000)
-#define ICT_CMPT_RSVD7      (0x00C000)
+enum
+{
+    ICT_COMPAT_DONTCARE = 0,
+    ICT_COMPAT_SUPPORTS = 1,
+    ICT_COMPAT_REQUIRES = 2,
+    ICT_COMPAT_INCOMPAT = 3
+};
 
-#define ICT_CMPT_DONTCARE   (0x000000)
-#define ICT_CMPT_SUPPORTS   (0x005555)
-#define ICT_CMPT_REQUIRES   (0x00AAAA)
-#define ICT_CMPT_INCOMPAT   (0x00FFFF)
+/* ------------------------------------------------------------------------ */
+/*  These translation macros require metadata.h to be included before you   */
+/*  can use them.  This mapping isn't exact, but it's sufficiently close.   */
+/*  For example, DONTCARE could mean either "TOLERATES" or "UNSPECIFIED".   */
+/*  I chose a mapping such that IC => GM => IC gives you back the original. */
+/* ------------------------------------------------------------------------ */
+#define IC_TO_GM_COMPAT(x) \
+    ( (x) == ICT_COMPAT_DONTCARE ? CMP_TOLERATES    \
+    : (x) == ICT_COMPAT_SUPPORTS ? CMP_ENHANCED     \
+    : (x) == ICT_COMPAT_REQUIRES ? CMP_REQUIRES     \
+    : (x) == ICT_COMPAT_INCOMPAT ? CMP_INCOMPATIBLE \
+    :                              CMP_UNSPECIFIED )
 
-#define ICT_ATTR_NPLAYER    (0x030000)
-#define ICT_ATTR_NP_1PLAY   (0x000000)
-#define ICT_ATTR_NP_2PLAY   (0x010000)
-#define ICT_ATTR_NP_1OR2    (0x020000)
-#define ICT_ATTR_NP_UPTO4   (0x030000)
+#define GM_TO_IC_COMPAT(x) \
+    ( (x) == CMP_INCOMPATIBLE ? ICT_COMPAT_INCOMPAT \
+    : (x) == CMP_TOLERATES    ? ICT_COMPAT_DONTCARE \
+    : (x) == CMP_ENHANCED     ? ICT_COMPAT_SUPPORTS \
+    : (x) == CMP_REQUIRES     ? ICT_COMPAT_REQUIRES \
+    :                           ICT_COMPAT_DONTCARE)
+    
+typedef struct ict_compat_t
+{
+    union
+    {
+        uint8_t raw[5];
+        struct
+        {
+            /* Byte 0 */
+            BFE(uint8_t keyboard_component  : 2,
+            BFE(uint8_t intellivoice        : 2,
+            BFE(uint8_t rsvd_0_4            : 2,        /* Was 4CTRL    */
+                uint8_t ecs                 : 2)));
+                                           
+            /* Byte 1 */                   
+            BFE(uint8_t intellivision_2     : 2,
+            BFE(uint8_t tutorvision         : 2,
+            BFE(uint8_t rsvd_1_4            : 2,
+                uint8_t rsvd_1_6            : 2)));
+            
+            /* Byte 2 */
+            uint8_t rsvd_byte;
 
-#define ICT_ATTR_MULTI      (0x040000)
+            /* Bytes 3, 4 are optional.  However, if byte 3 is present, */
+            /* byte 4 must also be present. */
 
-#define ICT_MEMA_CODE       (0x10)
-#define ICT_MEMA_DATA       (0x20)
-#define ICT_MEMA_DBDATA     (0x40)
-#define ICT_MEMA_STRING     (0x80)
+            /* Byte 3 */
+            BFE(uint8_t jlp_flash_hi        : 2,
+            BFE(uint8_t rsvd_3_2            : 3,
+            BFE(uint8_t lto_mapper          : 1,
+                uint8_t jlp_accel           : 2)));
+
+            /* Byte 4 */
+            uint8_t jlp_flash_lo;
+        } s;
+    } u;
+} ict_compat_t;
+
+enum
+{
+    ICT_MEMATTR_CODE    = 0x10,
+    ICT_MEMATTR_DATA    = 0x20,
+    ICT_MEMATTR_DBDATA  = 0x40,
+    ICT_MEMATTR_STRING  = 0x80
+};
 
 /* ======================================================================== */
 /*  Structures for the tag list and for each of the tag types.              */
 /* ======================================================================== */
-typedef struct icarttag_t       icarttag_t;
-typedef struct ict_credits_t    ict_credits_t;
-typedef struct ict_infourls_t   ict_infourls_t;
-typedef struct ict_bindings_t   ict_bindings_t;
-typedef struct ict_symtab_t     ict_symtab_t;
-typedef struct ict_memattr_t    ict_memattr_t;
-typedef struct ict_linemap_t    ict_linemap_t;
-typedef struct ict_extended_t   ict_extended_t;
-typedef struct ict_unknown_t    ict_unknown_t;
-
-struct ict_credits_t
+typedef struct ict_title_t
 {
-    int                 count;          /* Number of credits.           */
-    int                 alloc;          /* Number of credits allocated  */
-    char                **name;         /* Array of names.              */
-    uint_32             *flags;         /* Array of flags for each name */
-};
+    char        *name;
+} ict_title_t;
 
-struct ict_infourls_t
+typedef struct ict_publisher_t
 {
-    int                 count;          /* Number of URLs.              */
-    int                 alloc;          /* Number of URLs allocated.    */
-    char                **desc;         /* Description of URL.          */
-    char                **url;          /* The URL (http, mailto, etc.) */
-};
+    char        *name;
+} ict_publisher_t;
 
-struct ict_bindings_t
+typedef struct ict_credits_t
 {
-    char                *binding[256];  /* Bindings by key.             */
-};
+    char            *name;      /* Name associated with this credit         */
+    ict_credbit_t   credbits;  /* Credit bits associated with this name     */
+} ict_credits_t;
 
-struct ict_symtab_t
-{
-    PAVLTree            by_name;        /* Symbol table sorted by name. */
-    PAVLTree            by_addr;        /* Symbol table sorted by addr. */
-};
 
-struct ict_memattr_t
+typedef struct ict_infourl_t
 {
-    int                 count;          /* Number of ranges             */
-    int                 alloc;          /* Number of ranges allocated.  */
-    uint_16             *addr_lo;       /* 
-    uint_16             *addr_hi;       /* inclusive range */
-    uint_8              *flags;
-};
+    char        *url;           /* The URL (http, mailto, etc.)             */
+} ict_infourl_t;
 
-struct ict_linemap_t
+typedef struct ict_license_t
 {
-    int                 count;          /* Number of mappings           */
-    int                 alloc;          /* Number of mappings alloc'd.  */
-    int                 *line_no;
-    uint_16             *addr;
-};
+    char        *license;
+} ict_license_t;
 
-struct ict_unknown_t
+typedef struct ict_desc_t
 {
-    uint_8              *data;
-    uint_32             len;
-};
+    char        *text;
+} ict_desc_t;
+
+typedef struct ict_version_t
+{
+    char        *text;
+} ict_version_t;
+
+/* Use game_date_t instead of our own custom ict_date_t.  Forward decl: */
+struct game_date_t;
+
+#if 0 /* Let's not support these just yet. */
+typedef struct ict_symtab_t
+{
+    PAVLTree    by_name;        /* Symbol table sorted by name.             */
+    PAVLTree    by_addr;        /* Symbol table sorted by addr.             */
+} ict_symtab_t;
+
+typedef struct ict_memattr_t
+{
+    uint16_t    addr_lo;        /* starting address                         */
+    uint16_t    addr_hi;        /* ending address (inclusive range)         */
+    uint8_t     flags;          /* flags associated with span               */
+} ict_memattr_t;
+
+typedef struct ict_linemap_t
+{
+    int         line_no;
+    uint16_t    addr;
+} ict_linemap_t;
+
+typedef struct ict_unknown_t
+{
+    uint8_t     *data;
+    uint32_t    len;
+} ict_unknown_t;
 
 struct ict_extended_t
 {
     char                *name;
     ict_unknown_t       body;
 };
+#endif
 
+/* ======================================================================== */
+/*  ICARTTAG parser                                                         */
+/*  Built on the gawdawful visitor pattern, because I enjoy pain.           */
+/* ======================================================================== */
+typedef int ict_startstop_fxn(void *opaque);
+typedef int ict_title_fxn    (void *opaque, const ict_title_t *         );
+typedef int ict_publisher_fxn(void *opaque, const ict_publisher_t *     );
+typedef int ict_credits_fxn  (void *opaque, const ict_credits_t *       );
+typedef int ict_infourl_fxn  (void *opaque, const ict_infourl_t *       );
+typedef int ict_date_fxn     (void *opaque, const struct game_date_t *  );
+typedef int ict_compat_fxn   (void *opaque, const ict_compat_t *        );
+typedef int ict_license_fxn  (void *opaque, const ict_license_t *       );
+typedef int ict_desc_fxn     (void *opaque, const ict_desc_t *          );
+typedef int ict_version_fxn  (void *opaque, const ict_version_t *       );
 
-struct icarttag_t
+typedef struct icarttag_visitor_t
 {
-    icarttag_t  *next;
-    ict_type_t  type;
-    union
-    {
-        char            *title;
-        char            *publisher;
-        ict_credits_t   *credits;
-        ict_infourls_t  *info_urls;
-        uint_8          date[3];
-        uint_32         game_attr;
-        ict_bindings_t  *bindings;
-        ict_symtab_t    *sym_tab;
-        ict_memattr_t   *mem_attr;
-        ict_linemap_t   *line_map;
-        ict_extended_t  *extended;
-        ict_unknown_t   *unknown;
-    } d;
+    /*  The opaque pointer gets passed to every 'visit' call.  It's a bit   */
+    /*  like a 'this' pointer in C++.                                       */
+    void                *opaque;
+
+    /*  The start fxn is called before parsing any tags.  The stop fxn is   */
+    /*  called after tag parsing completes.                                 */
+    ict_startstop_fxn   *start, *stop;
+
+    /*  Each of these is called for each instance of its corresponding tag. */
+    /*  The tag provided will get deallocated after the visit.  The callee  */
+    /*  should make copies of anything it intends to keep.  NULL pointers   */
+    /*  are legal here, and indicate "no visit requested."                  */
+    ict_title_fxn       *visit_full_title;
+    ict_publisher_fxn   *visit_publisher;
+    ict_credits_fxn     *visit_credits;
+    ict_infourl_fxn     *visit_infourl;
+    ict_date_fxn        *visit_release_date;
+    ict_compat_fxn      *visit_compat;
+    ict_title_fxn       *visit_short_title;
+    ict_license_fxn     *visit_license;
+    ict_desc_fxn        *visit_desc;
+    ict_date_fxn        *visit_build_date;
+    ict_version_fxn     *visit_version;
+} icarttag_visitor_t;
+
+enum icarttag_errors    /* -1 thru -7 are icartrom_errors */
+{
+    IC_CRC_ERROR_TAG    = -8,
+    IC_OUT_OF_MEMORY    = -9,
+    IC_TAG_PARSING_ERR  = -10,
+    IC_VISITOR_ERROR    = -11
 };
 
+/* returns number of bytes processed on success, or -ve value on failure.   */
+int icarttag_decode
+(
+    const uint8_t *const rom_img,           /* First byte of ROM file.      */
+    const int            length,            /* Total size of .ROM file.     */
+    const int            ignore_crc,        /* Disables CRC checks if set.  */
+    const int            tag_ofs,           /* Offset of tags, if known.    */
+                                            /* Pass in -1 if not known.     */
+    const icarttag_visitor_t *const visitor,/* Visiting class               */
+    int *const           visitor_error      /* For reporting visitor errors */
+);
+    
 /* ======================================================================== */
-/*  API functions for reading/writing tags.                                 */
+/*  An ICARTTAG printing visitor, for debug purposes.                       */
 /* ======================================================================== */
-icarttag_t  *ict_decode(uint_8 *rom_img, int ignore_crc, int drop_unknown);
-uint_8      *ict_gentag(icarttag_t *tags);
-
-/* ======================================================================== */
-/*  API functions for querying the tags.                                    */
-/* ======================================================================== */
-icarttag_t  *ict_findtag        (icarttag_t *tag, ict_type_t type);
-
-char        *ict_get_title      (icarttag_t *tag);
-char        *ict_get_publisher  (icarttag_t *tag);
-char        *ict_get_credits    (icarttag_t *tag);
-char        *ict_get_date       (icarttag_t *tag);   /* Human Readable Date */
-
-int         ict_get_supports    (icarttag_t *tag, uint_32 what);
-int         ict_get_requires    (icarttag_t *tag, uint_32 what);
-int         ict_get_incompat    (icarttag_t *tag, uint_32 what);
-
-char*       ict_addr2symb       (icarttag_t *tag, uint_32 addr);
-uint_32     ict_symb2addr       (icarttag_t *tag, char *symb);
+extern const icarttag_visitor_t ict_printer;
 
 /* ======================================================================== */
-/*  API functions for generating tags.                                      */
+/*  ICARTTAG encoder                                                        */
+/*  For now just accept a game metadata structure to encode.  Returns an    */
+/*  allocated chunk of memory with the encoded tags.  Good enough for now.  */
 /* ======================================================================== */
-void        ict_set_title       (icarttag_t *tag, char *title);
-void        ict_set_publisher   (icarttag_t *tag, char *name);
-void        ict_add_credit      (icarttag_t *tag, char *name, uint_8 flags);
-void        ict_set_date        (icarttag_t *tag, int yr, int mo, int day);
-
-void        ict_set_supports    (icarttag_t *tag, uint_32 what);
-void        ict_set_requires    (icarttag_t *tag, uint_32 what);
-void        ict_set_incompat    (icarttag_t *tag, uint_32 what);
-
-int         ict_def_symbol      (icarttag_t *tag, char *symb, uint_32 addr);
-
+struct game_metadata_t;     /* forward decl. */
+uint8_t *icarttag_encode
+(
+    const struct game_metadata_t *const metadata,
+    size_t                       *const encoded_length,
+    int                          *const error_code
+);
+ 
 /* ======================================================================== */
-/*  Useful arrays                                                           */
+/*  Misc data                                                               */
 /* ======================================================================== */
-extern char *ict_publisher_names[];
-extern char *ict_credit_names[];
+extern const char *ic_author_list[128];
+extern const char *ic_publisher_names[15];
 
+enum
+{
+    IC_PUBLISHER_COUNT = 15
+};
 
 #endif

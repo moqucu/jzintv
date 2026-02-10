@@ -13,12 +13,12 @@
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
 
-   You should have received a copy of the GNU General Public License
-   along with this program; if not, write to the Free Software
-   Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.  */
+   You should have received a copy of the GNU General Public License along
+   with this program; if not, write to the Free Software Foundation, Inc.,
+   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA. */
 
-#ifndef _GETOPT_H
-#define _GETOPT_H 1
+#ifndef GETOPT_H_
+#define GETOPT_H_ 1
 
 #ifdef  __cplusplus
 extern "C" {
@@ -96,7 +96,7 @@ struct option
 #define required_argument       1
 #define optional_argument       2
 
-#if __STDC__ || defined(PROTO)
+#if __STDC__ || defined(PROTO) || defined(__cplusplus)
 #if defined(__GNU_LIBRARY__)
 /* Many other libraries have conflicting prototypes for getopt, with
    differences in the consts, in stdlib.h.  To avoid compilation

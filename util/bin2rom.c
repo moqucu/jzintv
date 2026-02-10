@@ -1,21 +1,5 @@
 /* ======================================================================== */
 /*  Takes a BIN (and optional CFG) and generates a .ROM from it.            */
-/* ------------------------------------------------------------------------ */
-/*  This program is free software; you can redistribute it and/or modify    */
-/*  it under the terms of the GNU General Public License as published by    */
-/*  the Free Software Foundation; either version 2 of the License, or       */
-/*  (at your option) any later version.                                     */
-/*                                                                          */
-/*  This program is distributed in the hope that it will be useful,         */
-/*  but WITHOUT ANY WARRANTY; without even the implied warranty of          */
-/*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
-/*  General Public License for more details.                                */
-/*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
-/* ------------------------------------------------------------------------ */
-/*                 Copyright (c) 1998-2001, Joseph Zbiciak                  */
 /* ======================================================================== */
 
 #include <stdio.h>
@@ -25,8 +9,11 @@
 #include "config.h"
 #include "icart/icartrom.h"
 #include "icart/icartbin.h"
+#include "icart/icarttag.h"
+#include "lzoe/lzoe.h"
+#include "metadata/metadata.h"
+#include "metadata/cfgvar_metadata.h"
 #include "file/file.h"
-
 
 icartrom_t the_icart;
 
@@ -40,14 +27,18 @@ int main(int argc, char *argv[])
     char bin_fn[1024], cfg_fn[1024], rom_fn[1024];
     int fn_len;
     ictype_t icart_type = ICART;
+    int add_meta = 1;
 
     if (argc > 2)
     {
         argc--;
 
         if      (!strcmp(argv[1], "--cc3")) { icart_type = CC3_STD; argv++; }
+        else if (!strcmp(argv[1], "-3"))    { icart_type = CC3_STD; argv++; }
         else if (!strcmp(argv[1], "--adv")) { icart_type = CC3_ADV; argv++; }
-        else    
+        else if (!strcmp(argv[1], "--metadata"))    { add_meta = 1; argv++; }
+        else if (!strcmp(argv[1], "--no-metadata")) { add_meta = 0; argv++; }
+        else
             argc++;
     }
 
@@ -92,7 +83,16 @@ int main(int argc, char *argv[])
     /* -------------------------------------------------------------------- */
     /*  Read the BIN+CFG into the icartrom_t.                               */
     /* -------------------------------------------------------------------- */
-    icb_read_bincfg(bin_fn, cfg_fn, &the_icart);
+    icb_read_bincfg(bin_fn, cfg_fn, &the_icart, 1);
+
+    /* -------------------------------------------------------------------- */
+    /*  Strip metadata, if asked to do so.                                  */
+    /* -------------------------------------------------------------------- */
+    if (!add_meta)
+    {
+        free_game_metadata(the_icart.metadata);
+        the_icart.metadata = NULL;
+    }
 
     /* -------------------------------------------------------------------- */
     /*  Finally, generate the ROM file and write it out.                    */
@@ -113,9 +113,9 @@ int main(int argc, char *argv[])
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                 Copyright (c) 1998-2001, Joseph Zbiciak                  */
 /* ======================================================================== */

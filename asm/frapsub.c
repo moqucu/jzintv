@@ -6,11 +6,11 @@ DESCRIPTION: "  Reconfigurable Cross-assembler producing Intel (TM)
         Hex format object records.  ";
 SYSTEM:     UNIX, MS-Dos ;
 FILENAME:   frapsub.c ;
-WARNINGS:   "This software is in the public domain.  
-        Any prior copyright claims are relinquished.  
+WARNINGS:   "This software is in the public domain.
+        Any prior copyright claims are relinquished.
 
-        This software is distributed with no warranty whatever.  
-        The author takes no responsibility for the consequences 
+        This software is distributed with no warranty whatever.
+        The author takes no responsibility for the consequences
         of its use.  "  ;
 SEE-ALSO:   frasmain.c;
 AUTHORS:    Mark Zenier;
@@ -23,12 +23,13 @@ AUTHORS:    Mark Zenier;
 */
 
 #include "config.h"
+#include "lzoe/lzoe.h"
 #include "file/file.h"
 #include "fragcon.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include "frasmdat.h"
-#include "types.h"
+#include "as1600_types.h"
 #include "protos.h"
 #include "intermed.h"
 #include "memo_string.h"
@@ -70,6 +71,8 @@ char *savestring(const char *stx, int len)
 }
 #endif
 
+extern struct evalrel evalr[NUMPEXP];
+
 /* expression node operations */
 
 /* expression tree element */
@@ -87,10 +90,6 @@ struct etelem enode[NUMENODE];
 
 local int nextenode = 1;
 
-/* non general, one exprlist or stringlist per line */
-int nextexprs = 0;
-int nextstrs = 0;
-
 void clrexpr(void)
 /*
     description clear out the stuff used for each line
@@ -100,10 +99,9 @@ void clrexpr(void)
 */
 {
     nextenode = 1;
-    nextexprs = nextstrs = 0;
 }
 
-int exprnode(int swact, int left, int op, int right, int value, 
+int exprnode(int swact, int left, int op, int right, int value,
              struct symel *symbol)
 /*
     description add an element to the expression tree pool
@@ -179,8 +177,8 @@ int syhash(const char *str)
 */
 {
     unsigned rv = 0;
-    int offset = 1;
-    int c;
+    unsigned offset = 1;
+    unsigned c;
 
     while((c = *(str++)) > 0)
     {
@@ -201,14 +199,14 @@ static struct symel *getsymslot(const char *str)
                 if there are no symbols for the hash value
                     create one for this string
                 otherwise
-                scan the linked list until the symbol is 
+                scan the linked list until the symbol is
                 found or the end of the list is found
                 if the symbol was found
                     exit
                 if the symbol was not found, allocate and
                 add at the end of the linked list
                 fill out the symbol
-    parameters  the character string 
+    parameters  the character string
     globals     all the symbol table
     return      a pointer to the symbol table element for this
             character string
@@ -252,7 +250,7 @@ char *currmode = "";
 char *proc = NULL;
 int   proc_len = 0;
 
-struct symel *symbentryidx(const char *str, int toktyp, int hasidx, 
+struct symel *symbentryidx(const char *str, int toktyp, int hasidx,
                            unsigned idx)
 /*
     description find or add a nonreserved symbol to the symbol table
@@ -273,7 +271,7 @@ struct symel *symbentryidx(const char *str, int toktyp, int hasidx,
     {
         /* One of the '@' accounts for NUL at end... hacky. */
         /* We'll add +1 anyway. */
-        int need = proc_len + strlen(str) + 1;  
+        int need = proc_len + strlen(str) + 1;
 
         if (buf_len < need)
         {
@@ -334,7 +332,7 @@ struct symel *symbentryidx(const char *str, int toktyp, int hasidx,
         rv->symnum = nextsymnum++;
         rv->seg    = SSG_UNDEF;
         rv->flags  = SFLAG_NONE;
-    } 
+    }
 
     return rv;
 }
@@ -370,6 +368,8 @@ void reservedsym(const char *str, int tok, int value)
 
 }
 
+struct symel **symbindex;
+
 void buildsymbolindex(void )
 /*
     description allocate and fill an array that points to each
@@ -382,7 +382,7 @@ void buildsymbolindex(void )
     int hi;
     struct symel *curr;
 
-    if((symbindex = (struct symel **)calloc((unsigned)nextsymnum, 
+    if((symbindex = (struct symel **)calloc((unsigned)nextsymnum,
             sizeof (struct symel *))) == (struct symel **)NULL)
     {
         frafatal(" unable to allocate symbol index");
@@ -412,7 +412,7 @@ local int ohashtab[OPHASHSZ];
 void setophash(void)
 /*
     description set up the linked list hash table for the
-            opcode symbols 
+            opcode symbols
     globals     the opcode hash table
             the opcode table
 */
@@ -482,7 +482,7 @@ int opcodehash(const char *str)
 */
 {
     unsigned rv = 0;
-    int offset = 1, c;
+    unsigned offset = 1, c;
 
     while((c = *(str++)) > 0)
     {
@@ -503,7 +503,7 @@ const char *findgen(int op, int syntax, int crit)
             for  the dimensions [opcode, syntax] and then
             points to a list of generation elements that
             are matched to the criteria (binary set) that
-            are provided by the action in the grammer for that
+            are provided by the action in the grammar for that
             specific syntax.
     parameters  Opcode table subscript
                 note 0 is the value which points to an
@@ -552,7 +552,7 @@ const char *findgen(int op, int syntax, int crit)
 #define GSTR_PASS 0
 #define GSTR_PROCESS 1
 
-local char *goutptr; 
+local char *goutptr;
 local char *goutbuff = NULL;
 local int   gout_bs  = 0;
 
@@ -602,7 +602,7 @@ int geninstr(const char *str)
             in a 'D' record in the intermediate file, after
             merging in the expression results.
     parameters  the instruction generation string
-    globals     the evaluation results 
+    globals     the evaluation results
                 evalr[].value   a numeric value known at
                         the time of the first pass
                 evalr[].exprstr  a polish form expression
@@ -638,14 +638,7 @@ int geninstr(const char *str)
                 str++;
                 break;
 
-            case IFC_EMU8:
-            case IFC_EMS7:
-                len++;
-                goutch(*str++);
-                break;
-
             case IFC_EM16:
-            case IFC_EMBR16:
                 len += 2;
                 goutch(*str++);
                 break;
@@ -663,7 +656,7 @@ int geninstr(const char *str)
                 state = GSTR_PASS;
                 str++;
                 break;
-            
+
             case '0':
             case '1':
             case '2':
@@ -676,7 +669,7 @@ int geninstr(const char *str)
             case '9':
                 innum = (innum << 4) + (*str++) - '0';
                 break;
-            
+
             case 'a':
             case 'b':
             case 'c':
@@ -685,7 +678,7 @@ int geninstr(const char *str)
             case 'f':
                 innum = (innum << 4) + (*str++) - 'a' + 10;
                 break;
-            
+
             case 'A':
             case 'B':
             case 'C':
@@ -694,7 +687,7 @@ int geninstr(const char *str)
             case 'F':
                 innum = (innum << 4) + (*str++) - 'A' + 10;
                 break;
-            
+
             case IG_CPCON:
                 goutxnum((unsigned int)evalr[innum].value);
                 innum = 0;
@@ -708,11 +701,11 @@ int geninstr(const char *str)
                     goutch(*expr++);
                 str++;
                 break;
-            
+
             case IG_ERROR:
                 fraerror(++str);
                 return 0;
-            
+
             default:
                 fraerror("invalid char in instruction generation");
                 break;
@@ -749,7 +742,7 @@ int chtcreate(void)
 
     for(cnt = 0; cnt < 512; cnt++)
         trantab[cnt] = -1;
-    
+
     chtatab[chtnxalph] = chtnpoint = trantab;
 
     return chtnxalph++;
@@ -767,11 +760,12 @@ int chtcfind(int *chtab, char **sourcepnt, int **tabpnt, int *numret)
 */
 {
     int numval, *valaddr;
-    char *sptr, cv;
+    char *sptr = *sourcepnt;
+    int cv = 0xFF & *sptr;
 
     sptr = *sourcepnt;
 
-    switch( cv = *sptr)
+    switch (cv)
     {
     case '\0':
         return CF_END;
@@ -779,38 +773,38 @@ int chtcfind(int *chtab, char **sourcepnt, int **tabpnt, int *numret)
     default:
         if( chtab == (int *)NULL)
         {
-            *numret = *sptr;
+            *numret = cv;
             *sourcepnt = ++sptr;
             return CF_NUMBER;
         }
         else
         {
-            valaddr = &(chtab[cv & 0xff]);
+            valaddr = &(chtab[cv]);
             *sourcepnt = ++sptr;
             *tabpnt = valaddr;
             return (*valaddr == -1) ?
                 CF_UNDEF : CF_CHAR;
         }
-        
+
     case '\\':
-        switch(cv =  *(++sptr) )
+        switch (cv = 0xFF & *(++sptr))
         {
         case '\0':
             *sourcepnt = sptr;
             return CF_INVALID;
-        
+
         case '\'':
         case '\"':
         case '\\':
-            if( chtab == (int *)NULL)
+            if (chtab == (int *)NULL)
             {
-                *numret = *sptr;
+                *numret = cv;
                 *sourcepnt = ++sptr;
                 return CF_NUMBER;
             }
             else
             {
-                valaddr = &(chtab[(cv & 0xff) + 256]);
+                valaddr = &(chtab[cv + 256]);
                 *sourcepnt = ++sptr;
                 *tabpnt = valaddr;
                 return (*valaddr == -1) ?
@@ -819,14 +813,14 @@ int chtcfind(int *chtab, char **sourcepnt, int **tabpnt, int *numret)
 
 
         default:
-            if( chtab == (int *)NULL)
+            if (chtab == (int *)NULL)
             {
                 *sourcepnt = ++sptr;
                 return CF_INVALID;
             }
             else
             {
-                valaddr = &(chtab[(cv & 0xff) + 256]);
+                valaddr = &(chtab[cv + 256]);
                 *sourcepnt = ++sptr;
                 *tabpnt = valaddr;
                 return (*valaddr == -1) ?
@@ -837,22 +831,20 @@ int chtcfind(int *chtab, char **sourcepnt, int **tabpnt, int *numret)
         case '4': case '5': case '6': case '7':
             {
                 numval = cv - '0';
-                cv =  *(++sptr);
-                if(cv >= '0' && cv <= '7')
+                cv = 0xFF & *(++sptr);
+                if (cv >= '0' && cv <= '7')
                 {
-                    numval = numval * 8 +
-                        cv - '0';
+                    numval = numval * 8 + cv - '0';
 
-                    cv = *(++sptr);
-                    if(cv >= '0' && cv <= '7')
+                    cv = 0xFF & *(++sptr);
+                    if (cv >= '0' && cv <= '7')
                     {
-                        numval = numval * 8 +
-                            cv - '0';
+                        numval = numval * 8 + cv - '0';
                         ++sptr;
                     }
                 }
                 *sourcepnt = sptr;
-                *numret = numval & 0xff;
+                *numret = numval & 0xFF;
                 return CF_NUMBER;
             }
 
@@ -865,24 +857,24 @@ int chtcfind(int *chtab, char **sourcepnt, int **tabpnt, int *numret)
 
                 while (expdig-->0)
                 {
-                    switch(cv = *(++sptr))
+                    switch(cv = 0xFF & *(++sptr))
                     {
                     case '0': case '1': case '2': case '3':
                     case '4': case '5': case '6': case '7':
                     case '8': case '9':
                         numval = numval * 16 + cv - '0';
                         break;
-                    
-                    case 'a': case 'b': case 'c': 
+
+                    case 'a': case 'b': case 'c':
                     case 'd': case 'e': case 'f':
-                        numval = numval * 16 + cv - 'a' + 10; 
+                        numval = numval * 16 + cv - 'a' + 10;
                         break;
-                    
+
                     case 'A': case 'B': case 'C':
                     case 'D': case 'E': case 'F':
                         numval = numval * 16 + cv - 'A' + 10;
                         break;
-                    
+
                     default:
                         if (dig1)
                         {
@@ -902,8 +894,8 @@ int chtcfind(int *chtab, char **sourcepnt, int **tabpnt, int *numret)
             }
         }
     }
-    /* can't get here? */
-    return 0;
+    /* NOTREACHED */
+    /* return 0; */
 }
 
 int chtran(char **sourceptr)
@@ -917,7 +909,7 @@ int chtran(char **sourceptr)
     case CF_END:
     default:
         return 0;
-    
+
     case CF_INVALID:
         fracherror("invalid character constant", beforeptr, *sourceptr);
         return 0;
@@ -934,40 +926,6 @@ int chtran(char **sourceptr)
     }
 }
 
-
-int genstring(char *str)
-/*
-    description Produce 'D' records for a ascii string constant
-    parameters  a character string
-    return      the length of the string total (machine code bytes)
-*/
-{
-    int rvlen = 0;
-
-    if (!goutbuff)
-    {
-        goutbuff = (char *)malloc(STRALLOCSZ);
-        gout_bs  = STRALLOCSZ;
-    }
-
-    goutptr = goutbuff;
-
-    while (*str)
-    {
-        gout2hex(chtran(&str));
-        goutch(IFC_EMU8);
-        rvlen++;
-    }
-
-    if(goutptr > &goutbuff[2])
-    {
-        goutch(0);
-        emit_generated_instr(goutbuff);
-    }
-
-    return rvlen;
-}
-    
 static char *pepolptr;
 static int pepolcnt;
 static int etop;
@@ -992,6 +950,7 @@ static inline void polout(char ch)
     }
 }
 
+struct evstkel estk[PESTKDEPTH], *estkm1p;
 
 void pevalexpr(int sub, int exn)
 /*
@@ -1065,9 +1024,35 @@ int pepolcon(int esub)
             switch(enode[esub].op)
             {
 #include "fraeuni.h"
+
+            case IFC_CLASSIFY:
+                etop = etopseg == SSG_ABS    ? CLASS_ABS
+                     : etopseg == SSG_SET    ? CLASS_SET
+                     : etopseg == SSG_EQU    ? CLASS_EQU
+                     : etopseg == SSG_RESV   ? CLASS_RESV
+                     : etopseg == SSG_UNDEF  ? CLASS_UNDEF
+                     : etopseg == SSG_UNUSED ? CLASS_UNUSED
+                     :                         CLASS_UNKNOWN;
+                etopseg = SSG_ABS;
+                break;
             }
         }
         break;
+
+    case  PCCASE_CLASSSYM:
+        {
+            int symseg = (enode[esub].sym)->seg;
+            etop = symseg == SSG_ABS    ? CLASS_ABS
+                 : symseg == SSG_SET    ? CLASS_SET
+                 : symseg == SSG_EQU    ? CLASS_EQU
+                 : symseg == SSG_RESV   ? CLASS_RESV
+                 : symseg == SSG_UNDEF  ? CLASS_UNDEF
+                 : symseg == SSG_UNUSED ? CLASS_UNUSED
+                 :                        CLASS_UNKNOWN;
+            etopseg = SSG_ABS;
+            polnumout(etop);
+            break;
+        }
 
     case  PCCASE_BIN:
         {
@@ -1084,7 +1069,7 @@ int pepolcon(int esub)
 
             (++estkm1p)->v = etop;
             estkm1p->s = etopseg;
-            etopseg = SSG_UNUSED;   
+            etopseg = SSG_UNUSED;
             etop = 0;
 
             if( ! pepolcon(enode[esub].right))
@@ -1122,7 +1107,7 @@ int pepolcon(int esub)
         etop = (enode[esub].sym)->value;
         etopseg = (enode[esub].sym)->seg;
         if(etopseg == SSG_EQU ||
-           etopseg == SSG_SET ) 
+           etopseg == SSG_SET )
         {
             etopseg = SSG_ABS;
             polnumout((unsigned int)(enode[esub].sym)->value);
@@ -1133,13 +1118,13 @@ int pepolcon(int esub)
             polout(IFC_SYMB);
         }
         break;
-            
+
     case  PCCASE_PROGC:
         polout(IFC_PROGCTR);
         etop = locctr >> 1;
         etopseg = SSG_ABS;
         break;
-            
+
     case  PCCASE_CONS:
         polnumout((unsigned int)enode[esub].val);
         etop = enode[esub].val;
@@ -1148,4 +1133,20 @@ int pepolcon(int esub)
 
     }
     return TRUE;
+}
+
+
+/* Helpers for ROTL/ROTR */
+unsigned long rotl16(unsigned long val, int amt)
+{
+    unsigned long l = (0xFFFFU & val) << (amt & 15);
+    unsigned long r = (0xFFFFU & val) >> (16 - (amt & 15));
+    return (l | r) & 0xFFFFU;
+}
+
+unsigned long rotl32(unsigned long val, int amt)
+{
+    unsigned long l = (0xFFFFFFFFUL & val) << (amt & 31);
+    unsigned long r = (0xFFFFFFFFUL & val) >> (32 - (amt & 31));
+    return (l | r) & 0xFFFFFFFFUL;
 }

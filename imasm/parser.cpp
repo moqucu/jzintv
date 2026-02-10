@@ -12,8 +12,8 @@ as published by the Free Software Foundation; either version 2
 of the License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of 
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the 
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
@@ -28,6 +28,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <cstdlib>
 
 using namespace std;
+
+static const IgnoreFlags IgnoreFully  = { true,  true  };
+static const IgnoreFlags IgnoreNone   = { false, false };
 
 #define NUL '\0'
 
@@ -54,6 +57,13 @@ int stricmp_(const char *str1, const char *str2)
     return -1;
 }
 
+#elif defined(USE_STRCASECMP)
+
+int stricmp_(const char *str1, const char *str2)
+{
+    return strcasecmp(str1, str2);
+}
+
 #else
 
 int stricmp_(const char *str1, const char *str2)
@@ -65,8 +75,8 @@ int stricmp_(const char *str1, const char *str2)
 
 Parser::~Parser()
 {
-    map <const char *, macro *>::iterator itr;
-    
+    map<const char *, macro *, Parser_ltstr>::iterator itr;
+
     for (itr = m_macroMap.begin(); itr != m_macroMap.end(); itr++)
     {
         free(static_cast<void *>(const_cast<char *>(itr->first)));
@@ -80,17 +90,17 @@ Parser::~Parser()
 int Parser::ParseSourceFile()
 {
     string s;
-    bool Ignore;
+    IgnoreFlags Ignore;
 
     while (inputFIFO->getLine(s, Ignore))
     {
         StripReturn(s);
 
-        if (Ignore)
+        if (Ignore.skip_macro)
         {
-            PutString(s, true, false);
+            PutString(s, true, IgnoreNone);
             continue;
-        } 
+        }
 
         if (ParseLine(s) == -1)
             return 0;
@@ -102,18 +112,18 @@ int Parser::ParseSourceFile()
 int Parser::ParseUntilOutput()
 {
     string s;
-    bool Ignore;
+    IgnoreFlags Ignore;
 
     while (outputFIFO->isEmpty() &&
            inputFIFO->getLine(s, Ignore))
     {
         StripReturn(s);
 
-        if (Ignore)
+        if (Ignore.skip_macro)
         {
-            PutString(s, true, false);
+            PutString(s, true, IgnoreNone);
             continue;
-        } 
+        }
 
         if (ParseLine(s) == -1)
             return 0;
@@ -122,7 +132,7 @@ int Parser::ParseUntilOutput()
     return 1;
 }
 
-void Parser::PutString(string &s, bool addNL, bool Ignore)
+void Parser::PutString(string &s, bool addNL, IgnoreFlags Ignore)
 {
     string sTmp = s;
     string sSub;
@@ -135,7 +145,7 @@ void Parser::PutString(string &s, bool addNL, bool Ignore)
     while ((crPos = sTmp.find('\r')) != string::npos)
         sTmp.erase(crPos, 1);
 
-    // Now chop into newline-terminated substrings 
+    // Now chop into newline-terminated substrings
     while ((nlPos = sTmp.find('\n')) != string::npos)
     {
         sSub = sTmp.substr(0, nlPos + 1);
@@ -148,7 +158,7 @@ void Parser::PutString(string &s, bool addNL, bool Ignore)
         outputFIFO->putLine(sTmp.c_str(), Ignore);
 }
 
-void Parser::PutStringAsCmt(string &s, bool addNL, bool Ignore)
+void Parser::PutStringAsCmt(string &s, bool addNL, IgnoreFlags Ignore)
 {
     string sTmp = s;
     string sSub;
@@ -161,7 +171,7 @@ void Parser::PutStringAsCmt(string &s, bool addNL, bool Ignore)
     while ((crPos = sTmp.find('\r')) != string::npos)
         sTmp.erase(crPos, 1);
 
-    // Now chop into newline-terminated substrings 
+    // Now chop into newline-terminated substrings
     while ((nlPos = sTmp.find('\n')) != string::npos)
     {
         sSub = sTmp.substr(0, nlPos + 1);
@@ -171,7 +181,7 @@ void Parser::PutStringAsCmt(string &s, bool addNL, bool Ignore)
         // it's anything else (including a TAB), insert in front of it.
         if (sSub.length() > 0 && sSub[0] == ' ')
             sSub.replace(0,1, ";");
-        else    
+        else
             sSub.insert(0, ";");
 
         outputFIFO->putLine(sSub.c_str(), Ignore);
@@ -194,7 +204,7 @@ int Parser::ParseLine(string &sLine)
     string::size_type iPos = sLine.find(";");
     if (iPos != string::npos)
         sLine.substr(0, iPos);
-    
+
     // Now, through the magic of operator overloading, tokenize the line.
     lineToks = sLine;
 
@@ -207,12 +217,11 @@ int Parser::ParseLine(string &sLine)
             bool redef_err = false;
 
             // Output original line as a comment
-            PutString(sOrig, true, true);
+            PutString(sOrig, true, IgnoreFully);
 
             redef_err = (m_macroMap.find(lineToks[1]) != m_macroMap.end());
 
             m->sName = lineToks[1];
-
 
             if (ReadMacro(m, sLine) == -1)
                 return -1;
@@ -237,8 +246,8 @@ int Parser::ParseLine(string &sLine)
             else if (iRet == 1)
             {
                 // Found a macro, so output the original line as a comment
-                // followed by the expanded line.  
-                PutStringAsCmt(sOrig, true, false);
+                // followed by the expanded line.
+                PutStringAsCmt(sOrig, true, IgnoreNone);
                 if (sMacro.length() > 0)
                     PutString(sMacro);
 
@@ -246,14 +255,14 @@ int Parser::ParseLine(string &sLine)
             }
             // else if iRet == 0, pass the line through.
         }
-        
+
     }
 
     if (!bHandled)
     {
         PutString(sOrig);
     }
-        
+
     return 1;
 }
 
@@ -262,8 +271,8 @@ int Parser::ReadMacro(macro *pMacro, string &sLine)
     string s, sTemp;
     Token t(" \t\r\n");
     bool ok;
-    bool Ignore;
-    
+    IgnoreFlags Ignore;
+
     pMacro->iType = mUNKNOWN;
 
     s = sLine;
@@ -278,17 +287,16 @@ int Parser::ReadMacro(macro *pMacro, string &sLine)
     // Read the first line of the macro
     do {
         ok = inputFIFO->getLine(s, Ignore);
-        if (Ignore) 
-            PutString(s, false, false);
-    } while (ok && Ignore);
+        if (Ignore.skip_macro)
+            PutString(s, false, IgnoreNone);  // XXX: Why IgnoreNone?
+    } while (ok && Ignore.skip_macro);
     if (!ok && inputFIFO->isEOF())
     {
-        ThrowError("End of file encountered while reading macro %s", 
+        ThrowError("End of file encountered while reading macro %s",
                    pMacro->sName.c_str());
         return -1;
     }
-    PutString(s, false, true);
-        
+    PutString(s, false, IgnoreFully);
 
     // Strip leading whitespace and trailing return character.
     string::size_type iPos = 0, len = s.length();
@@ -301,41 +309,41 @@ int Parser::ReadMacro(macro *pMacro, string &sLine)
     t = s;
 
     if (t.GetNumTokens() == 0 || stricmp_(t[0], "ENDM") != 0)
-    {           
-        pMacro->codeVector.push_back(s);        
+    {
+        pMacro->codeVector.push_back(s);
     }
-    else 
+    else
     {
         ThrowWarning("Empty macro %s defined.", pMacro->sName.c_str());
         return 1;
     }
-    
+
 
     // Read the rest of the macro
     while (1)
     {
         do {
             ok = inputFIFO->getLine(s, Ignore);
-            if (Ignore) 
-                PutString(s, false, false);
-        } while (ok && Ignore);
+            if (Ignore.skip_macro)
+                PutString(s, false, IgnoreNone);
+        } while (ok && Ignore.skip_macro);
 
         if (!ok && inputFIFO->isEOF())
         {
-            ThrowError("End of file encountered while reading macro %s", 
+            ThrowError("End of file encountered while reading macro %s",
                        pMacro->sName.c_str());
             return -1;
-        }       
+        }
 
-        PutString(s, false, true);
+        PutString(s, false, IgnoreFully);
         StripReturn(s);
         t = s;
 
         if (t.GetNumTokens() > 0)
-        {           
+        {
             if (stricmp_(t[0], "ENDM") != 0)
-            {           
-                pMacro->codeVector.push_back(s);        
+            {
+                pMacro->codeVector.push_back(s);
             }
             else
             {
@@ -352,16 +360,14 @@ int Parser::ThrowError(const char *format, ...)
     char msg_buf[1024], loc_buf[16];
     va_list args;
     va_start(args, format);
-    vsprintf(msg_buf, format, args);
+    vsnprintf(msg_buf, 1024, format, args);
 
     const StringFIFO::loc *inLoc = inputFIFO->getLocation();
-    sprintf(loc_buf, ":%d: ", inLoc->lineNo);
+    snprintf(loc_buf, 16, ":%d: ", inLoc->lineNo);
 
     string msg = string(inLoc->fname) + loc_buf + "ERROR - " + msg_buf;
 
     throw ParseError(msg);
-    
-    return 1;
 }
 
 int Parser::ThrowWarning(const char *format, ...)
@@ -369,10 +375,10 @@ int Parser::ThrowWarning(const char *format, ...)
     char msg_buf[256], loc_buf[16];
     va_list args;
     va_start(args, format);
-    vsprintf(msg_buf, format, args);
+    vsnprintf(msg_buf, 256, format, args);
 
     const StringFIFO::loc *inLoc = inputFIFO->getLocation();
-    sprintf(loc_buf, ":%d: ", inLoc->lineNo);
+    snprintf(loc_buf, 16, ":%d: ", inLoc->lineNo);
     cerr << inLoc->fname << loc_buf << "WARNING - " << msg_buf << endl;
 
     return 1;
@@ -385,7 +391,7 @@ int Parser::GetMacroString(macro *pMacro, string &sLine, string &sOut)
     sMacName = pMacro->sName;
 
     string::size_type iPos = sLine.find(sMacName);
-    
+
     if (iPos != string::npos)
     {
         int iParen = 0;
@@ -425,7 +431,7 @@ int Parser::GetMacroString(macro *pMacro, string &sLine, string &sOut)
         {
             ThrowError("Mismatched parenthesis in macro: %s", sMacName.c_str());
         }
-    } 
+    }
 
     // Eat trailing whitespace
     iPos = sOut.length();
@@ -438,7 +444,7 @@ int Parser::GetMacroString(macro *pMacro, string &sLine, string &sOut)
         sOut = sOut.substr(0, iPos+1);
     }
 
-    return iRet;    
+    return iRet;
 }
 
 // Macros should be found and parsed in a left to right order
@@ -446,7 +452,7 @@ int Parser::FindMacros(string &sLine, string &sOut)
 {
     int iRet = 0, i, iNumToks;
     Token t(" \t,()\r\n#$");
-    macro *pMac = NULL;
+    macro *pMac = nullptr;
     string sSub;
     string::size_type iPos, iEnd;
 
@@ -480,7 +486,7 @@ int Parser::FindMacros(string &sLine, string &sOut)
     // Tokenize it and expand all macros in the line.
     // A macro may expand to multiple lines.
     bChanged = false;
-    pMac     = NULL;
+    pMac     = nullptr;
     t        = sCurStr;
     iNumToks = t.GetNumTokens();
 
@@ -488,8 +494,8 @@ int Parser::FindMacros(string &sLine, string &sOut)
     {
         pMac = GetMacroPtr(t[i]);
 
-        if (pMac != NULL)
-        {   
+        if (pMac != nullptr)
+        {
             iRet = 1;
 
             // Always expand the leftmost macro
@@ -507,14 +513,14 @@ int Parser::FindMacros(string &sLine, string &sOut)
                 {
                     return -1;
                 }
-                 
+
                 sCurStr.replace(iPos, sMacro.length(), sExpanded);
 
                 if (sCurStr.length() >= MAX_LINE - 1)
                 {
-                    PutStringAsCmt(sOrig, true, false);
+                    PutStringAsCmt(sOrig, true, IgnoreNone);
                     ThrowError("Maximum line length of %d exceeded "
-                               "during expansion of '%s'", 
+                               "during expansion of '%s'",
                                MAX_LINE, pMac->sName.c_str());
                 }
 
@@ -535,7 +541,7 @@ int Parser::FindMacros(string &sLine, string &sOut)
     // expand to more than one line.
     if (bChanged)
     {
-        // Put new stuff in front of existing unprocessed stuff 
+        // Put new stuff in front of existing unprocessed stuff
         sTmpStr = sCurStr + sTmpStr;
         sCurStr.erase();
 
@@ -551,7 +557,7 @@ int Parser::FindMacros(string &sLine, string &sOut)
         vector<string::size_type> newlines;
 
         iPos = sTmpStr.find('\n');
-        
+
         while (iPos != string::npos)
         {
             newlines.push_back(iPos);
@@ -566,16 +572,16 @@ int Parser::FindMacros(string &sLine, string &sOut)
             newlines.pop_back();
 
             inputFIFO->ungetLine(
-                sTmpStr.substr(iPos + 1, iEnd - iPos).c_str(), 
-                false);
+                sTmpStr.substr(iPos + 1, iEnd - iPos).c_str(),
+                IgnoreNone);
 
             iEnd = iPos;
         }
 
         if (iEnd != 0)
             inputFIFO->ungetLine(
-                sTmpStr.substr(0, iEnd).c_str(), 
-                false);
+                sTmpStr.substr(0, iEnd).c_str(),
+                IgnoreNone);
     }
 
     return iRet;
@@ -583,10 +589,10 @@ int Parser::FindMacros(string &sLine, string &sOut)
 
 macro *Parser::GetMacroPtr(const char *macName)
 {
-    map <const char *, macro *>::iterator itr;
-    
+    map<const char *, macro *, Parser_ltstr>::iterator itr;
+
     itr = m_macroMap.find(macName);
-    return itr == m_macroMap.end() ? NULL : itr->second;
+    return itr == m_macroMap.end() ? nullptr : itr->second;
 }
 
 int Parser::ExpandMacro(macro *pMacro, string &sMacro, string &sTargetString)
@@ -598,7 +604,7 @@ int Parser::ExpandMacro(macro *pMacro, string &sMacro, string &sTargetString)
     vector<string> args;
 
     int iNumArgs = GetMacroArgs(pMacro->sName, sMacro, args, pMacro->iType);
-    
+
     if (iNumArgs == -1)
     {
         return -1;
@@ -608,13 +614,15 @@ int Parser::ExpandMacro(macro *pMacro, string &sMacro, string &sTargetString)
 
     if (iNumArgs != iNumSyms)
     {
-        ThrowError("MACRO '%s' expected %d arguments, got %d", 
+        ThrowError("MACRO '%s' expected %d arguments, got %d",
                     pMacro->sName.c_str(), iNumSyms, iNumArgs);
         return -1;
     }
 
+    string exp_string = std::to_string(num_expansions++);
+
     vector<string>::iterator pCurLine;
-    for 
+    for
     (
         pCurLine  = pMacro->codeVector.begin();
         pCurLine != pMacro->codeVector.end();
@@ -632,18 +640,18 @@ int Parser::ExpandMacro(macro *pMacro, string &sMacro, string &sTargetString)
         vector<string>::iterator pSym;
         vector<string>::iterator pArg;
 
-        for 
+        for
         (
             pSym  = pMacro->argVector.begin(), pArg = args.begin();
-            pSym != pMacro->argVector.end(); 
+            pSym != pMacro->argVector.end();
             ++pSym, ++pArg
         )
-        {           
+        {
             // Set the symbol we will search for
             sSearch = "%";
             sSearch += *pSym;
             sSearch += '%';
-            
+
             // Now do a search and replace
             iPos  = sMutableLine.find(sSearch);
             iSkip = 0;
@@ -659,6 +667,26 @@ int Parser::ExpandMacro(macro *pMacro, string &sMacro, string &sTargetString)
             }
         }
 
+        // Expand any %% that remain to a unique string representing the
+        // number of macro expansions we've had..
+        {
+            sSearch = "%%";
+
+            // Now do a search and replace
+            iPos  = sMutableLine.find(sSearch);
+            iSkip = 0;
+
+            // If we found it, replace all occurances
+            while (iPos != string::npos)
+            {
+                iSkip = iPos + exp_string.length();
+                sMutableLine.replace(iPos, sSearch.length(), exp_string);
+
+                // Find again
+                iPos = sMutableLine.find(sSearch, iSkip);
+            }
+        }
+
         sTargetString += sMutableLine;
     }
 
@@ -667,35 +695,52 @@ int Parser::ExpandMacro(macro *pMacro, string &sMacro, string &sTargetString)
 
 int Parser::GetMacroArgs(macro *pMacro, string &sMacro)
 {
-    int iNum = 0;
-    string s;
-    string::size_type iPos;
+    int iNum = -1;
 
-    if (pMacro == NULL)
+    if (pMacro && pMacro->iType == mUNKNOWN)
     {
-        iNum = -1;
-    }
-    else
-    {
-        if (pMacro->iType == mUNKNOWN)
+        string::size_type iPos = 0;
+
+        // Ugly: Find MACRO case-insensitively so we can skip it.  :-P
+        while (1)
         {
-            // Get to the first char of the macro name
-            iPos = sMacro.find(pMacro->sName);
+            iPos = sMacro.find_first_of("mM", iPos);
 
-            s = sMacro.substr(iPos);
-
-            iPos = s.find_first_of('(');
             if (iPos == string::npos)
+                break;
+
+            if (stricmp_("MACRO", sMacro.substr(iPos,5).c_str()) == 0 &&
+                sMacro.length() > iPos + 5 && isspace(sMacro[iPos+5]))
             {
-                pMacro->iType = mNOPAREN;
+                iPos += 6;
+                break;
             }
-            else
-            {
-                pMacro->iType = mPAREN;
-            }
+            iPos++;
         }
 
-        iNum = GetMacroArgs(pMacro->sName, s, 
+        if (iPos == string::npos)
+        {
+            ThrowError("Unable to find MACRO keyword in macro string %s",
+                        sMacro.c_str());
+            return -1;
+        }
+
+        // Get to the first char of the macro name
+        iPos = sMacro.find(pMacro->sName, iPos);
+
+        string s = sMacro.substr(iPos);
+
+        iPos = s.find_first_of('(');
+        if (iPos == string::npos)
+        {
+            pMacro->iType = mNOPAREN;
+        }
+        else
+        {
+            pMacro->iType = mPAREN;
+        }
+
+        iNum = GetMacroArgs(pMacro->sName, s,
                             pMacro->argVector, pMacro->iType);
     }
 
@@ -709,13 +754,34 @@ int Parser::GetMacroArgs(string &sMacName, string &sMacro, vector<string> &argVe
     bool bDone = false;
     bool bAdd;
     string sTemp;
-    string::size_type iPos;
+    string::size_type iPos = 0;
 
-    iPos = sMacro.find(sMacName);
+    // Ugly: Find MACRO case-insensitively so we can skip it.  :-P
+    while (1)
+    {
+        iPos = sMacro.find_first_of("mM", iPos);
+
+        if (iPos == string::npos)
+            break;
+
+        if (stricmp_("MACRO", sMacro.substr(iPos,5).c_str()) == 0 &&
+            sMacro.length() > iPos + 5 && isspace(sMacro[iPos+5]))
+        {
+            iPos += 6;
+            break;
+        }
+        iPos++;
+    }
+
+    // MACRO keyword may have already been stripped... ugh
+    if (iPos == string::npos)
+        iPos = 0;
+
+    iPos = sMacro.find(sMacName, iPos);
 
     if (iPos == string::npos)
     {
-        ThrowError("Unable to find macro name %s in macro string %s", 
+        ThrowError("Unable to find macro name %s in macro string %s",
                    sMacName.c_str(), sMacro.c_str());
         return -1;
     }
@@ -727,7 +793,7 @@ int Parser::GetMacroArgs(string &sMacName, string &sMacro, vector<string> &argVe
         {
             if (iPos < sMacro.length() && !isspace(sMacro[iPos]))
             {
-                ThrowError("Macro %s does not match macro name %s", 
+                ThrowError("Macro %s does not match macro name %s",
                            sMacro.c_str(), sMacName.c_str());
                 return -1;
             }
@@ -740,7 +806,7 @@ int Parser::GetMacroArgs(string &sMacName, string &sMacro, vector<string> &argVe
 
             if (sMacro[iPos] != '(')
             {
-                ThrowError("Opening parenthesis not found for macro \"%s\"", 
+                ThrowError("Opening parenthesis not found for macro \"%s\"",
                            sMacro.c_str());
                 return -1;
             }
@@ -758,15 +824,15 @@ int Parser::GetMacroArgs(string &sMacName, string &sMacro, vector<string> &argVe
 
         // Grab each of the params
         while (!bDone)
-        {           
+        {
             sTemp.erase();
-        
+
             // Eat whitespace
             for (; iPos < sMacro.length() && isspace(sMacro[iPos]) ; iPos++)
                 ;
 
             bAdd = false;
-            
+
             do
             {
                 c = iPos < sMacro.length() ? sMacro[iPos++] : NUL;
@@ -774,7 +840,7 @@ int Parser::GetMacroArgs(string &sMacName, string &sMacro, vector<string> &argVe
                 if (c == '(')
                 {
                     sTemp += c;
-                    
+
                     if (iBracket == 0)
                     {
                         iParen++;
@@ -786,7 +852,7 @@ int Parser::GetMacroArgs(string &sMacName, string &sMacro, vector<string> &argVe
                     {
                         iParen--;
                     }
-                    
+
                     // If iParen is 0, we have reached the end of the macro
                     if (iParen == 0)
                     {
@@ -846,7 +912,7 @@ int Parser::GetMacroArgs(string &sMacName, string &sMacro, vector<string> &argVe
                     {
                         sTemp += c;
                     }
-                }               
+                }
                 else if (c == NUL)
                 {
                     if (iType == mNOPAREN)
@@ -870,7 +936,7 @@ int Parser::GetMacroArgs(string &sMacName, string &sMacro, vector<string> &argVe
                     }
 
                     bDone = true;
-                }               
+                }
                 else
                 {
                     sTemp += c;
@@ -880,10 +946,10 @@ int Parser::GetMacroArgs(string &sMacName, string &sMacro, vector<string> &argVe
                 {
                     // Eat trailing whitespace
                     iTempPos = sTemp.length() - 1;
-            
+
                     if (iTempPos >= 0)
                     {
-                        for (; ((iTempPos >= 0) && isspace(sTemp[iTempPos])); iTempPos--) 
+                        for (; ((iTempPos >= 0) && isspace(sTemp[iTempPos])); iTempPos--)
                             /* empty */;
 
                         sTemp = sTemp.substr(0, iTempPos+1);
@@ -936,12 +1002,12 @@ int Parser::StripReturn(char *s)
 {
     char *pC = strchr(s, '\r');
 
-    if (pC != NULL)
+    if (pC != nullptr)
         *pC = NUL;
 
     pC = strchr(s, '\n');
 
-    if (pC != NULL)
+    if (pC != nullptr)
         *pC = NUL;
 
     return 1;

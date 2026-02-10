@@ -23,15 +23,15 @@ typedef struct ay8910_t ay8910_t;
 
 typedef struct demo_t
 {
-    FILE        *f;
+    FILE       *f;
 
-    uint_16     btab[240];
-    uint_8      gram[512];
-    uint_16     stic[32];
+    uint16_t    btab[240];
+    uint8_t     gram[512];
+    uint16_t    stic[32];
 
-    ay8910_t    *psg0, *psg1;
-    uint_16     psg0_reg[16];
-    uint_16     psg1_reg[16];
+    ay8910_t   *psg0, *psg1;
+    uint16_t    psg0_reg[16];
+    uint16_t    psg1_reg[16];
 } demo_t;
 
 /* ======================================================================== */
@@ -39,7 +39,7 @@ typedef struct demo_t
 /* ======================================================================== */
 void demo_tick
 (
-    demo_t      *demo,
+    demo_t        *demo,
     struct stic_t *stic
 );
 
@@ -68,9 +68,9 @@ void demo_dtor(demo_t *demo);
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                 Copyright (c) 2005-+Inf, Joseph Zbiciak                  */
 /* ======================================================================== */

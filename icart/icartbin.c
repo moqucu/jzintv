@@ -1,21 +1,5 @@
 /* ======================================================================== */
 /*  Routines for reading/writing a .BIN+.CFG to/from an icartrom_t.         */
-/* ------------------------------------------------------------------------ */
-/*  This program is free software; you can redistribute it and/or modify    */
-/*  it under the terms of the GNU General Public License as published by    */
-/*  the Free Software Foundation; either version 2 of the License, or       */
-/*  (at your option) any later version.                                     */
-/*                                                                          */
-/*  This program is distributed in the hope that it will be useful,         */
-/*  but WITHOUT ANY WARRANTY; without even the implied warranty of          */
-/*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
-/*  General Public License for more details.                                */
-/*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
-/* ------------------------------------------------------------------------ */
-/*                 Copyright (c) 1998-2001, Joseph Zbiciak                  */
 /* ======================================================================== */
 
 #include <stdio.h>
@@ -24,14 +8,17 @@
 #include "config.h"
 #include "icart/icartrom.h"
 #include "icart/icartbin.h"
+#include "lzoe/lzoe.h"
 #include "bincfg/bincfg.h"
-
+#include "metadata/metadata.h"
+#include "metadata/cfgvar_metadata.h"
+#include "misc/printer.h"
 
 /* ======================================================================== */
 /*  ICB_SHOW_RANGES                                                         */
 /*  Shows a list of ranges of addresses represented by a bit-vector.        */
 /* ======================================================================== */
-void icb_show_ranges(uint_32 *bv)
+void icb_show_ranges(uint32_t *bv)
 {
     int lo, hi, i;
 
@@ -79,7 +66,7 @@ int icb_write_mappings(FILE *fb, FILE *fc, icartrom_t *icart, int ofs)
     if (i == 8)
         return 0;
 
-    fprintf(fc, "[mapping]\r\n");
+    fprintf(fc, "[mapping]\015\012");
 
     /* -------------------------------------------------------------------- */
     /*  Iterate over all 256 256-decle pages, with a little slop at both    */
@@ -92,8 +79,8 @@ int icb_write_mappings(FILE *fb, FILE *fc, icartrom_t *icart, int ofs)
 
         idx = i >> 5;
         shf = i & 31;
-        if (i < 256 && 
-            (1 & ((icart->preload [idx] & 
+        if (i < 256 &&
+            (1 & ((icart->preload [idx] &
                    icart->readable[idx]) >> shf)))
         {
             hi = i;
@@ -104,7 +91,7 @@ int icb_write_mappings(FILE *fb, FILE *fc, icartrom_t *icart, int ofs)
             {
                 lo <<= 8;
                 hi = (hi << 8) + 0x100;
-                fprintf(fc, "$%.4X - $%.4X = $%.4X\r\n", 
+                fprintf(fc, "$%.4X - $%.4X = $%.4X\015\012",
                         ofs, ofs + hi - lo - 1, lo);
                 for (j = lo; j < hi; j++)
                 {
@@ -139,7 +126,7 @@ int icb_write_preloads(FILE *fb, FILE *fc, icartrom_t *icart, int ofs)
     if (i == 8)
         return 0;
 
-    fprintf(fc, "[preload]\r\n");
+    fprintf(fc, "[preload]\015\012");
 
     /* -------------------------------------------------------------------- */
     /*  Iterate over all 256 256-decle pages, with a little slop at both    */
@@ -152,8 +139,8 @@ int icb_write_preloads(FILE *fb, FILE *fc, icartrom_t *icart, int ofs)
 
         idx = i >> 5;
         shf = i & 31;
-        if (i < 256 && 
-            (1 & (( icart->preload [idx] & 
+        if (i < 256 &&
+            (1 & (( icart->preload [idx] &
                    ~icart->readable[idx]) >> shf)))
         {
             hi = i;
@@ -164,7 +151,7 @@ int icb_write_preloads(FILE *fb, FILE *fc, icartrom_t *icart, int ofs)
             {
                 lo <<= 8;
                 hi = (hi << 8) + 0x100;
-                fprintf(fc, "$%.4X - $%.4X = $%.4X\r\n", 
+                fprintf(fc, "$%.4X - $%.4X = $%.4X\015\012",
                         ofs, ofs + hi - lo - 1, lo);
                 for (j = lo; j < hi; j++)
                 {
@@ -202,7 +189,7 @@ void icb_write_banksw(FILE *fc, icartrom_t *icart)
     /*  Iterate over all 256 256-decle pages, with a little slop at both    */
     /*  ends of the spectrum.  Look for spans of pages that are banksw.     */
     /* -------------------------------------------------------------------- */
-    fprintf(fc, "[bankswitch]\r\n");
+    fprintf(fc, "[bankswitch]\015\012");
     for (i = 0, lo = hi = -1; i <= 256; i++)
     {
         int idx, shf;
@@ -217,7 +204,7 @@ void icb_write_banksw(FILE *fc, icartrom_t *icart)
         {
             if (lo != -1)
             {
-                fprintf(fc, "$%.4X - $%.4X\r\n",
+                fprintf(fc, "$%.4X - $%.4X\015\012",
                         lo << 8, (hi << 8) + 0xFF);
             }
             hi = lo = -1;
@@ -225,79 +212,98 @@ void icb_write_banksw(FILE *fc, icartrom_t *icart)
     }
 }
 
+LOCAL const struct
+{
+    uint8_t     want_read;
+    uint8_t     want_write;
+    uint8_t     want_narrow;
+    uint8_t     preload_ok;     /* Can match this if PRELOAD set */
+    const char *name;
+} memattr_types[6] =
+{
+    {   1, 0, 1, 0, "ROM 8"   },
+    {   1, 0, 0, 0, "ROM 16"  },
+    {   0, 1, 1, 1, "WOM 8"   },
+    {   0, 1, 0, 1, "WOM 16"  },
+    {   1, 1, 1, 1, "RAM 8"   },
+    {   1, 1, 0, 1, "RAM 16"  },
+};
+
 /* ======================================================================== */
 /*  ICB_WRITE_MEMATTR                                                       */
 /*  Writes the [memattr] section.  These are sections marked as RAM.        */
 /* ======================================================================== */
 void icb_write_memattr(FILE *fc, icartrom_t *icart)
 {
-    int lo, hi, i;
+    int lo, hi, i, t;
+    int first = 1;
 
     /* -------------------------------------------------------------------- */
-    /*  Make sure at least one page is 'writable.'                          */
-    /*  If there are none, then don't output a [memattr] section.           */
+    /*  Iterate over all 256 256-decle pages, with a little slop at both    */
+    /*  ends of the spectrum.  Look for spans of pages that fit one of      */
+    /*  RAM 8, RAM 16, WOM 8, or WOM 16.                                    */
     /* -------------------------------------------------------------------- */
-    for (i = 0; i < 8; i++)
-        if (icart->writable[i])
-            break;
-    if (i == 8)
+    for (t = 0; t < (int)(sizeof(memattr_types)/sizeof(memattr_types[0])); t++)
+    {
+        const int want_read   = memattr_types[t].want_read;
+        const int want_write  = memattr_types[t].want_write;
+        const int want_narrow = memattr_types[t].want_narrow;
+        const int preload_ok  = memattr_types[t].preload_ok;
+
+        for (i = 0, lo = hi = -1; i <= 256; i++)
+        {
+            const int idx = (i >> 5) & 7;
+            const int shf = i & 31;
+            const int got_read    = (icart->readable[idx] >> shf) & 1;
+            const int got_write   = (icart->writable[idx] >> shf) & 1;
+            const int got_narrow  = (icart->narrow  [idx] >> shf) & 1;
+            const int got_preload = (icart->preload [idx] >> shf) & 1;
+
+            if (i < 256 &&
+                want_read   == got_read  &&
+                want_write  == got_write &&
+                want_narrow == got_narrow &&
+                preload_ok  >= got_preload)
+            {
+                hi = i;
+                if (lo == -1) { lo = i; }
+            } else
+            {
+                if (lo != -1)
+                {
+                    if (first)
+                    {
+                        fprintf(fc, "[memattr]\015\012");
+                        first = 0;
+                    }
+                    fprintf(fc, "$%.4X - $%.4X = %s\015\012",
+                            lo << 8, (hi << 8) + 0xFF,
+                            memattr_types[t].name);
+                }
+                hi = lo = -1;
+            }
+        }
+    }
+}
+
+/* ======================================================================== */
+/*  ICB_WRITE_CFGVARS    -- Write [vars] section from metadata, if any.     */
+/* ======================================================================== */
+void icb_write_cfgvars(FILE *fc, icartrom_t *icart)
+{
+    cfg_var_t *cfgvars;
+    printer_t pf = printer_to_file(fc);
+
+    if (!icart->metadata)
         return;
 
-    fprintf(fc, "[memattr]\r\n");
-    /* -------------------------------------------------------------------- */
-    /*  Iterate over all 256 256-decle pages, with a little slop at both    */
-    /*  ends of the spectrum.  Look for spans of pages that are writable    */
-    /*  but not narrow.  These are RAM 16 spans.                            */
-    /* -------------------------------------------------------------------- */
-    for (i = 0, lo = hi = -1; i <= 256; i++)
-    {
-        int idx, shf;
+    cfgvars = cfgvars_from_game_metadata(icart->metadata);
 
-        idx = i >> 5;
-        shf = i & 31;
-        if (i < 256 && 
-            (1 & (( icart->writable [idx] & 
-                   ~icart->narrow   [idx]) >> shf)))
-        {
-            hi = i;
-            if (lo == -1) { lo = i; }
-        } else
-        {
-            if (lo != -1)
-            {
-                fprintf(fc, "$%.4X - $%.4X = RAM 16\r\n",
-                        lo << 8, (hi << 8) + 0xFF);
-            }
-            hi = lo = -1;
-        }
-    }
-    /* -------------------------------------------------------------------- */
-    /*  Iterate over all 256 256-decle pages, with a little slop at both    */
-    /*  ends of the spectrum.  Look for spans of pages that are writable    */
-    /*  and also narrow.  These are RAM 8 spans.                            */
-    /* -------------------------------------------------------------------- */
-    for (i = 0, lo = hi = -1; i <= 256; i++)
-    {
-        int idx, shf;
+    if (!cfgvars)
+        return;
 
-        idx = i >> 5;
-        shf = i & 31;
-        if (i < 256 && 
-            (1 & (( icart->writable [idx] & 
-                    icart->narrow   [idx]) >> shf)))
-        {
-            hi = i;
-            if (lo == -1) { lo = i; }
-        } else
-        {
-            if (lo != -1)
-            {
-                fprintf(fc, "$%.4X - $%.4X = RAM 8\r\n",
-                        lo << 8, (hi << 8) + 0xFF);
-            }
-            hi = lo = -1;
-        }
-    }
+    bc_print_varlike(&pf, cfgvars, "[vars]");
+    free_cfg_var_list( cfgvars );
 }
 
 /* ======================================================================== */
@@ -310,6 +316,7 @@ int icb_write_bincfg(FILE *fb, FILE *fc, icartrom_t *icart, int ofs)
     ofs = icb_write_preloads(fb, fc, icart, ofs);
     icb_write_memattr(fc, icart);
     icb_write_banksw (fc, icart);
+    icb_write_cfgvars(fc, icart);
 
     return ofs;
 }
@@ -368,9 +375,8 @@ void icb_show_summary(icartrom_t *icart)
 /* ======================================================================== */
 static void icb_apply_cfg(bc_cfgfile_t *bc, icartrom_t *icart, int loud)
 {
-    uint_32 ic_flags;
+    uint32_t ic_flags;
     bc_memspan_t *span;
-
 
     /* -------------------------------------------------------------------- */
     /*  Traverse the memspan list, calling icartrom_addseg on each.         */
@@ -405,12 +411,12 @@ static void icb_apply_cfg(bc_cfgfile_t *bc, icartrom_t *icart, int loud)
                    ((span->flags & BC_SPAN_B) ? ICARTROM_BANKSW  : 0) |
                    ((span->flags & BC_SPAN_N) ? ICARTROM_NARROW  : 0) |
    ((span->flags & (BC_SPAN_PL | BC_SPAN_PK)) ? ICARTROM_PRELOAD : 0);
-        
+
 
         if (loud)
         {
             printf("SEGMENT ofs %.4X  len %.4X  addr %.4X  "
-                    "FLAGS: %c%c%c%c%c\n", 
+                    "FLAGS: %c%c%c%c%c\n",
                    span->s_fofs, slen, span->s_addr,
                    ic_flags & ICARTROM_READ    ? 'R' : '-',
                    ic_flags & ICARTROM_WRITE   ? 'W' : '-',
@@ -435,19 +441,20 @@ static void icb_apply_cfg(bc_cfgfile_t *bc, icartrom_t *icart, int loud)
 /* ======================================================================== */
 /*  ICB_READ_BINCFG -- Reads a .BIN and optional .CFG file.                 */
 /* ======================================================================== */
-void icb_read_bincfg(char *bin_fn, char *cfg_fn, icartrom_t *the_icart)
+void icb_read_bincfg(char *bin_fn, char *cfg_fn, icartrom_t *the_icart,
+                     int loud)
 {
-    FILE *fc;
+    LZFILE *fc;
     bc_cfgfile_t *bc;
 
     /* -------------------------------------------------------------------- */
     /*  Read the .CFG file.  This process  open it, then parse it.          */
     /*  Otherwise, we skip it -- lack of .CFG file is non-fatal.            */
     /* -------------------------------------------------------------------- */
-    if (cfg_fn && (fc = fopen(cfg_fn, "r")) != NULL)
+    if (cfg_fn && (fc = lzoe_fopen(cfg_fn, "r")) != NULL)
     {
         bc = bc_parse_cfg(fc, bin_fn, cfg_fn);
-        fclose(fc);
+        lzoe_fclose(fc);
     } else
     {
         bc = bc_parse_cfg(NULL, bin_fn, NULL);
@@ -472,7 +479,18 @@ void icb_read_bincfg(char *bin_fn, char *cfg_fn, icartrom_t *the_icart)
     /* -------------------------------------------------------------------- */
     /*  Apply the configuration.  This generates the icartrom.              */
     /* -------------------------------------------------------------------- */
-    icb_apply_cfg(bc, the_icart, 1);
+    icb_apply_cfg(bc, the_icart, loud);
+
+    /* -------------------------------------------------------------------- */
+    /*  Move the metadata out of the bincfg and into us.                    */
+    /* -------------------------------------------------------------------- */
+    the_icart->metadata = bc->metadata;
+
+    /* -------------------------------------------------------------------- */
+    /*  If this were C++, it'd all be unique_ptr and move semantics. Here,  */
+    /*  we just NULL the pointer because we've stolen the storage.  HAHA!   */
+    /* -------------------------------------------------------------------- */
+    bc->metadata = NULL;
 
 #ifndef BC_NOFREE
     /* -------------------------------------------------------------------- */
@@ -494,9 +512,9 @@ void icb_read_bincfg(char *bin_fn, char *cfg_fn, icartrom_t *the_icart)
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                 Copyright (c) 1998-2001, Joseph Zbiciak                  */
 /* ======================================================================== */

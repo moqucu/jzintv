@@ -2,7 +2,6 @@
  * ============================================================================
  *  Title:    Platform-specific Initialization Functions
  *  Author:   J. Zbiciak
- *  $Id: plat.h,v 1.1 1999/09/12 10:28:17 im14u2c Exp $
  * ============================================================================
  *  All platform-specific initialization should be handled in plat_init().
  *  The default supported platform is "SDL".
@@ -10,10 +9,12 @@
  *  PLAT_INIT -- Platform-specific initialization. Returns non-zero on fail.
  * ============================================================================
  */
-#ifndef _PLAT_H_
-#define _PLAT_H_
+#ifndef PLAT_H_
+#define PLAT_H_
 
 int plat_init(void);
+
+bool plat_is_batch_mode(void);    /* Returns true if running in batch mode. */
 
 #endif /*PLAT_H*/
 /* ======================================================================== */
@@ -27,9 +28,9 @@ int plat_init(void);
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
-/*                 Copyright (c) 1998-1999, Joseph Zbiciak                  */
+/*                 Copyright (c) 1998-2020, Joseph Zbiciak                  */
 /* ======================================================================== */

@@ -13,6 +13,8 @@ SEE-ALSO:   frapsub.c, fraosub.c, as*.y;
 AUTHORS:    Mark Zenier;
 */
 
+/* note: 0..9 a..f A..F are taken for hex constants */
+
 #define IG_START    '['
 #define IG_END      ']'
 #define IG_CPCON    '#'
@@ -59,6 +61,11 @@ AUTHORS:    Mark Zenier;
 #define IFC_SWIDTH  'R'
 #define IFC_IWIDTH  'I'
 #define IFC_TESTERR 'T'
+#define IFC_CLASSIFY 'z'
+#define IFC_ROTL16  'g'
+#define IFC_ROTL32  'h'
+#define IFC_ROTR16  'i'
+#define IFC_ROTR32  'j'
 
 #define PCCASE_BIN  1
 #define PCCASE_UN   2
@@ -66,4 +73,4 @@ AUTHORS:    Mark Zenier;
 #define PCCASE_SYMB 4
 #define PCCASE_CONS 5
 #define PCCASE_PROGC    6
-
+#define PCCASE_CLASSSYM 7

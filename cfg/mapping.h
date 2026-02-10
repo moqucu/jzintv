@@ -16,15 +16,15 @@
 /*
  * ============================================================================
  *  CFG_EVTACT_T     -- Human-readable name associations for various jzIntv
- *                      event actions. 
+ *                      event actions.
  * ============================================================================
  */
-typedef struct cfg_evtact_t 
+typedef struct cfg_evtact_t
 {
     const char  *name;          /* Event action name                        */
-    v_uint_32   *word;          /* Word modified by input.                  */
-    uint_32     and_mask[2];    /* Up/down AND masks.                       */
-    uint_32     or_mask [2];    /* Up/down OR masks.                        */
+    uint32_t    *word;          /* Word modified by an input.               */
+    uint32_t    and_mask[2];    /* Up/down AND masks.                       */
+    uint32_t    or_mask [2];    /* Up/down OR masks.                        */
 } cfg_evtact_t;
 
 /*
@@ -55,8 +55,16 @@ extern          int cfg_event_action_cnt;
 /* ------------------------------------------------------------------------ */
 extern cfg_kbd_t cfg_key_bind[];
 
-#endif
+/* ------------------------------------------------------------------------ */
+/*  Some constants that need a better home:                                 */
+/* ------------------------------------------------------------------------ */
+#define PAUSE_NOP  (0)              /*  Nothing to do.                      */
+#define PAUSE_TOG  (1)              /*  Toggle pause on/off.                */
+#define PAUSE_ON   (2)              /*  Force pause on.                     */
+#define PAUSE_OFF  (3)              /*  Force pause off.                    */
+#define PAUSE_2SEC (4)              /*  2 second pause (window/fullsc flip) */
 
+#endif
 /* ======================================================================== */
 /*  This program is free software; you can redistribute it and/or modify    */
 /*  it under the terms of the GNU General Public License as published by    */
@@ -68,9 +76,9 @@ extern cfg_kbd_t cfg_key_bind[];
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                 Copyright (c) 1998-2000, Joseph Zbiciak                  */
 /* ======================================================================== */

@@ -20,15 +20,16 @@ P           = export PATH;
 
 SDL_DIR     = /usr/local
 
-SDL_CFLAGS = -mcrt=clib2 -ISDK:Local/clib2/include/SDL -ISDK:Local/common/include/SDL -ISDK:Local/clib2/include/boost 
+SDL1_CFLAGS = -mcrt=clib2 -ISDK:Local/clib2/include/SDL -ISDK:Local/common/include/SDL -ISDK:Local/clib2/include/boost 
 #-D_REENTRANT
-SDL_LFLAGS = -mcrt=clib2 -lSDL_gfx -lSDL_net -lSDL_image -ltiff -lpng -ljpeg -lz -lSDL_mixer -lsmpeg -lm -lvorbisfile -lvorbis -logg -lstdc++ -lSDL_ttf -lfreetype -lz -lsdlmain -lsdl -lauto -lport -lpthread -lm -lpthread -L/SDK/Local/clib2/lib/perl5
+SDL1_LFLAGS = -mcrt=clib2 -lSDL_gfx -lSDL_net -lSDL_image -ltiff -lpng -ljpeg -lz -lSDL_mixer -lsmpeg -lm -lvorbisfile -lvorbis -logg -lstdc++ -lSDL_ttf -lfreetype -lz -lsdlmain -lsdl -lauto -lport -lpthread -lm -lpthread -L/SDK/Local/clib2/lib/perl5
 #-L/SDK/PosixLib/AmigaOS4
-#SDL_CFLAGS := $(shell sdl-config --cflags)
-#SDL_LFLAGS := $(shell sdl-config --libs) 
+#SDL1_CFLAGS := $(shell sdl-config --cflags)
+#SDL1_LFLAGS := $(shell sdl-config --libs) 
 
-# Set "X" to be the executable extension
-X =        
+# Set "X" to be the executable extension, and "O" to be the object extension.
+X = 
+O = o
 
 # Set "RM" to be the remove/delete command
 RM = rm -f 
@@ -43,7 +44,7 @@ RM = rm -f
 #OPT_FLAGS = -ggdb 
 #OPT_FLAGS = -O
 #OPT_FLAGS = -O2 -ggdb
- OPT_FLAGS = -O6 -fomit-frame-pointer #-DBENCHMARK_STIC
+ OPT_FLAGS = -O3 -fomit-frame-pointer #-DBENCHMARK_STIC
 #OPT_FLAGS = -O2 -pg -ggdb -DLOCAL=
 
 CFLAGS   = $(OPT_FLAGS) $(WARN)   -I. -I.. $(DEF_FLAGS) $(EXTRA)
@@ -52,32 +53,30 @@ CXXFLAGS = $(OPT_FLAGS) $(WARNXX) -I. -I.. $(DEF_FLAGS) $(EXTRA)
 LFLAGS   = -L../lib 
 
 
-OBJS=jzintv.o
-PROG=$(B)/jzintv
-TOCLEAN=$(B)/jzintv core
+OBJS      = jzintv.$(O)
+PROG_SDL1 = $(B)/jzintv
+TOCLEAN   = $(B)/jzintv core
 
 #PROGS=$(PROG)
 
-CFLAGS += $(SDL_CFLAGS) 
-LFLAGS += $(SDL_LFLAGS)
+CFLAGS += $(SDL1_CFLAGS) 
+LFLAGS += $(SDL1_LFLAGS)
 
 ##############################################################################
 ## Generic build-rules
 ##############################################################################
 
-all: $(OBJS) $(PROG)
+all: build
 
-$(PROG): $(OBJS)
-	$(CC) -o $(PROG) $(OBJS) $(CFLAGS) $(LFLAGS)
+$(PROG_SDL1): $(OBJS) $(OBJS_SDL1)
+	$(CC) -o $(PROG_SDL1) $(OBJS) $(OBJS_SDL1) $(CFLAGS) $(LFLAGS)
 
 clean:
-	$(RM) $(OBJS) 
+	$(RM) $(OBJS) $(OBJS_SDL1)
 #	$(RM) $(TOCLEAN)
 
-%.o: %.c
+%.$(O): %.c
 	$(CC) -o $@ $(CFLAGS) -c $<
-
-#OBJS += pads/pads_cgc_linux.o
 
 ##############################################################################
 ## Makefile.common includes all the subMakefiles and such

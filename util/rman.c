@@ -1,4 +1,4 @@
-char *rman[11][16] = 
+char *rman[11][16] =
 {
     {
     "........####....",
@@ -220,7 +220,7 @@ int script[] =
  *  GFX_STIC_PALETTE -- The STIC palette.
  * ============================================================================
  */
-uint_8 palette[17][3] = 
+uint8_t palette[17][3] =
 {
     { 0x00, 0x00, 0x00 },
     { 0x00, 0x2D, 0xFF },
@@ -243,8 +243,8 @@ uint_8 palette[17][3] =
     { 0xFF, 0x80, 0x80 },
 };
 
-uint_8 curr[16*16];
-uint_8 prev[16*16];
+uint8_t curr[16*16];
+uint8_t prev[16*16];
 
 const char * typedesc[6] =
 {
@@ -260,12 +260,12 @@ int color_histo[65536];
 int color_votes[16];
 int color_map[16];
 
-uint_8 map_palette[16][3];
+uint8_t map_palette[16][3];
 
 int main(int argc, char *argv[])
 {
     FILE *fi, *fo;
-    uint_8 bbox[8][4];
+    uint8_t bbox[8][4];
     int fr, out_fr = 0;
     int flag;
     int i, j;
@@ -314,9 +314,9 @@ int main(int argc, char *argv[])
         int r;
 
         r = script[fr];
-        if (r < 0) 
-        { 
-            r = ~r; 
+        if (r < 0)
+        {
+            r = ~r;
             for (i = 0; i < 16; i++)
                 for (j = 0; j < 16; j++)
                     prev[i*16 + j] = rman[r][i][15 - j] == '#';
@@ -357,7 +357,7 @@ int main(int argc, char *argv[])
     fclose(fo);
 
     printf("Encoded %d unique frames\n", out_fr);
-    printf("Encoded %d bytes (%d bytes/source frame, %d bytes/unique frame)\n", 
+    printf("Encoded %d bytes (%d bytes/source frame, %d bytes/unique frame)\n",
             wrote, wrote / fr, wrote / out_fr);
     printf("GIF frame type breakdown:\n");
     for (i = 0; i < 6; i++)

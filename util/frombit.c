@@ -64,7 +64,7 @@ LOCAL line_t * get_line_t(void)
             fprintf(stderr,"Could not allocate new line_t structure\n");
             exit(1);
         }
-            
+
         for (i = 0; i < POOL_FILL-1; i++)
             line_t_pool[i].next = &line_t_pool[i+1];
 
@@ -135,13 +135,13 @@ LOCAL line_t * read_long_line(FILE * f)
     /* ==================================================================== */
     /*  Check for EOF.  If we're at the end, return a NULL line_t*.         */
     /* ==================================================================== */
-    if (feof(f)) 
+    if (feof(f))
         return NULL;
 
     /* ==================================================================== */
     /*  Now read as many chunks as we can until we reach a newline.         */
     /* ==================================================================== */
-    do 
+    do
     {
         /* ================================================================ */
         /*  Allocate a "chunk" structure.  A very long line will exist as   */
@@ -197,7 +197,7 @@ LOCAL line_t * read_long_line(FILE * f)
         /* ================================================================ */
         chunk->line[MAXCHUNK-1] = 0;
         chunk->len = strlen(chunk->line);
-        
+
         /* ================================================================ */
         /*  Is this the last chunk of the line?                             */
         /* ================================================================ */
@@ -316,7 +316,7 @@ int main(int argc, char *argv[])
     /* ==================================================================== */
     /*  Check to see if the user is asking for help.                        */
     /* ==================================================================== */
-    if (argc>1 && (!strcmp(argv[1],"-?")     || 
+    if (argc>1 && (!strcmp(argv[1],"-?")     ||
                    !strcmp(argv[1],"-h")     ||
                    !strcmp(argv[1],"--help")))
     {
@@ -379,7 +379,7 @@ int main(int argc, char *argv[])
         {
             val = (val << 1) + (*s++ == '1');
             bits++;
-            
+
             if (bits >= 8)
             {
                 *o++ = val;
@@ -396,7 +396,7 @@ int main(int argc, char *argv[])
     }
 
     if (bits > 0) { val <<= 8 - bits; *o++ = val; }
-            
+
     if (o - buf > 0)
         fwrite(buf,1,o-buf,fo);
 
@@ -426,9 +426,9 @@ int main(int argc, char *argv[])
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                 Copyright (c) 1998-2001, Joseph Zbiciak                  */
 /* ======================================================================== */

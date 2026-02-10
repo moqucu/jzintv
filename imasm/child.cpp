@@ -12,8 +12,8 @@ as published by the Free Software Foundation; either version 2
 of the License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of 
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the 
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
@@ -32,14 +32,14 @@ extern RegHelp g_reg;
 
 //-----------------------------------------------------------------------------
 // Name: ChildProc()
-// Desc: 
+// Desc:
 //-----------------------------------------------------------------------------
 LRESULT CALLBACK ChildProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     WndInfo *pWI;
 
-    switch (message) 
-    {   
+    switch (message)
+    {
         case WM_CREATE: // This happens when window is first created
         {
             pWI = new WndInfo;
@@ -47,7 +47,7 @@ LRESULT CALLBACK ChildProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
 
             pWI->kBytes = 200;
             pWI->bInsert = true;
-            
+
             pWI->hRichEd = CreateWindowEx(  0,
                                             g_szClass,
                                             NULL,
@@ -76,7 +76,7 @@ LRESULT CALLBACK ChildProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
 
                 SendMessage(pWI->hRichEd, EM_SETCHARFORMAT, (WPARAM)SCF_ALL, (LPARAM)&cfmt);
             }
-            
+
             if (g_bAutoUpdate)
             {
                 SetTimer(hWnd, UPDATETIMER, 20000, NULL);
@@ -90,10 +90,10 @@ LRESULT CALLBACK ChildProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
             SendMessage(    pWI->hRichEd,
                             EM_SETEVENTMASK,
                             (WPARAM)0,
-                            (LPARAM)(   ENM_KEYEVENTS | ENM_MOUSEEVENTS | 
+                            (LPARAM)(   ENM_KEYEVENTS | ENM_MOUSEEVENTS |
                                         ENM_SCROLLEVENTS | ENM_UPDATE |
                                         ENM_CHANGE | ENM_DROPFILES));
-                                        
+
             SetFocus(pWI->hRichEd);
             pWI->bIsDirty = false;
 
@@ -110,7 +110,7 @@ LRESULT CALLBACK ChildProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
                 g_hCurChild = NULL;
             }
             break;
-                    
+
         case WM_TIMER:
             HighlightDoc(GetDlgItem(hWnd, IDC_MAINRICHED));
             break;
@@ -139,19 +139,19 @@ LRESULT CALLBACK ChildProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
                                     SetWindowText(hWnd, "untitled*");
                                 }
                             }
-                            break;                  
+                            break;
                     }
                     break;
             }
             break;
 
-        case WM_NOTIFY: 
+        case WM_NOTIFY:
         {
             LPNMHDR pHdr = (LPNMHDR)lParam;
             pWI = (WndInfo *)GetWindowLong(hWnd, WL_INFOPTR);
 
-            switch (pHdr->code) 
-            { 
+            switch (pHdr->code)
+            {
                 case EN_DROPFILES:
                     pWI = (WndInfo *)GetWindowLong(hWnd, WL_INFOPTR);
 
@@ -161,7 +161,7 @@ LRESULT CALLBACK ChildProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
                         {
                             ENDROPFILES *pED = (ENDROPFILES *)lParam;
                             char szBuff[MAX_PATH];
-                            
+
                             UINT uNum = DragQueryFile((HDROP)pED->hDrop, 0xFFFFFFFF, szBuff, MAX_PATH);
 
                             if (uNum > 1)
@@ -197,7 +197,7 @@ LRESULT CALLBACK ChildProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
                                 pWI = (WndInfo *)GetWindowLong(hWnd, WL_INFOPTR);
                                 if (pWI)
                                 {
-                                    pWI->bInsert = !pWI->bInsert;                               
+                                    pWI->bInsert = !pWI->bInsert;
                                 }
                             }
                         }
@@ -205,10 +205,10 @@ LRESULT CALLBACK ChildProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
                     }
                     break;
                 }
-                
-                default: 
-                    break; 
-            } 
+
+                default:
+                    break;
+            }
             break;
         }
 
@@ -216,14 +216,14 @@ LRESULT CALLBACK ChildProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
             ConfirmSave(hWnd);
             DestroyWindow(hWnd);
             break;
-        
+
         case WM_SIZE:  // Get size of client
         {
             int iClientX = LOWORD(lParam);
             int iClientY = HIWORD(lParam);
-                
+
             pWI = (WndInfo *)GetWindowLong(hWnd, WL_INFOPTR);
-            
+
             if (pWI)
             {
                 if (pWI->hRichEd)
@@ -234,7 +234,7 @@ LRESULT CALLBACK ChildProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
 
             break; // WM_SIZE
         }
-        
+
         case WM_DESTROY:
         {
             WndInfo *pWI = (WndInfo *)GetWindowLong(hWnd, WL_INFOPTR);
@@ -246,10 +246,10 @@ LRESULT CALLBACK ChildProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
             break; // WM_DESTROY
         }
 
-        default:    // Otherwise, let Windows process message       
+        default:    // Otherwise, let Windows process message
             break;
    }// end switch
-   
+
    return DefMDIChildProc(hWnd, message, wParam, lParam);
 }
 

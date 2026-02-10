@@ -2,14 +2,18 @@
 ## subMakefile for debug
 ##############################################################################
 
-debug/debug.o: debug/debug.c debug/debug_.h debug/subMakefile config.h
-debug/debug.o: debug/debug_dasm1600.h periph/periph.h cp1600/cp1600.h
-debug/debug.o: speed/speed.h gfx/gfx.h stic/stic.h demo/demo.h
-debug/debug.o: plat/plat_lib.h cp1600/req_bus.h 
-debug/debug.o: misc/avl.h util/symtab.h debug/debug_tag.h
-debug/debug_dasm1600.o: debug/debug_dasm1600.c debug/debug_dasm1600.h 
-debug/debug_dasm1600.o: debug/subMakefile config.h 
-debug/debug_dasm1600.o: plat/plat_lib.h misc/avl.h util/symtab.h
-debug/source.o: config.h file/file.h debug/debug_tag.h asm/typetags.h
+debug/debug.$(O): debug/debug.c debug/debug_.h debug/subMakefile config.h
+debug/debug.$(O): debug/debug_dasm1600.h periph/periph.h cp1600/cp1600.h
+debug/debug.$(O): speed/speed.h gfx/gfx.h gfx/palette.h stic/stic.h demo/demo.h
+debug/debug.$(O): plat/plat_lib.h cp1600/req_q.h event/event.h
+debug/debug.$(O): misc/avl.h util/symtab.h debug/debug_tag.h debug/debug_if.h
+debug/debug_dasm1600.$(O): debug/debug_dasm1600.c debug/debug_dasm1600.h 
+debug/debug_dasm1600.$(O): debug/subMakefile config.h 
+debug/debug_dasm1600.$(O): plat/plat_lib.h misc/avl.h util/symtab.h
+debug/source.$(O): config.h file/file.h debug/debug_tag.h asm/typetags.h
 
-OBJS+=debug/debug.o debug/debug_dasm1600.o util/symtab.o debug/source.o
+OBJS += debug/debug.$(O) debug/debug_dasm1600.$(O)
+OBJS += util/symtab.$(O) debug/source.$(O)
+
+debug/debug.$(O):
+	$(CC) $(FO)debug/debug.$(O) $(CFLAGS) $(RL_CFLAGS) -c debug/debug.c

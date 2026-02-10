@@ -5,20 +5,6 @@
 /*  ECScable monitor must have a compatible memory map ahead of time for    */
 /*  this to work.                                                           */
 /* ------------------------------------------------------------------------ */
-/*  This program is free software; you can redistribute it and/or modify    */
-/*  it under the terms of the GNU General Public License as published by    */
-/*  the Free Software Foundation; either version 2 of the License, or       */
-/*  (at your option) any later version.                                     */
-/*                                                                          */
-/*  This program is distributed in the hope that it will be useful,         */
-/*  but WITHOUT ANY WARRANTY; without even the implied warranty of          */
-/*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
-/*  General Public License for more details.                                */
-/*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
-/* ------------------------------------------------------------------------ */
 /*                 Copyright (c) 2001-+Inf, Joseph Zbiciak                  */
 /* ======================================================================== */
 
@@ -49,10 +35,10 @@ char *rom_errors[] =
 
 
 volatile int please_die = 0;
- 
+
 void die(int x)
 {
-    UNUSED(x); 
+    UNUSED(x);
 
     if (please_die > 2)
     {
@@ -66,9 +52,9 @@ void die(int x)
 
 void do_title(icartrom_t *ic, ecscable_t *ec)
 {
-    uint_16 addr;
+    uint16_t addr;
     int year, i;
-    uint_16 ctitle[20];
+    uint16_t ctitle[20];
     char buf[21];
 
     addr = (ic->image[0x500A] & 0x00FF) | ((ic->image[0x500B] & 0x00FF) << 8);
@@ -108,7 +94,7 @@ int main(int argc, char *argv[])
     int len, decoded, i, lo, hi;
     int ecs_rom_enable = -1;
     ecscable_t ec;
-    uint_8 *rom_img;
+    uint8_t *rom_img;
     icartrom_t the_icart;
 
     if (argc < 2)
@@ -121,7 +107,7 @@ usage:
                         );
         exit(1);
     }
-    
+
     if (!strncmp(argv[1], "-e", 2))
     {
         ecs_rom_enable = atoi(argv[1]+2);
@@ -168,7 +154,7 @@ usage:
     fclose(f);
 
     icartrom_init(&the_icart);
-    decoded = icartrom_decode(&the_icart, rom_img, 0);
+    decoded = icartrom_decode(&the_icart, rom_img, len, 0, 1);
     free(rom_img);
 
     if (decoded < 0)
@@ -180,9 +166,9 @@ usage:
     }
 
     /* Actually load the game and reset to it. */
-    if (ec_reset_intv(&ec, 1) < 0) 
+    if (ec_reset_intv(&ec, 1) < 0)
     {
-        fprintf(stderr,"failed to reset\n"); exit(1); 
+        fprintf(stderr,"failed to reset\n"); exit(1);
     }
     if (ec_ping(&ec)<0) { fprintf(stderr,"failed to ping unit\n"); exit(1); }
     if (please_die) exit(0);
@@ -203,8 +189,8 @@ usage:
             if (lo != -1)
             {
                 lo <<= 8;
-                hi = (hi << 8) + 0x100; 
-                printf("Loading range %.4X - %.4X... ", lo, hi - 1); 
+                hi = (hi << 8) + 0x100;
+                printf("Loading range %.4X - %.4X... ", lo, hi - 1);
                 fflush(stdout);
                 ec_upload(&ec, lo, hi - lo, the_icart.image + lo, -1, 1);
                 printf("Done.\n");
@@ -233,9 +219,9 @@ usage:
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ------------------------------------------------------------------------ */
 /*                 Copyright (c) 2001-+Inf, Joseph Zbiciak                  */
 /* ======================================================================== */

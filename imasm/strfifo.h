@@ -12,8 +12,8 @@ as published by the Free Software Foundation; either version 2
 of the License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of 
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the 
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
@@ -30,8 +30,13 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <list>
 #include <string>
 #include <iostream>
+#include "c_wrap.h"
 
-using namespace std;
+struct IgnoreFlags
+{
+    bool skip_parse;    // If set, do not parse this line.
+    bool skip_macro;    // If set, do not expand macros.
+};
 
 /* ======================================================================== */
 /*  StringFIFO is a generic FIFOing mechanism for providing I/O between     */
@@ -54,18 +59,18 @@ using namespace std;
 class StringFIFO
 {
     private:
-        static const int max_looping = 4000;
-        static const int max_queue   = 4000;
+        static const int max_looping = 400000;
+        static const int max_queue   = 400000;
 
     public:
         StringFIFO() : looping(0), q_depth(0),
                        lineNo(0), fname("<internal>") { }
         virtual ~StringFIFO() { }
 
-        virtual bool getLine(char *buf,  int  maxlen, bool &Ignore);
-        virtual bool getLine(char **buf, int *buflen, bool &Ignore);
+        virtual bool getLine(char *buf,  int  maxlen, IgnoreFlags &Ignore);
+        virtual bool getLine(char **buf, int *buflen, IgnoreFlags &Ignore);
 
-        virtual bool getLine(string &str, bool &Ignore)
+        virtual bool getLine(std::string &str, IgnoreFlags &Ignore)
         {
             if (queue.empty())
                 return false;
@@ -74,8 +79,8 @@ class StringFIFO
             if (looping > max_looping)
                 throw LoopingExceeded(max_looping);
 
-            str    = *(queue.begin());
-            Ignore = *(Ignore_queue.begin());
+            str    = queue.front();
+            Ignore = Ignore_queue.front();
 
             queue.pop_front();
             Ignore_queue.pop_front();
@@ -84,17 +89,17 @@ class StringFIFO
             return true;
         }
 
-        virtual void putLine(const char *buf, bool Ignore)
+        virtual void putLine(const char *buf, IgnoreFlags Ignore)
         {
             q_depth++;
-            queue.push_back(string(buf));
+            queue.push_back(std::string(buf));
             Ignore_queue.push_back(Ignore);
 
             if (q_depth > max_queue)
                 throw QueueDepthExceeded(max_queue);
         }
 
-        virtual void putLine(const string &str, bool Ignore)
+        virtual void putLine(const std::string &str, IgnoreFlags Ignore)
         {
             q_depth++;
             queue.push_back(str);
@@ -104,17 +109,17 @@ class StringFIFO
                 throw QueueDepthExceeded(max_queue);
         }
 
-        virtual void ungetLine(const char *buf, bool Ignore)
+        virtual void ungetLine(const char *buf, IgnoreFlags Ignore)
         {
             q_depth++;
-            queue.push_front(string(buf));
+            queue.push_front(std::string(buf));
             Ignore_queue.push_front(Ignore);
 
             if (q_depth > max_queue)
                 throw QueueDepthExceeded(max_queue);
         }
 
-        virtual void ungetLine(const string &str, bool Ignore)
+        virtual void ungetLine(const std::string &str, IgnoreFlags Ignore)
         {
             q_depth++;
             queue.push_front(str);
@@ -128,9 +133,9 @@ class StringFIFO
         virtual bool isEmpty(void) { return queue.empty(); }
         virtual bool isEOF(void)   { return queue.empty(); }
 
-        virtual void didLoop(void) 
-        { 
-            looping++;            
+        virtual void didLoop(void)
+        {
+            looping++;
 
             if (looping > max_looping)
             {
@@ -179,9 +184,9 @@ class StringFIFO
         int looping;
         int q_depth;
 
-        list<string> queue;
-        list<bool> Ignore_queue;
-        
+        std::list<std::string>  queue;
+        std::list<IgnoreFlags>  Ignore_queue;
+
         loc location;
         int lineNo;
         const char *fname;
@@ -194,12 +199,12 @@ class StringFIFO_fromFile : public StringFIFO
         StringFIFO_fromFile(const char *f_name);
         ~StringFIFO_fromFile();
 
-        bool getLine(char *buf,  int  maxlen, bool &Ignore);
-        bool getLine(char **buf, int *buflen, bool &Ignore);
-        bool getLine(string &str, bool &Ignore);
+        bool getLine(char *buf,  int  maxlen, IgnoreFlags &Ignore);
+        bool getLine(char **buf, int *buflen, IgnoreFlags &Ignore);
+        bool getLine(std::string &str, IgnoreFlags &Ignore);
         bool isEOF(void);
     private:
-        ifstream inFile;
+        std::ifstream inFile;
 };
 
 
@@ -209,58 +214,48 @@ class StringFIFO_toFile : public StringFIFO
         StringFIFO_toFile(const char *f_name);
         ~StringFIFO_toFile();
 
-        bool getLine(char  *buf, int  maxlen, bool &Ignore);
-        bool getLine(char **buf, int *buflen, bool &Ignore);
-        bool getLine(string &str, bool &Ignore);
-        void putLine(const char *buf, bool Ignore);
-        void putLine(const string &str, bool Ignore);
-        void ungetLine(const char *buf, bool Ignore);
-        void ungetLine(const string &str, bool Ignore);
+        bool getLine(char  *buf, int  maxlen, IgnoreFlags &Ignore);
+        bool getLine(char **buf, int *buflen, IgnoreFlags &Ignore);
+        bool getLine(std::string &str, IgnoreFlags &Ignore);
+        void putLine(const char *buf, IgnoreFlags Ignore);
+        void putLine(const std::string &str, IgnoreFlags Ignore);
+        void ungetLine(const char *buf, IgnoreFlags Ignore);
+        void ungetLine(const std::string &str, IgnoreFlags Ignore);
         bool isEmpty(void) { return true;  }
         bool isEOF(void)   { return false; }
 
     private:
-        ofstream outFile;
+        std::ofstream outFile;
 };
 
-static const int hbSize = 1 << 16;
+static const int hbSize = 1 << 24;
 
-class StringFIFO_fromCallback : public StringFIFO
+class StringFIFO_fromCallback : public StringFIFO, parser_callbacks
 {
     public:
         StringFIFO_fromCallback
         (
-            int (*gl)(char*,int,int*,void*), // getline callback function
-            void *glo               = NULL,  // opaque ptr passed to getline
-            const char*(*gp)(int *,void*) = NULL,  // get_pos callback function
-            void *gpo               = NULL,  // opaque ptr passed to get_pos
-            int (*ge)(void*)        = NULL,  // get_eof callback function
-            void *geo               = NULL,  // opaque ptr passed to get_eof
-            int (*rx)(char*,int,int*,void*) = NULL, // reexam callback fxn
-            void *rxo               = NULL   // opaque ptr passed to reexam
-        ) : getline(gl), gl_opaque(glo), 
-            get_pos(gp), gp_opaque(gpo),
-            get_eof(ge), ge_opaque(geo),
-            reexam (rx), rx_opaque(rxo)
+            const parser_callbacks &pc
+        ) : parser_callbacks(pc)
         {
             is_eof = false;
             lineNo = 0;
             fname  = "<internal>";
             location.fname = fname;
         };
-        ~StringFIFO_fromCallback() 
+        ~StringFIFO_fromCallback()
         {
             if (location.fname && location.fname != fname)
                 delete[] location.fname;
         };
 
-        bool getLine(char  *buf, int  maxlen, bool &Ignore);
-        bool getLine(char **buf, int *buflen, bool &Ignore);
-        bool getLine(string &str, bool &Ignore);
-        void putLine(const char *buf, bool Ignore);
-        void putLine(const string &str, bool Ignore);
-        void ungetLine(const char *buf, bool Ignore);
-        void ungetLine(const string &str, bool Ignore);
+        bool getLine(char  *buf, int  maxlen, IgnoreFlags &Ignore);
+        bool getLine(char **buf, int *buflen, IgnoreFlags &Ignore);
+        bool getLine(std::string &str, IgnoreFlags &Ignore);
+        void putLine(const char *buf, IgnoreFlags Ignore);
+        void putLine(const std::string &str, IgnoreFlags Ignore);
+        void ungetLine(const char *buf, IgnoreFlags Ignore);
+        void ungetLine(const std::string &str, IgnoreFlags Ignore);
 
         bool isEmpty(void) { return queue.empty();  }
         bool isEOF(void);
@@ -268,15 +263,7 @@ class StringFIFO_fromCallback : public StringFIFO
 
 
     private:
-        int  (*getline)(char *buf, int maxlen, int *, void *);
-        void *gl_opaque;
-        const char*(*get_pos)(int*, void*);
-        void *gp_opaque;
-        int  (*get_eof)(void*);
-        void *ge_opaque;
         bool is_eof;
-        int  (*reexam)(char *buf, int maxlen, int *, void *);
-        void *rx_opaque;
 
         //static const int hbSize = 4096;
         static char hugeBuf[hbSize];

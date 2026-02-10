@@ -1,7 +1,7 @@
 /* Auto generated, do not edit */
 
 #include "cp1600/op_tables.h"
-const cp1600_ins_t fn_cond_br[] =
+cp1600_ins_t *const fn_cond_br[] =
 {
 /*00000*/    fn_B_i,
 /*00001*/    fn_BC_i,

@@ -17,7 +17,7 @@
 /* ======================================================================== */
 /*  CRC16_TBL    -- Lookup table used for the CRC-16 code.                  */
 /* ======================================================================== */
-const uint_16 crc16_tbl[256] =
+const uint16_t crc16_tbl[256] =
 {
     0x0000, 0x1021, 0x2042, 0x3063, 0x4084, 0x50A5, 0x60C6, 0x70E7,
     0x8108, 0x9129, 0xA14A, 0xB16B, 0xC18C, 0xD1AD, 0xE1CE, 0xF1EF,
@@ -58,7 +58,7 @@ const uint_16 crc16_tbl[256] =
 /*                  Note:  The 16-bit CRC is set up as a left-shifting      */
 /*                  CRC with no inversions.                                 */
 /* ======================================================================== */
-uint_16 crc16_update(uint_16 crc, uint_8 data)
+uint16_t crc16_update(uint16_t crc, uint8_t data)
 {
     return (crc << 8) ^ crc16_tbl[(crc >> 8) ^ data];
 }
@@ -68,7 +68,7 @@ uint_16 crc16_update(uint_16 crc, uint_8 data)
 /*                  Note:  The 16-bit CRC is set up as a left-shifting      */
 /*                  CRC with no inversions.                                 */
 /* ======================================================================== */
-uint_16 crc16_block(uint_16 crc, uint_8 *data, int len)
+uint16_t crc16_block(uint16_t crc, const uint8_t *data, int len)
 {
     int i;
 

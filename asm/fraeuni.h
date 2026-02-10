@@ -19,7 +19,7 @@ AUTHORS:    Mark Zenier;
             break;
 
         case IFC_NOT:
-            etop = ~ etop;
+            etop = !etop;
             break;
 
         case IFC_HIGH:
@@ -29,4 +29,3 @@ AUTHORS:    Mark Zenier;
         case IFC_LOW:
             etop = etop & 0xff;
             break;
-

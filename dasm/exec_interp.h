@@ -2,20 +2,6 @@
 /*  DIS-1600  Advanced(?) CP-1600 Disassembler.                             */
 /*  By Joseph Zbiciak                                                       */
 /* ------------------------------------------------------------------------ */
-/*  This program is free software; you can redistribute it and/or modify    */
-/*  it under the terms of the GNU General Public License as published by    */
-/*  the Free Software Foundation; either version 2 of the License, or       */
-/*  (at your option) any later version.                                     */
-/*                                                                          */
-/*  This program is distributed in the hope that it will be useful,         */
-/*  but WITHOUT ANY WARRANTY; without even the implied warranty of          */
-/*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
-/*  General Public License for more details.                                */
-/*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
-/* ------------------------------------------------------------------------ */
 /*                   Copyright (c) 2006, Joseph Zbiciak                     */
 /* ======================================================================== */
 
@@ -35,18 +21,18 @@ void setup_exec_routine_sym(void);
 /* ======================================================================== */
 /* ======================================================================== */
 
-extern uint_32 used_mob_pics[ 8];
-extern uint_32 used_gfx_pics[16];
+extern uint32_t used_mob_pics[ 8];
+extern uint32_t used_gfx_pics[16];
 
 /* ======================================================================== */
 /*  DECODE_GRAM_INIT                                                        */
 /* ======================================================================== */
-int decode_gram_init(uint_32 addr);
+int decode_gram_init(uint32_t addr);
 
 /* ======================================================================== */
 /*  DECODE_TIMER_TABLE   -- Decode list of periodically-executed functions  */
 /* ======================================================================== */
-int decode_timer_table(uint_32 addr);
+int decode_timer_table(uint32_t addr);
 
 
 /* ======================================================================== */
@@ -60,7 +46,7 @@ int mark_cart_header_pre(void);
 /* ======================================================================== */
 /*  DECODE_GFX_LIST                                                         */
 /* ======================================================================== */
-int decode_gfx_list(uint_32 addr);
+int decode_gfx_list(uint32_t addr);
 
 
 /* ======================================================================== */
@@ -97,9 +83,9 @@ int decode_print_calls(void);
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ------------------------------------------------------------------------ */
 /*                   Copyright (c) 2006, Joseph Zbiciak                     */
 /* ======================================================================== */

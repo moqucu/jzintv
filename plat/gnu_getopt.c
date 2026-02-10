@@ -1,6 +1,20 @@
 #include "config.h"
 #ifdef NO_GETOPT_LONG
 
+/* Added by JZ purely for warning suppression, because this getopt_long
+ * violates const.  *sigh*
+ */
+static char **remove_const_char_ptr_ptr(char * const* x)
+{
+    union {
+        char * const* before;
+        char *      * after;
+    } pun;
+
+    pun.before = x;
+    return pun.after;
+}
+
 /* Getopt for GNU.
    NOTE: getopt is now part of the C library, so if you don't know what
    "Keep this file name-space clean" means, talk to roland@gnu.ai.mit.edu
@@ -19,19 +33,14 @@
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
 
-   You should have received a copy of the GNU General Public License
-   along with this program; if not, write to the Free Software
-   Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.  */
+   You should have received a copy of the GNU General Public License along
+   with this program; if not, write to the Free Software Foundation, Inc.,
+   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.  */
 
-#ifndef __STDC__
+#if !defined(__STDC__) && !defined(__cplusplus)
 #  ifndef const
 #    define const
 #  endif
-#endif
-
-/* This tells Alpha OSF/1 not to define a getopt prototype in <stdio.h>.  */
-#ifndef _NO_PROTO
-#define _NO_PROTO
 #endif
 
 #include <stdio.h>
@@ -173,7 +182,7 @@ static enum
 /* Avoid depending on library functions or files
    whose names are inconsistent.  */
 
-#if __STDC__ || defined(PROTO)
+#if __STDC__ || defined(PROTO) || defined(__cplusplus)
 extern char *getenv(const char *name);
 extern int  strcmp (const char *s1, const char *s2);
 extern int  strncmp(const char *s1, const char *s2, int n);
@@ -239,13 +248,11 @@ static int last_nonopt;
        reverse non options: -x -y a b c
 */
 
-#if __STDC__ || defined(PROTO)
+#if __STDC__ || defined(PROTO) || defined(__cplusplus)
 static void exchange (char **argv);
 #endif
 
-static void
-exchange (argv)
-     char **argv;
+static void exchange (char **argv)
 {
   char *temp, **first, **last;
 
@@ -329,13 +336,8 @@ exchange (argv)
    long-named options.  */
 
 int
-_getopt_internal (argc, argv, optstring, longopts, longind, long_only)
-     int argc;
-     char *const *argv;
-     const char *optstring;
-     const struct option *longopts;
-     int *longind;
-     int long_only;
+_getopt_internal (int argc, char *const *argv, const char *optstring,
+                  const struct option *longopts, int *longind, int long_only)
 {
   int option_index;
 
@@ -378,7 +380,7 @@ _getopt_internal (argc, argv, optstring, longopts, longind, long_only)
              exchange them so that the options come first.  */
 
           if (first_nonopt != last_nonopt && last_nonopt != optind)
-            exchange ((char **) argv);
+            exchange (remove_const_char_ptr_ptr(argv));
           else if (last_nonopt != optind)
             first_nonopt = optind;
 
@@ -406,7 +408,7 @@ _getopt_internal (argc, argv, optstring, longopts, longind, long_only)
           optind++;
 
           if (first_nonopt != last_nonopt && last_nonopt != optind)
-            exchange ((char **) argv);
+            exchange (remove_const_char_ptr_ptr(argv));
           else if (first_nonopt == last_nonopt)
             first_nonopt = optind;
           last_nonopt = argc;
@@ -472,7 +474,7 @@ _getopt_internal (argc, argv, optstring, longopts, longind, long_only)
            p++, option_index++)
         if (!strncmp (p->name, nextchar, s - nextchar))
           {
-            if (s - nextchar == my_strlen (p->name))
+            if (s - nextchar == (int)my_strlen (p->name))
               {
                 /* Exact match found.  */
                 pfound = p;
@@ -584,7 +586,7 @@ _getopt_internal (argc, argv, optstring, longopts, longind, long_only)
 
   {
     char c = *nextchar++;
-    char *temp = my_index (optstring, c);
+    const char *temp = my_index (optstring, c);
 
     /* Increment `optind' when we start to process its last character.  */
     if (*nextchar == '\0')
@@ -663,10 +665,7 @@ _getopt_internal (argc, argv, optstring, longopts, longind, long_only)
 }
 
 int
-getopt (argc, argv, optstring)
-     int argc;
-     char *const *argv;
-     const char *optstring;
+getopt (int argc, char *const *argv, const char *optstring)
 {
   return _getopt_internal (argc, argv, optstring,
                            (const struct option *) 0,
@@ -675,12 +674,8 @@ getopt (argc, argv, optstring)
 }
 
 int
-getopt_long (argc, argv, options, long_options, opt_index)
-     int argc;
-     char *const *argv;
-     const char *options;
-     const struct option *long_options;
-     int *opt_index;
+getopt_long (int argc, char * const *argv, const char *options,
+             const struct option *long_options, int *opt_index)
 {
   return _getopt_internal (argc, argv, options, long_options, opt_index, 0);
 }

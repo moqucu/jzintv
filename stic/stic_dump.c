@@ -2,7 +2,6 @@
  * ============================================================================
  *  Title:    STIC DUMP
  *  Author:   J. Zbiciak
- *  $Id: stic_dump.c,v 1.9 2001/11/02 02:00:04 im14u2c Exp $
  * ============================================================================
  *  This quick and dirty program generates a STIC image from a memory dump.
  *  I'm using this to post-mortem the emulator in the absence of a STIC
@@ -13,14 +12,14 @@
 
 #include "config.h"
 
-uint_16 backtab[240];
-uint_16 grfx   [512 * 8];
-uint_16 regs   [32];
+uint16_t backtab[240];
+uint16_t grfx   [512 * 8];
+uint16_t regs   [32];
 
-uint_8  bitmap [(160 + 16) * (96 + 16)];
+uint8_t  bitmap [(160 + 16) * (96 + 16)];
 
 /* These need _alot_ of work.  They're just rough guesses */
-uint_8  colors[16][3] = 
+uint8_t  colors[16][3] =
 {
 #if 0
     { 0x00, 0x00, 0x00 },   /* Black            */
@@ -60,14 +59,14 @@ uint_8  colors[16][3] =
 };
 
 
-void efix(uint_16 *ary, int len);
+void efix(uint16_t *ary, int len);
 
 int main(int argc, char *argv[])
 {
     FILE *f_i, *f_o;
     int i, j, csq = 0;
-    uint_32 x, y, xx, yy, pat, fg, bg, col_stack = 0, card; 
-    uint_32 cs0=0, cs1=0, cs2=0, cs3=0;
+    uint32_t x, y, xx, yy, pat, fg, bg, col_stack = 0, card;
+    uint32_t cs0=0, cs1=0, cs2=0, cs3=0;
     int mode;
 
     if (argc != 4)
@@ -176,7 +175,7 @@ int main(int argc, char *argv[])
                 for (yy = 8 + (y << 3), j = 0; j < 8; yy++, j++)
                     for (xx = 8 + (x << 3), i = 0; i < 8; xx++, i++)
                     {
-                        bitmap[yy * (160+16) + xx] = 
+                        bitmap[yy * (160+16) + xx] =
                             (0x80 & (grfx[pat + j] << i)) ? fg : bg;
                     }
             }
@@ -187,7 +186,7 @@ int main(int argc, char *argv[])
     fprintf(f_o, "P6\n176 112 255\n");
     for (i = 0; i < (signed)sizeof(bitmap); i++)
         fprintf(f_o, "%c%c%c",
-                colors[bitmap[i]][0], 
+                colors[bitmap[i]][0],
                 colors[bitmap[i]][1],
                 colors[bitmap[i]][2]);
 
@@ -198,7 +197,7 @@ int main(int argc, char *argv[])
 
 
 
-void efix(uint_16 *ary, int size)
+void efix(uint16_t *ary, int size)
 {
 #ifdef BYTE_BE
     UNUSED(ary);
@@ -223,9 +222,9 @@ void efix(uint_16 *ary, int size)
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                 Copyright (c) 1998-1999, Joseph Zbiciak                  */
 /* ======================================================================== */

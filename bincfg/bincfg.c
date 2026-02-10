@@ -25,10 +25,15 @@
 /* ======================================================================== */
 
 #include "config.h"
+#include "lzoe/lzoe.h"
+#include "file/file.h"
+#ifndef BC_NOMETADATA
+#   include "metadata/metadata.h"
+#   include "metadata/cfgvar_metadata.h"
+#endif
 #include "bincfg/bincfg.h"
 #include "bincfg/bincfg_lex.h"
 #include "bincfg/bincfg_grmr.tab.h"
-#include "file/file.h"
 
 bc_cfgfile_t *bc_parsed_cfg = NULL;
 
@@ -39,12 +44,14 @@ extern int bc_parse(void);  /* grrr... bison doesn't do this for us?!       */
 /* ======================================================================== */
 bc_cfgfile_t *bc_parse_cfg
 (
-    FILE *f, 
+    LZFILE *f,
     const char *const binfile,
-    const char *const cfgfile  
+    const char *const cfgfile
 )
 {
-    bc_memspan_t *span, *prev;
+    bc_memspan_t *span, **prev;
+    int num_preload = 0, num_memattr = 0, need_default = 0, ma, pl;
+    bc_memspan_t **preloads, **memattrs;
 
     bc_parsed_cfg = NULL;
 
@@ -54,9 +61,9 @@ bc_cfgfile_t *bc_parse_cfg
     /* -------------------------------------------------------------------- */
     if (f)
     {
-        bc_restart(f);      /* register the file with the lexer.            */
-        bc_parse();         /* run the grammar.  It calls the bc_lex().     */
-    } 
+        bc_restart( (FILE*)f ); /* register the file with the lexer.        */
+        bc_parse();             /* run the grammar.  It calls the bc_lex(). */
+    }
 
     /* -------------------------------------------------------------------- */
     /*  If not parsing a configuration file, or the file was empty, just    */
@@ -77,22 +84,47 @@ bc_cfgfile_t *bc_parse_cfg
     if (cfgfile) bc_parsed_cfg->cfgfile = strdup(cfgfile);
 
     /* -------------------------------------------------------------------- */
-    /*  Scan the memory spans looking for preload sections.  If none are    */
-    /*  found, add the default configuration's memory spans.                */
+    /*  Scan the memory spans counting up preload sections and non-preload  */
+    /*  (ie. memattr) sections.  We need to apply memattr spans to any      */
+    /*  preload spans they overlap, but before we do so, we need to         */
+    /*  allocate some storage.                                              */
     /* -------------------------------------------------------------------- */
-    prev = NULL;
-    span = bc_parsed_cfg->span;
-    while (span && (span->flags & BC_SPAN_PL) == 0)
+    for (span = bc_parsed_cfg->span; span;
+         span = (bc_memspan_t*)(span->l.next))
     {
-        prev = span;
-        span = (bc_memspan_t*)(span->l.next);
+        if (span->flags & BC_SPAN_PL) num_preload++;
+        else                          num_memattr++;
     }
 
     /* -------------------------------------------------------------------- */
-    /*  If span's NULL, we didn't find a section with 'preload'.            */
-    /*  This means that there were no [mapping] or [preload] sections.      */
+    /*  If there were no preload sections, we'll need a default config.     */
+    /*  The default config gets instantiated after we allocate arrays.      */
     /* -------------------------------------------------------------------- */
-    if (!span)
+    if (num_preload == 0)
+    {
+        num_preload = 3;
+        need_default = 1;
+    }
+
+    /* -------------------------------------------------------------------- */
+    /*  Allocate storage for the preload and memattr lists and fill them.   */
+    /* -------------------------------------------------------------------- */
+    preloads = CALLOC(bc_memspan_t*, num_preload);
+    memattrs = CALLOC(bc_memspan_t*, num_memattr);
+    assert((preloads && memattrs) || "Out of memory");
+    for (span = bc_parsed_cfg->span, ma = pl = 0; span;
+         span = (bc_memspan_t*)(span->l.next))
+    {
+        if (span->flags & BC_SPAN_PL) preloads[pl++] = span;
+        else                          memattrs[ma++] = span;
+    }
+    assert( pl == num_preload || (need_default && pl == 0));
+    assert( ma == num_memattr );
+
+    /* -------------------------------------------------------------------- */
+    /*  If there were no preload sections, create a default mapping.        */
+    /* -------------------------------------------------------------------- */
+    if (need_default)
     {
         bc_memspan_t *s0, *s1, *s2;
 
@@ -112,7 +144,7 @@ bc_cfgfile_t *bc_parse_cfg
         s0->width  = 16;
         s0->epage  = BC_SPAN_NOPAGE;
         s0->f_name = NULL;
-        s0->l.next = (ll_t *)s1;
+        s0->l.next = NULL;
 
         s1->s_fofs = 0x2000;
         s1->e_fofs = 0x2FFF;
@@ -122,7 +154,7 @@ bc_cfgfile_t *bc_parse_cfg
         s1->width  = 16;
         s1->epage  = BC_SPAN_NOPAGE;
         s1->f_name = NULL;
-        s1->l.next = (ll_t *)s2;
+        s1->l.next = NULL;
 
         s2->s_fofs = 0x3000;
         s2->e_fofs = 0x3FFF;
@@ -134,28 +166,173 @@ bc_cfgfile_t *bc_parse_cfg
         s2->f_name = NULL;
         s2->l.next = NULL;
 
-        if (!prev)
-            bc_parsed_cfg->span = s0;
-        else
-            prev->l.next = (ll_t*)s0;
+        assert( preloads );
+        assert( num_preload == 3 );
+        preloads[0] = s0;
+        preloads[1] = s1;
+        preloads[2] = s2;
     }
 
+    /* -------------------------------------------------------------------- */
+    /*  Step through all of the memattr sections, applying their attribute  */
+    /*  flags to overlapping preload sections.  This is O(N^2), but who     */
+    /*  cares, as the total number of spans is at most dozens.  (Worse      */
+    /*  than O(N^2) if we have to split a span.)                            */
+    /* -------------------------------------------------------------------- */
+    for ( ma = 0 ; ma < num_memattr ; ma++ )
+    {
+        bc_memspan_t *m = memattrs[ma];
+
+        for ( pl = 0 ; pl < num_preload ; pl++ )
+        {
+            bc_memspan_t *p = preloads[pl];
+
+            /* Skip if spans don't overlap */
+            if (m->e_addr < p->s_addr) continue;
+            if (m->s_addr > p->e_addr) continue;
+            if (m->epage != p->epage)  continue;
+
+            /* Is p completely inside m? No: split p. Fragments go to end.  */
+            if (p->s_addr < m->s_addr)
+            {
+                int np = num_preload++;
+                bc_memspan_t *n;
+                preloads = (bc_memspan_t**)realloc((void*)preloads,
+                               num_preload * sizeof(bc_memspan_t*));
+                assert(preloads || "Out of memory");
+
+                n = preloads[np] = CALLOC(bc_memspan_t, 1);
+                assert(preloads[np] || "Out of memory");
+
+                *n = *p;
+
+                n->e_addr = m->s_addr - 1;
+                p->s_addr = m->s_addr;
+                p->s_fofs = p->e_fofs - p->e_addr + p->s_addr;
+                n->e_fofs = n->s_fofs + n->e_addr - n->s_addr;
+            }
+
+            if (p->e_addr > m->e_addr)
+            {
+                int np = num_preload++;
+                bc_memspan_t *n;
+                preloads = (bc_memspan_t**)realloc((void*)preloads,
+                               num_preload * sizeof(bc_memspan_t*));
+                assert(preloads || "Out of memory");
+
+                n = preloads[np] = CALLOC(bc_memspan_t, 1);
+                assert(preloads[np] || "Out of memory");
+
+                *n = *p;
+
+                n->s_addr = m->e_addr + 1;
+                p->e_addr = m->e_addr;
+                n->s_fofs = n->e_fofs - n->e_addr + n->s_addr;
+                p->e_fofs = p->s_fofs + p->e_addr - p->s_addr;
+            }
+
+            /* Is m completely inside p? No: split m. Fragments go to end.  */
+            if (m->s_addr < p->s_addr)
+            {
+                int nm = num_memattr++;
+                bc_memspan_t *n;
+                memattrs = (bc_memspan_t**)realloc((void*)memattrs,
+                               num_memattr * sizeof(bc_memspan_t*));
+                assert(memattrs || "Out of memory");
+
+                n = memattrs[nm] = CALLOC(bc_memspan_t, 1);
+                assert(memattrs[nm] || "Out of memory");
+
+                *n = *m;
+
+                n->e_addr = p->s_addr - 1;
+                m->s_addr = p->s_addr;
+            }
+
+            if (m->e_addr > p->e_addr)
+            {
+                int nm = num_memattr++;
+                bc_memspan_t *n;
+                memattrs = (bc_memspan_t**)realloc((void*)memattrs,
+                               num_memattr * sizeof(bc_memspan_t*));
+                assert(memattrs || "Out of memory");
+
+                n = memattrs[nm] = CALLOC(bc_memspan_t, 1);
+                assert(memattrs[nm] || "Out of memory");
+
+                *n = *m;
+
+                n->s_addr = p->e_addr + 1;
+                m->e_addr = p->e_addr;
+            }
+
+            assert(m->s_addr == p->s_addr);
+            assert(m->e_addr == p->e_addr);
+
+            /* Apply the memattr to the preload */
+            p->width = m->width;
+            p->flags = (m->flags | BC_SPAN_PL) & ~BC_SPAN_DEL;
+            m->flags |= BC_SPAN_DEL;
+        }
+    }
+
+    /* -------------------------------------------------------------------- */
+    /*  Now reassemble the span list.  For memattr spans, only keep the     */
+    /*  ones not marked BC_SPAN_DEL, as those didn't overlap any preload.   */
+    /* -------------------------------------------------------------------- */
+    prev = &(bc_parsed_cfg->span);
+
+    for (pl = 0; pl < num_preload; pl++)
+    {
+        *prev = preloads[pl];
+        prev = (bc_memspan_t**)&(preloads[pl]->l.next);
+        assert( (preloads[pl]->flags & BC_SPAN_DEL) == 0 );
+    }
+
+    for (ma = 0; ma < num_memattr; ma++)
+    {
+        if (memattrs[ma]->flags & BC_SPAN_DEL)
+        {
+            free(memattrs[ma]);
+            continue;
+        }
+        *prev = memattrs[ma];
+        prev = (bc_memspan_t**)&(memattrs[ma]->l.next);
+    }
+    *prev = NULL;
+
+    free(preloads);
+    free(memattrs);
+
+    /* -------------------------------------------------------------------- */
+    /*  By default, assume no decoded metadata.                             */
+    /* -------------------------------------------------------------------- */
+    bc_parsed_cfg->metadata = NULL;
+
+#ifndef BC_NOMETADATA
+    /* -------------------------------------------------------------------- */
+    /*  Parse config variables into a metadata structure.                   */
+    /* -------------------------------------------------------------------- */
+    bc_parsed_cfg->metadata =
+        bc_parsed_cfg->vars ? game_metadata_from_cfgvars(bc_parsed_cfg->vars)
+                            : default_game_metadata();
+#endif
     return bc_parsed_cfg;
 }
 
 /* ======================================================================== */
 /*  BC_READ_HELPER -- helper function for bc_read_data.                     */
 /* ======================================================================== */
-LOCAL int bc_read_helper(char *f_name, uint_16 *buf, int width)
-{        
-    FILE *f;
+LOCAL int bc_read_helper(char *f_name, uint16_t *buf, int width)
+{
+    LZFILE *f;
     int len;
 
     /* -------------------------------------------------------------------- */
     /*  Open and read up to 64K words from a file.  Return how much we      */
     /*  actually read from the file to the caller.                          */
     /* -------------------------------------------------------------------- */
-    if ((f = fopen(f_name, "rb")) == NULL)
+    if ((f = lzoe_fopen(f_name, "rb")) == NULL)
     {
 
         perror("fopen()");
@@ -164,16 +341,16 @@ LOCAL int bc_read_helper(char *f_name, uint_16 *buf, int width)
         return -1;
     }
 
-    len = width > 8 ? file_read_rom16(f, BC_MAXBIN, buf) 
+    len = width > 8 ? file_read_rom16(f, BC_MAXBIN, buf)
                     : file_read_rom8 (f, BC_MAXBIN, buf);
 
-    if (len < 0)
+    if (len < 1)
     {
         fprintf(stderr, "Unable to read binary file '%s'\n", f_name);
         return -1;
     }
 
-    fclose(f);
+    lzoe_fclose(f);
 
     return len;
 }
@@ -187,8 +364,8 @@ LOCAL int bc_read_helper(char *f_name, uint_16 *buf, int width)
 int bc_read_data(bc_cfgfile_t *bc)
 {
     bc_memspan_t *span, *prev;
-    uint_16 *pbuf, *lbuf, *buf;
-    size_t plen, llen, len;
+    uint16_t *pbuf, *lbuf, *buf = NULL;
+    size_t plen, llen, len = 0;
     int slen, i;
 
     /* -------------------------------------------------------------------- */
@@ -198,7 +375,7 @@ int bc_read_data(bc_cfgfile_t *bc)
     /*  is due to the 'free()' semantics for the ->data field in each       */
     /*  memspan.                                                            */
     /* -------------------------------------------------------------------- */
-    if ((pbuf = CALLOC(uint_16, BC_MAXBIN*2)) == NULL)
+    if ((pbuf = CALLOC(uint16_t, BC_MAXBIN*2)) == NULL)
     {
         fprintf(stderr, "out of memory\n");
         exit(1);
@@ -234,7 +411,7 @@ int bc_read_data(bc_cfgfile_t *bc)
     /* -------------------------------------------------------------------- */
     /*  Chase down the spans, attaching ->data to each span.                */
     /* -------------------------------------------------------------------- */
-    for (prev = NULL, span = bc->span; span; 
+    for (prev = NULL, span = bc->span; span;
          prev = span, span = (bc_memspan_t *)(span->l.next))
     {
         bc_memspan_t dummy;
@@ -258,7 +435,7 @@ int bc_read_data(bc_cfgfile_t *bc)
         /* ---------------------------------------------------------------- */
         /*  Load any file that might be associated with this span.          */
         /* ---------------------------------------------------------------- */
-        if (span->f_name != NULL) 
+        if (span->f_name != NULL)
         {
             int tmp;
 
@@ -276,20 +453,29 @@ int bc_read_data(bc_cfgfile_t *bc)
         }
 
         /* ---------------------------------------------------------------- */
-        /*  Now attach data from the file to the memspan.  If the span      */
-        /*  started after EOF, delete the span from the span list.  If      */
-        /*  the span starts in the file, but ends after EOF, trim it.       */
+        /*  Now attach data from the file to the memspan.  We handle spans  */
+        /*  that go outside the file specially, and differently depending   */
+        /*  on whether they're writeable.                                   */
+        /*   -- Non-writeable, entirely beyond EOF:  delete span            */
+        /*   -- Non-writeable, partially beyond EOF:  trim span             */
+        /*   -- Writeable, entirely beyond EOF:  drop preload flag          */
+        /*   -- Writeable, partially beyond EOF:  split and drop preload    */
+        /*      flag on part beyond EOF.                                    */
         /* ---------------------------------------------------------------- */
-        if (span->s_fofs >= len)
+
+        /* ---------------------------------------------------------------- */
+        /*   -- Non-writeable, entirely beyond EOF:  delete span            */
+        /* ---------------------------------------------------------------- */
+        if (span->s_fofs >= len && (span->flags & BC_SPAN_W) == 0)
         {
             ll_t *dead = (ll_t *)span;
 
-            if (!prev) 
+            if (!prev)
             {
                 bc->span     = (bc_memspan_t *)span->l.next;
                 dummy.l.next = span->l.next;
                 span         = &dummy;
-            } else       
+            } else
             {
                 prev->l.next = span->l.next;
                 span         = prev;
@@ -300,16 +486,50 @@ int bc_read_data(bc_cfgfile_t *bc)
             continue;
         }
 
-        if (span->e_fofs >= len)
+        /* ---------------------------------------------------------------- */
+        /*   -- Non-writeable, partially beyond EOF:  trim span             */
+        /* ---------------------------------------------------------------- */
+        if (span->e_fofs >= len && (span->flags & BC_SPAN_W) == 0)
             span->e_fofs = len - 1;
 
+        /* ---------------------------------------------------------------- */
+        /*   -- Writeable, entirely beyond EOF:  drop preload flag          */
+        /* ---------------------------------------------------------------- */
+        if (span->s_fofs >= len && (span->flags & BC_SPAN_W) != 0)
+        {
+            span->flags &= ~BC_SPAN_PL;
+            continue;
+        }
+
+        /* ---------------------------------------------------------------- */
+        /*   -- Writeable, partially beyond EOF:  split and drop preload    */
+        /*      flag on part beyond EOF.                                    */
+        /* ---------------------------------------------------------------- */
+        if (span->e_fofs >= len && (span->flags & BC_SPAN_W) != 0)
+        {
+            bc_memspan_t *part = CALLOC(bc_memspan_t, 1);
+            *part = *span;
+            part->flags &= BC_SPAN_PL;
+            part->s_fofs = 0;
+            part->e_fofs = 0;
+            part->s_addr = span->s_addr + len - span->s_fofs;
+            span->e_fofs = len - 1;
+            span->e_addr = span->s_addr + span->e_fofs - span->s_fofs;
+            part->l.next = (ll_t *)span;
+            prev->l.next = (ll_t *)part;
+        }
+
+        /* ---------------------------------------------------------------- */
+        /*  Allocate span->data and copy over the data from the file.       */
+        /* ---------------------------------------------------------------- */
         slen         = span->e_fofs - span->s_fofs + 1;
         span->e_addr = span->s_addr + slen - 1;
-        span->data   = CALLOC(uint_16, slen);
+        span->data   = CALLOC(uint16_t, slen);
 
         if (!span->data) { fprintf(stderr, "out of memory\n"); exit(1); }
 
-        memcpy(span->data, pbuf + span->s_fofs, slen * sizeof(uint_16));
+        assert(buf);
+        memcpy(span->data, buf + span->s_fofs, slen * sizeof(uint16_t));
     }
 
     free(pbuf);
@@ -375,7 +595,7 @@ int  bc_do_macros(bc_cfgfile_t *cfg, int partial_ok)
     /* -------------------------------------------------------------------- */
     if (!partial_ok)
     {
-        for (macro = bc_parsed_cfg->macro; macro; 
+        for (macro = bc_parsed_cfg->macro; macro;
              macro = (bc_macro_t*)macro->l.next)
         {
             if (macro->cmd != BC_MAC_LOAD    &&
@@ -392,7 +612,7 @@ int  bc_do_macros(bc_cfgfile_t *cfg, int partial_ok)
         /*  If we exited before end of list, we're at an unsupported macro. */
         /*  If it's not a "run" macro at the end of the list, refuse it.    */
         /* ---------------------------------------------------------------- */
-        if (macro != NULL && 
+        if (macro != NULL &&
             (macro->l.next != NULL || macro->cmd != BC_MAC_RUN))
             return -1;
     }
@@ -400,7 +620,7 @@ int  bc_do_macros(bc_cfgfile_t *cfg, int partial_ok)
     /* -------------------------------------------------------------------- */
     /*  Chase down the macro list looking for LOAD/POKE commands.           */
     /* -------------------------------------------------------------------- */
-    for (macro = bc_parsed_cfg->macro; macro; 
+    for (macro = bc_parsed_cfg->macro; macro;
          macro = (bc_macro_t*)macro->l.next)
     {
         if (macro->cmd == BC_MAC_LOAD || macro->cmd == BC_MAC_POKE)
@@ -415,8 +635,7 @@ int  bc_do_macros(bc_cfgfile_t *cfg, int partial_ok)
             newspan->l.next = NULL;
 
             /* Inefficient, but called very rarely. */
-            bc_parsed_cfg->span = LL_CONCAT(bc_parsed_cfg->span, newspan,
-                                            bc_memspan_t);
+            LL_CONCAT(bc_parsed_cfg->span, newspan, bc_memspan_t);
         }
 
         switch (macro->cmd)
@@ -440,21 +659,24 @@ int  bc_do_macros(bc_cfgfile_t *cfg, int partial_ok)
 
             case BC_MAC_POKE :
             {
-                if (!(newspan->data = CALLOC(uint_16, 1)))
+                if (!(newspan->data = CALLOC(uint16_t, 1)))
                 {
                     fprintf(stderr, "out of memory\n");
                     exit(1);
                 }
 
                 newspan->s_fofs  = 0;
-                newspan->e_fofs  = 0; 
+                newspan->e_fofs  = 0;
                 newspan->s_addr  = macro->arg.poke.addr;
                 newspan->e_addr  = macro->arg.poke.addr;
                 newspan->width   = 16;
                 newspan->flags   = BC_SPAN_PL | BC_SPAN_R | BC_SPAN_PK;
-                newspan->epage   = BC_SPAN_NOPAGE;
+                newspan->epage   = macro->arg.poke.epage;
                 newspan->f_name  = NULL;
                 newspan->data[0] = macro->arg.poke.value;
+
+                if (macro->arg.poke.epage != BC_SPAN_NOPAGE)
+                    newspan->flags |= BC_SPAN_EP;
 
                 break;
             }
@@ -491,8 +713,6 @@ int  bc_do_macros(bc_cfgfile_t *cfg, int partial_ok)
 /*                                                                          */
 /*  BC_FREE_MEMSPAN_T    -- Releases storage associated with bc_memspan_t.  */
 /*  BC_FREE_MACRO_T      -- Releases storage associated with bc_macro_t.    */
-/*  BC_FREE_VAR_T        -- Releases storage associated with bc_var_t.      */
-/*  BC_FREE_VARLIKE_T    -- Releases storage associated with bc_varlike_t.  */
 /*  BC_FREE_DIAG_T       -- Releases storage associated with bc_diag_t      */
 /* ======================================================================== */
 #ifndef CONDFREE
@@ -525,26 +745,12 @@ void bc_free_macro_t(ll_t *l_mac, void *unused)
     {
         case BC_MAC_LOAD:   CONDFREE(mac->arg.load.name);   break;
 
-        case BC_MAC_WATCH:  CONDFREE(mac->arg.watch.name); 
+        case BC_MAC_WATCH:  CONDFREE(mac->arg.watch.name);
                             CONDFREE(mac->arg.watch.addr);  break;
 
         default: /* nothing */ ;
     }
     free(mac);
-}
-
-/* ======================================================================== */
-/*  BC_FREE_VAR_T        -- Releases storage associated with bc_var_t.      */
-/* ======================================================================== */
-void bc_free_var_t(ll_t *l_var, void *unused)
-{
-    bc_var_t *var = (bc_var_t *)l_var;
-
-    UNUSED(unused);
-
-    CONDFREE(var->name);
-    CONDFREE(var->val.str_val);
-    free(var);
 }
 
 /* ======================================================================== */
@@ -558,6 +764,7 @@ void bc_free_diag_t(ll_t *l_diag, void *unused)
 
     CONDFREE(diag->sect);
     CONDFREE(diag->msg);
+    free(diag);
 }
 
 
@@ -569,15 +776,19 @@ void bc_free_cfg(bc_cfgfile_t *cfg)
     CONDFREE(cfg->cfgfile);
     CONDFREE(cfg->binfile);
 
-    if (cfg->span    ) ll_acton(&cfg->span->l,     bc_free_memspan_t, NULL);
-    if (cfg->macro   ) ll_acton(&cfg->macro->l,    bc_free_macro_t,   NULL);
-    if (cfg->vars    ) ll_acton(&cfg->vars->l,     bc_free_var_t,     NULL);
-    if (cfg->keys[0] ) ll_acton(&cfg->keys[0]->l,  bc_free_var_t,     NULL);
-    if (cfg->keys[1] ) ll_acton(&cfg->keys[1]->l,  bc_free_var_t,     NULL);
-    if (cfg->keys[2] ) ll_acton(&cfg->keys[2]->l,  bc_free_var_t,     NULL);
-    if (cfg->keys[3] ) ll_acton(&cfg->keys[3]->l,  bc_free_var_t,     NULL);
-    if (cfg->joystick) ll_acton(&cfg->joystick->l, bc_free_var_t,     NULL);
-    if (cfg->diags   ) ll_acton(&cfg->diags->l,    bc_free_diag_t,    NULL);
+    if (cfg->span    ) LL_ACTON(cfg->span,  bc_free_memspan_t, NULL);
+    if (cfg->macro   ) LL_ACTON(cfg->macro, bc_free_macro_t,   NULL);
+    if (cfg->vars    ) free_cfg_var_list( cfg->vars     );
+    if (cfg->keys[0] ) free_cfg_var_list( cfg->keys[0]  );
+    if (cfg->keys[1] ) free_cfg_var_list( cfg->keys[1]  );
+    if (cfg->keys[2] ) free_cfg_var_list( cfg->keys[2]  );
+    if (cfg->keys[3] ) free_cfg_var_list( cfg->keys[3]  );
+    if (cfg->joystick) free_cfg_var_list( cfg->joystick );
+    if (cfg->diags   ) LL_ACTON(cfg->diags, bc_free_diag_t,    NULL);
+
+#ifndef BC_NOMETADATA
+    if (cfg->metadata) free_game_metadata( cfg->metadata );
+#endif
 
     free(cfg);
 }
@@ -597,16 +808,15 @@ void bc_free_cfg(bc_cfgfile_t *cfg)
 /*  BC_PRINT_MEMSPAN -- Print out all the memory span information.          */
 /* ======================================================================== */
 
-
 /* ======================================================================== */
 /*  BC_PRINT_DIAG    -- Print all the collected diagnostics attached to cfg */
 /* ======================================================================== */
 void bc_print_diag
 (
-    FILE                *RESTRICT const f, 
-    const char          *RESTRICT const fname,
-    const bc_diag_t     *RESTRICT const diag,
-    int                                 cmt 
+    printer_t       *RESTRICT const p,
+    const char      *RESTRICT const fname,
+    const bc_diag_t *RESTRICT const diag,
+    const int                       cmt
 )
 {
     const bc_diag_t *RESTRICT d;
@@ -618,9 +828,9 @@ void bc_print_diag
     /* -------------------------------------------------------------------- */
     for (d = diag; d; d = (const bc_diag_t *)d->l.next)
     {
-        fprintf(f, "%s%s:%d:%s %s: %s\n", 
-                cmt ? "; " : "", fname, d->line, 
-                d->sect ? d->sect : "<toplevel?>", 
+        p->fxn(p->opq, "%s%s:%d:%s %s: %s\015\012",
+                cmt ? "; " : "", fname, d->line,
+                d->sect ? d->sect : "<toplevel?>",
                 d->type == BC_DIAG_WARNING ? "warning" : "error",
                 d->msg  ? d->msg  : "out of memory?");
         if (d->type == BC_DIAG_WARNING) tot_warn++; else tot_err++;
@@ -631,7 +841,7 @@ void bc_print_diag
     /* -------------------------------------------------------------------- */
     if (tot_warn || tot_err)
     {
-        fprintf(f, "%s%d warnings, %d errors\n", 
+        p->fxn(p->opq, "%s%d warnings, %d errors\015\012",
                 cmt ? "; " : "", tot_warn, tot_err);
     }
 }
@@ -639,45 +849,45 @@ void bc_print_diag
 /* ======================================================================== */
 /*  BC_PRINT_MACRO_T -- Print a single macro_t structure.                   */
 /* ======================================================================== */
-void bc_print_macro_t(ll_t *l_mac, void *v_f)
+LOCAL void bc_print_macro_t(ll_t *const l_mac, void *RESTRICT const v_p)
 {
-    bc_macro_t *RESTRICT const mac = (bc_macro_t*)l_mac;
-    FILE       *RESTRICT const f   = (FILE*)v_f;
+    const bc_macro_t *RESTRICT const mac = (bc_macro_t*)l_mac;
+    const printer_t *RESTRICT const p = (printer_t*)v_p;
 
-    if (mac->quiet) 
-        fputc('@', f);
+    if (mac->quiet)
+        p->fxn(p->opq, "@");
 
     switch (mac->cmd)
     {
-        case BC_MAC_NONE:       { fputc(';', f); break; }
-        case BC_MAC_AHEAD:      { fputc('A', f); break; }
-        case BC_MAC_BLANK:      { fputc('B', f); break; }
-        case BC_MAC_RUN:        { fputc('R', f); break; }
-        case BC_MAC_VIEW:       { fputc('V', f); break; }
+        case BC_MAC_NONE:       { p->fxn(p->opq, ";"); break; }
+        case BC_MAC_AHEAD:      { p->fxn(p->opq, "A"); break; }
+        case BC_MAC_BLANK:      { p->fxn(p->opq, "B"); break; }
+        case BC_MAC_RUN:        { p->fxn(p->opq, "R"); break; }
+        case BC_MAC_VIEW:       { p->fxn(p->opq, "V"); break; }
 
         case BC_MAC_REG:
         {
-            fprintf(f, "%d $%.4X", mac->arg.reg.reg, mac->arg.reg.value);
+            p->fxn(p->opq, "%d $%.4X", mac->arg.reg.reg, mac->arg.reg.value);
             break;
         }
-                                
-        case BC_MAC_INSPECT:    
+
+        case BC_MAC_INSPECT:
         {
-            fprintf(f, "I $%.4X", mac->arg.inspect.addr);
+            p->fxn(p->opq, "I $%.4X", mac->arg.inspect.addr);
             break;
         }
 
         case BC_MAC_POKE:
         {
-            fprintf(f, "P $%.4X $%.4X", 
+            p->fxn(p->opq, "P $%.4X $%.4X",
                     mac->arg.poke.addr, mac->arg.poke.value);
             break;
         }
 
         case BC_MAC_LOAD:
         {
-            fprintf(f, "L %s %d $%.4X",
-                    mac->arg.load.name,
+            p->fxn(p->opq, "L %s %d $%.4X",
+                    cfg_quote_str( mac->arg.load.name ),
                     mac->arg.load.width,
                     mac->arg.load.addr);
             break;
@@ -685,13 +895,13 @@ void bc_print_macro_t(ll_t *l_mac, void *v_f)
 
         case BC_MAC_RUNTO:
         {
-            fprintf(f, "O $%.4X", mac->arg.runto.addr);
+            p->fxn(p->opq, "O $%.4X", mac->arg.runto.addr);
             break;
         }
 
         case BC_MAC_TRACE:
         {
-            fprintf(f, "T $%.4X", mac->arg.runto.addr);
+            p->fxn(p->opq, "T $%.4X", mac->arg.runto.addr);
             break;
         }
 
@@ -699,17 +909,17 @@ void bc_print_macro_t(ll_t *l_mac, void *v_f)
         {
             int i, lo, hi;
 
-            fprintf(f, "W %s ", mac->arg.watch.name);
+            p->fxn(p->opq, "W %s ", mac->arg.watch.name);
             for (i = 0; i < mac->arg.watch.spans; i++)
             {
-                if (i) 
-                    fputc(',', f);
+                if (i)
+                    p->fxn(p->opq, ",");
 
                 lo = mac->arg.watch.addr[2*i + 0];
                 hi = mac->arg.watch.addr[2*i + 1];
 
-                if (lo == hi) fprintf(f, "$%.4X", lo);
-                else          fprintf(f, "$%.4X-$%.4X", lo, hi);
+                if (lo == hi) p->fxn(p->opq, "$%.4X", lo);
+                else          p->fxn(p->opq, "$%.4X-$%.4X", lo, hi);
             }
             break;
         }
@@ -717,48 +927,25 @@ void bc_print_macro_t(ll_t *l_mac, void *v_f)
         case BC_MAC_ERROR:
         default:
         {
-            fprintf(f, "; unknown macro\n");
+            p->fxn(p->opq, "; unknown macro\015\012");
             break;
         }
     }
 
-    fputc('\n', f);
+    p->fxn(p->opq, "\015\012");
 }
 
 /* ======================================================================== */
 /*  BC_PRINT_MACRO   -- Print the [macro] section                           */
 /* ======================================================================== */
-void bc_print_macro(FILE *RESTRICT f, bc_macro_t *RESTRICT mac)
+void bc_print_macro(printer_t  *RESTRICT const p,
+                    bc_macro_t *RESTRICT const mac)
 {
     /* -------------------------------------------------------------------- */
     /*  Step through the macro list, regenerating each macro.               */
     /* -------------------------------------------------------------------- */
-    fprintf(f, "\n[macro]\n");
-    ll_acton(&(mac->l), bc_print_macro_t, (void *)f);
-}
-
-/* ======================================================================== */
-/*  BC_PRINT_VAR_T   -- Print <name> = <value> tuple.                       */
-/* ======================================================================== */
-void bc_print_var_t
-(
-    ll_t *RESTRICT l_var,
-    void *RESTRICT v_f  
-)
-{
-    bc_var_t *var = (bc_var_t *)l_var;
-    FILE *f       = (FILE *)v_f;
-
-    if (var->val.flag & (BC_VAR_DECNUM))
-    {
-        fprintf(f, "%s = %d\n", var->name, var->val.dec_val);
-    } else if (var->val.flag & (BC_VAR_HEXNUM))
-    {
-        fprintf(f, "%s = $%.4X\n", var->name, var->val.hex_val);
-    } else
-    {
-        fprintf(f, "%s = %s\n", var->name, var->val.str_val);
-    }
+    p->fxn(p->opq, "\015\012[macro]\015\012");
+    LL_ACTON(mac, bc_print_macro_t, (void *)p);
 }
 
 /* ======================================================================== */
@@ -766,16 +953,16 @@ void bc_print_var_t
 /* ======================================================================== */
 void bc_print_varlike
 (
-    FILE       *RESTRICT f, 
-    bc_var_t   *RESTRICT varlike, 
-    const char *RESTRICT sectname
+    printer_t   *RESTRICT const p,
+    cfg_var_t   *RESTRICT const varlike,
+    const char  *RESTRICT const sectname
 )
 {
     /* -------------------------------------------------------------------- */
     /*  Real easy:  Just step thru the list and print all the tuples.       */
     /* -------------------------------------------------------------------- */
-    fprintf(f, "\n%s\n", sectname);
-    ll_acton(&(varlike->l), bc_print_var_t, f);
+    p->fxn(p->opq, "\015\012%s\015\012", sectname);
+    print_cfg_var_list( varlike, p );
 }
 
 /* ======================================================================== */
@@ -783,7 +970,7 @@ void bc_print_varlike
 /* ======================================================================== */
 void bc_print_memspan
 (
-    FILE                *RESTRICT const f, 
+    printer_t           *RESTRICT const p,
     const bc_memspan_t  *RESTRICT const mem
 )
 {
@@ -796,18 +983,19 @@ void bc_print_memspan
     m = mem;
     while (m)
     {
-        fprintf(f, "; $%.4X - $%.4X => $%.4X - $%.4X PAGE %X "
-                   "FLAGS %c%c%c%c%c%c%c from \"%s\"\n",
-                   m->s_fofs, m->e_fofs, m->s_addr, m->e_addr, m->epage,
-                   m->flags & BC_SPAN_R  ? 'R' : '-',
-                   m->flags & BC_SPAN_W  ? 'W' : '-',
-                   m->flags & BC_SPAN_N  ? 'N' : '-',
-                   m->flags & BC_SPAN_B  ? 'B' : '-',
-                   m->flags & BC_SPAN_PL ? 'L' : '-',
-                   m->flags & BC_SPAN_PK ? 'K' : '-',
-                   m->flags & BC_SPAN_EP ? 'E' : '-',
-                   m->f_name ? m->f_name : "(primary)"
-                   );
+        p->fxn(p->opq,
+           "; $%.4X - $%.4X => $%.4X - $%.4X PAGE %X "
+           "FLAGS %c%c%c%c%c%c%c from \"%s\"\015\012",
+           m->s_fofs, m->e_fofs, m->s_addr, m->e_addr, m->epage,
+           m->flags & BC_SPAN_R  ? 'R' : '-',
+           m->flags & BC_SPAN_W  ? 'W' : '-',
+           m->flags & BC_SPAN_N  ? 'N' : '-',
+           m->flags & BC_SPAN_B  ? 'B' : '-',
+           m->flags & BC_SPAN_PL ? 'L' : '-',
+           m->flags & BC_SPAN_PK ? 'K' : '-',
+           m->flags & BC_SPAN_EP ? 'E' : '-',
+           m->f_name ? m->f_name : "(primary)"
+       );
 
         m = (bc_memspan_t *)m->l.next;
     }
@@ -819,15 +1007,21 @@ void bc_print_memspan
     /*  The following truth table indicates how the attributes map back     */
     /*  to different sections.                                              */
     /*                                                                      */
-    /*      R W N B PL PK EP   Section       Format                         */
-    /*      R x x x PL -  -    [mapping]     $xxxx - $xxxx = $xxxx          */
-    /*      R x x x PL -  EP   [mapping]     $xxxx - $xxxx = $xxxx PAGE d   */
-    /*      - x x x PL -  -    [preload]     $xxxx - $xxxx = $xxxx          */
-    /*      - x x x PL -  EP   [preload]     $xxxx - $xxxx = $xxxx PAGE d   */
-    /*      x x x B x  -  x    [bankswitch]  $xxxx - $xxxx                  */
-    /*      R W x x x  -  x    [memattr]     $xxxx - $xxxx = RAM d          */
-    /*      - W x x x  -  x    [memattr]     $xxxx - $xxxx = WOM d          */
-    /*      R - x x -  -  x    [memattr]     $xxxx - $xxxx = ROM d          */
+    /*  R W N B PL PK EP   Section       Format                             */
+    /*  R - x x PL -  -    [mapping]     $xxxx - $xxxx = $xxxx              */
+    /*  - W x x PL -  -    [mapping]     $xxxx - $xxxx = $xxxx WOM w        */
+    /*  R W x x PL -  -    [mapping]     $xxxx - $xxxx = $xxxx RAM w        */
+    /*  R - x x PL -  EP   [mapping]     $xxxx - $xxxx = $xxxx PAGE p       */
+    /*  - W x x PL -  EP   [mapping]     $xxxx - $xxxx = $xxxx PAGE p WOM w */
+    /*  R W x x PL -  EP   [mapping]     $xxxx - $xxxx = $xxxx PAGE p RAM w */
+    /*  - - x x PL -  -    [preload]     $xxxx - $xxxx = $xxxx              */
+    /*  x x x B x  -  x    [bankswitch]  $xxxx - $xxxx                      */
+    /*  R - x x -  -  -    [memattr]     $xxxx - $xxxx = ROM d              */
+    /*  - W x x -  -  -    [memattr]     $xxxx - $xxxx = WOM d              */
+    /*  R W x x -  -  -    [memattr]     $xxxx - $xxxx = RAM d              */
+    /*  R - x x -  -  EP   [memattr]     $xxxx - $xxxx = PAGE p ROM d       */
+    /*  - W x x -  -  EP   [memattr]     $xxxx - $xxxx = PAGE p WOM d       */
+    /*  R W x x -  -  EP   [memattr]     $xxxx - $xxxx = PAGE p RAM d       */
     /* -------------------------------------------------------------------- */
 
 
@@ -837,23 +1031,44 @@ void bc_print_memspan
     need_hdr = 1;
     for (m = mem; m; m = (bc_memspan_t *)m->l.next)
     {
-        if ((m->flags & (BC_SPAN_R|BC_SPAN_PL)) != (BC_SPAN_R|BC_SPAN_PL) ||
+        if (
+            !(
+                (m->flags & BC_SPAN_PL) &&
+                (m->flags & (BC_SPAN_R | BC_SPAN_W))
+            ) ||
             (m->flags & BC_SPAN_PK) ||
             (m->f_name != NULL))
             continue;
 
         if (need_hdr)
         {
-            fprintf(f, "\n[mapping]\n");
+            p->fxn(p->opq, "\015\012[mapping]\015\012");
             need_hdr = 0;
         }
 
+        p->fxn(p->opq, "$%.4X - $%.4X = $%.4X",
+               m->s_fofs, m->e_fofs, m->s_addr);
+
         if (m->flags & BC_SPAN_EP)
-            fprintf(f, "$%.4X - $%.4X = $%.4X PAGE %X\n",
-                    m->s_fofs, m->e_fofs, m->s_addr, m->epage);
-        else
-            fprintf(f, "$%.4X - $%.4X = $%.4X\n",
-                    m->s_fofs, m->e_fofs, m->s_addr);
+            p->fxn(p->opq, " PAGE %X", m->epage);
+
+        switch (m->flags & (BC_SPAN_R | BC_SPAN_W))
+        {
+            case BC_SPAN_ROM:
+                if ( m->width != 16 )
+                    p->fxn(p->opq, " ROM %d", m->width); /* Weird... */
+                break;
+            case BC_SPAN_WOM:
+                p->fxn(p->opq, " WOM %d", m->width);
+                break;
+            case BC_SPAN_RAM:
+                p->fxn(p->opq, " RAM %d", m->width);
+                break;
+            default:
+                p->fxn(p->opq, " ; unknown!");
+                break;
+        }
+        p->fxn(p->opq, "\015\012");
     }
 
     /* -------------------------------------------------------------------- */
@@ -862,23 +1077,23 @@ void bc_print_memspan
     need_hdr = 1;
     for (m = mem; m; m = (bc_memspan_t *)m->l.next)
     {
-        if ((m->flags & (BC_SPAN_R|BC_SPAN_PL)) != (BC_SPAN_PL) ||
+        if ((m->flags & (BC_SPAN_R|BC_SPAN_W|BC_SPAN_PL)) != (BC_SPAN_PL) ||
             (m->flags & BC_SPAN_PK) ||
             (m->f_name != NULL))
             continue;
 
         if (need_hdr)
         {
-            fprintf(f, "\n[preload]\n");
+            p->fxn(p->opq, "\015\012[preload]\015\012");
             need_hdr = 0;
         }
 
         if (m->flags & BC_SPAN_EP)
-            fprintf(f, "$%.4X - $%.4X = $%.4X PAGE %X\n",
-                    m->s_fofs, m->e_fofs, m->s_addr, m->epage);
+            p->fxn(p->opq, "$%.4X - $%.4X = $%.4X PAGE %X\015\012",
+                   m->s_fofs, m->e_fofs, m->s_addr, m->epage);
         else
-            fprintf(f, "$%.4X - $%.4X = $%.4X\n",
-                    m->s_fofs, m->e_fofs, m->s_addr);
+            p->fxn(p->opq, "$%.4X - $%.4X = $%.4X\015\012",
+                   m->s_fofs, m->e_fofs, m->s_addr);
     }
 
     /* -------------------------------------------------------------------- */
@@ -893,70 +1108,52 @@ void bc_print_memspan
 
         if (need_hdr)
         {
-            fprintf(f, "\n[bankswitch]\n");
+            p->fxn(p->opq, "\015\012[bankswitch]\015\012");
             need_hdr = 0;
         }
 
-        fprintf(f, "$%.4X - $%.4X\n", m->s_addr, m->e_addr);
+        p->fxn(p->opq, "$%.4X - $%.4X\015\012", m->s_addr, m->e_addr);
     }
 
 
     /* -------------------------------------------------------------------- */
-    /*  Get all the [memattr] RAM sections.                                 */
+    /*  Get all the [memattr] sections.                                     */
     /* -------------------------------------------------------------------- */
-    need_hdr = 1; /* reuse for next 3 loops */
+    need_hdr = 1;
     for (m = mem; m; m = (bc_memspan_t *)m->l.next)
     {
-        if ((m->flags & (BC_SPAN_R | BC_SPAN_W)) != (BC_SPAN_R | BC_SPAN_W) ||
+        if ((m->flags & (BC_SPAN_R | BC_SPAN_W)) == 0 ||
+            (m->flags & BC_SPAN_PL) ||
             (m->flags & BC_SPAN_PK))
             continue;
 
         if (need_hdr)
         {
-            fprintf(f, "\n[memattr]\n");
+            p->fxn(p->opq, "\015\012[memattr]\015\012");
             need_hdr = 0;
         }
 
-        fprintf(f, "$%.4X - $%.4X = RAM %d\n", m->s_addr, m->e_addr, m->width);
-    }
+        p->fxn(p->opq, "$%.4X - $%.4X =", m->s_addr, m->e_addr);
 
+        if (m->flags & BC_SPAN_EP)
+            p->fxn(p->opq, " PAGE %X", m->epage);
 
-    /* -------------------------------------------------------------------- */
-    /*  Get all the [memattr] WOM sections.                                 */
-    /* -------------------------------------------------------------------- */
-    /* carry need_hdr from previous loop */
-    for (m = mem; m; m = (bc_memspan_t *)m->l.next)
-    {
-        if ((m->flags & (BC_SPAN_R | BC_SPAN_W)) != (BC_SPAN_W) ||
-            (m->flags & BC_SPAN_PK))
-            continue;
-
-        if (need_hdr)
+        switch (m->flags & (BC_SPAN_R | BC_SPAN_W))
         {
-            fprintf(f, "\n[memattr]\n");
-            need_hdr = 0;
+            case BC_SPAN_ROM:
+                p->fxn(p->opq, " ROM %d", m->width);
+                break;
+            case BC_SPAN_WOM:
+                p->fxn(p->opq, " WOM %d", m->width);
+                break;
+            case BC_SPAN_RAM:
+                p->fxn(p->opq, " RAM %d", m->width);
+                break;
+            default:
+                p->fxn(p->opq, " ; unknown!");
+                break;
         }
-
-        fprintf(f, "$%.4X - $%.4X = RAM %d\n", m->s_addr, m->e_addr, m->width);
-    }
-
-    /* -------------------------------------------------------------------- */
-    /*  Get all the [memattr] ROM sections.                                 */
-    /* -------------------------------------------------------------------- */
-    /* carry need_hdr from previous loop */
-    for (m = mem; m; m = (bc_memspan_t *)m->l.next)
-    {
-        if ((m->flags & (BC_SPAN_R | BC_SPAN_W | BC_SPAN_PL)) != (BC_SPAN_R) ||
-            (m->flags & BC_SPAN_PK))
-            continue;
-
-        if (need_hdr)
-        {
-            fprintf(f, "\n[memattr]\n");
-            need_hdr = 0;
-        }
-
-        fprintf(f, "$%.4X - $%.4X = RAM %d\n", m->s_addr, m->e_addr, m->width);
+        p->fxn(p->opq, "\015\012");
     }
 }
 
@@ -966,22 +1163,23 @@ void bc_print_memspan
 /* ======================================================================== */
 void bc_print_cfg
 (
-    FILE                *RESTRICT const f, 
+    printer_t           *RESTRICT const p,
     const bc_cfgfile_t  *RESTRICT const bc
 )
 {
-    if (bc->diags)      bc_print_diag   (f, bc->cfgfile,  bc->diags, 1   );
-    if (bc->span)       bc_print_memspan(f, bc->span                     );
-    if (bc->macro)      bc_print_macro  (f, bc->macro                    );
-    if (bc->vars)       bc_print_varlike(f, bc->vars,     "[vars]"       );
-    if (bc->keys[0])    bc_print_varlike(f, bc->keys[0],  "[keys]"       );
-    if (bc->keys[1])    bc_print_varlike(f, bc->keys[1],  "[capslock]"   );
-    if (bc->keys[2])    bc_print_varlike(f, bc->keys[2],  "[numlock]"    );
-    if (bc->keys[3])    bc_print_varlike(f, bc->keys[3],  "[scrolllock]" );
-    if (bc->joystick)   bc_print_varlike(f, bc->joystick, "[joystick]"   );
+    if (bc->diags)      bc_print_diag   (p, bc->cfgfile,  bc->diags, 1   );
+    if (bc->span)       bc_print_memspan(p, bc->span                     );
+    if (bc->macro)      bc_print_macro  (p, bc->macro                    );
+    if (bc->vars)       bc_print_varlike(p, bc->vars,     "[vars]"       );
+    if (bc->keys[0])    bc_print_varlike(p, bc->keys[0],  "[keys]"       );
+    if (bc->keys[1])    bc_print_varlike(p, bc->keys[1],  "[capslock]"   );
+    if (bc->keys[2])    bc_print_varlike(p, bc->keys[2],  "[numlock]"    );
+    if (bc->keys[3])    bc_print_varlike(p, bc->keys[3],  "[scrolllock]" );
+    if (bc->joystick)   bc_print_varlike(p, bc->joystick, "[joystick]"   );
 }
 
 #endif /* BC_NOPRINT */
+
 
 /* ======================================================================== */
 /*  This program is free software; you can redistribute it and/or modify    */
@@ -994,11 +1192,9 @@ void bc_print_cfg
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                 Copyright (c) 2003-+Inf, Joseph Zbiciak                  */
 /* ======================================================================== */
-
-

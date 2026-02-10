@@ -7,9 +7,9 @@
 /*  number of times to a rectangle in the output surface.                   */
 /*                                                                          */
 /*  The horizontal scalers do not know anything about color depth.  Rather, */
-/*  they work from a simple uint_32 palette, storing out uint_32's for each */
-/*  pixel.  The palette can be set up for 8bpp, 16bpp or 32bpp as long as   */
-/*  it's replicated out to the fill size used  by the horizontal scaler.    */
+/*  they work from a simple uint32_t palette, storing out uint32_t's for    */
+/*  each pixel.  The palette can be set up for 8bpp, 16bpp or 32bpp as long */
+/*  as it's replicated out to the fill size used  by the horizontal scaler. */
 /*                                                                          */
 /*  The hscale kernels assume the number of inputs are a multiple of 8.     */
 /*  Hscale factors below 4 do not use a palette.                            */
@@ -17,8 +17,8 @@
 
 #include "config.h"
 #include "periph/periph.h"
-#include "gfx.h"
-#include "gfx_scale.h"
+#include "gfx/gfx.h"
+#include "gfx/gfx_scale.h"
 
 #define R RESTRICT
 
@@ -32,57 +32,48 @@
 
 #ifdef BYTE_BE
 
-LOCAL inline uint_32 pack8_32(uint_8 p0, uint_8 p1, uint_8 p2, uint_8 p3)
+LOCAL INLINE uint32_t pack8_32(uint8_t p0, uint8_t p1, uint8_t p2, uint8_t p3)
 {
-    return ((uint_32)p0 << 24) | ((uint_32)p1 << 16) | ((uint_32)p2 << 8) | p3;
+    return ((uint32_t)p0 << 24) | ((uint32_t)p1 << 16) 
+         | ((uint32_t)p2 << 8) | p3;
 }
 
-LOCAL inline uint_32 pack16_32(uint_16 p0, uint_16 p1)
-{
-    return ((uint_32)p0 << 16) | p1;
-}
-
-LOCAL inline uint_32 merge16_32(uint_32 p0, uint_32 p1)
+LOCAL INLINE uint32_t merge16_32(uint32_t p0, uint32_t p1)
 {
     return (0xFFFF0000 & p0) | (0x0000FFFF & p1);
 }
 
-LOCAL inline uint_64 pack32_64(uint_32 p0, uint_32 p1)
-{
-    return ((uint_64)p0 << 32) | p1;
-}
-
-LOCAL inline uint_32 pack_AAAA(uint_8 p0)
+LOCAL INLINE uint32_t pack_AAAA(uint8_t p0)
 {
     return p0 * 0x01010101;
 }
 
-LOCAL inline uint_32 pack_AAAB(uint_8 p0, uint_8 p1)
+LOCAL INLINE uint32_t pack_AAAB(uint8_t p0, uint8_t p1)
 {
     return p0 * 0x01010100 + p1 * 0x00000001;
 }
 
-LOCAL inline uint_32 pack_AABB(uint_8 p0, uint_8 p1)
+LOCAL INLINE uint32_t pack_AABB(uint8_t p0, uint8_t p1)
 {
     return p0 * 0x01010000 + p1 * 0x00000101;
 }
 
-LOCAL inline uint_32 pack_ABBB(uint_8 p0, uint_8 p1)
+LOCAL INLINE uint32_t pack_ABBB(uint8_t p0, uint8_t p1)
 {
     return p0 * 0x01000000 + p1 * 0x00010101;
 }
 
-LOCAL inline uint_32 pack_ABBC(uint_8 p0, uint_8 p1, uint_8 p2)
+LOCAL INLINE uint32_t pack_ABBC(uint8_t p0, uint8_t p1, uint8_t p2)
 {
     return p0 * 0x01000000 + p1 * 0x00010100 + p2;
 }
 
-LOCAL inline uint_32 pack_AABC(uint_8 p0, uint_8 p1, uint_8 p2)
+LOCAL INLINE uint32_t pack_AABC(uint8_t p0, uint8_t p1, uint8_t p2)
 {
     return p0 * 0x01010000 + p1 * 0x00000100 + p2;
 }
 
-LOCAL inline uint_32 pack_ABCC(uint_8 p0, uint_8 p1, uint_8 p2)
+LOCAL INLINE uint32_t pack_ABCC(uint8_t p0, uint8_t p1, uint8_t p2)
 {
     return p0 * 0x01000000 + p1 * 0x00010000 + p2 * 0x00000101;
 }
@@ -90,57 +81,42 @@ LOCAL inline uint_32 pack_ABCC(uint_8 p0, uint_8 p1, uint_8 p2)
 
 #else /* BYTE_LE */
 
-LOCAL inline uint_32 pack8_32(uint_8 p0, uint_8 p1, uint_8 p2, uint_8 p3)
-{
-    return ((uint_32)p3 << 24) | ((uint_32)p2 << 16) | ((uint_32)p1 << 8) | p0;
-}
-
-LOCAL inline uint_32 pack16_32(uint_16 p0, uint_16 p1)
-{
-    return ((uint_32)p1 << 16) | p0;
-}
-
-LOCAL inline uint_32 merge16_32(uint_32 p0, uint_32 p1)
+LOCAL INLINE uint32_t merge16_32(uint32_t p0, uint32_t p1)
 {
     return (0xFFFF0000 & p1) | (0x0000FFFF & p0);
 }
 
-LOCAL inline uint_64 pack32_64(uint_32 p0, uint_32 p1)
-{
-    return ((uint_64)p1 << 32) | p0;
-}
-
-LOCAL inline uint_32 pack_AAAA(uint_8 p0)
+LOCAL INLINE uint32_t pack_AAAA(uint8_t p0)
 {
     return p0 * 0x01010101;
 }
 
-LOCAL inline uint_32 pack_AAAB(uint_8 p0, uint_8 p1)
+LOCAL INLINE uint32_t pack_AAAB(uint8_t p0, uint8_t p1)
 {
     return p0 * 0x00010101 + p1 * 0x01000000;
 }
 
-LOCAL inline uint_32 pack_AABB(uint_8 p0, uint_8 p1)
+LOCAL INLINE uint32_t pack_AABB(uint8_t p0, uint8_t p1)
 {
     return p0 * 0x00000101 + p1 * 0x01010000;
 }
 
-LOCAL inline uint_32 pack_ABBB(uint_8 p0, uint_8 p1)
+LOCAL INLINE uint32_t pack_ABBB(uint8_t p0, uint8_t p1)
 {
     return p0 * 0x00000001 + p1 * 0x01010100;
 }
 
-LOCAL inline uint_32 pack_ABBC(uint_8 p0, uint_8 p1, uint_8 p2)
+LOCAL INLINE uint32_t pack_ABBC(uint8_t p0, uint8_t p1, uint8_t p2)
 {
     return p0 * 0x00000001 + p1 * 0x00010100 + p2 * 0x01000000;
 }
 
-LOCAL inline uint_32 pack_AABC(uint_8 p0, uint_8 p1, uint_8 p2)
+LOCAL INLINE uint32_t pack_AABC(uint8_t p0, uint8_t p1, uint8_t p2)
 {
     return p0 * 0x00000101 + p1 * 0x00010000 + p2 * 0x01000000;
 }
 
-LOCAL inline uint_32 pack_ABCC(uint_8 p0, uint_8 p1, uint_8 p2)
+LOCAL INLINE uint32_t pack_ABCC(uint8_t p0, uint8_t p1, uint8_t p2)
 {
     return p0 * 0x00000001 + p1 * 0x00000100 + p2 * 0x01010000;
 }
@@ -148,48 +124,46 @@ LOCAL inline uint_32 pack_ABCC(uint_8 p0, uint_8 p1, uint_8 p2)
 #endif
 
 
-LOCAL void gfx_hscale_1_0x_np(uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
-                              int cnt)
+TARGET_CLONES(LOCAL void gfx_hscale_1_0x_np(uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
+                              int cnt))
 {
     memcpy((void *)hs_buf_ptr, (const void *)src, cnt);
 }
 
-LOCAL void gfx_hscale_1_5x_np(uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
-                              int cnt)
+TARGET_CLONES(LOCAL void gfx_hscale_1_5x_np(uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
+                              int cnt))
 {
     int i, j;
-    uint_8 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint8_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = src[i++];
         p1 = src[i++];
-        p2 = src[i++];
         p2 = src[i++]; hs_buf_ptr[j++] = pack_AABC(p0, p1, p2);
-        p2 = src[i++];
         p3 = src[i++];
-        p4 = src[i++];
         p4 = src[i++]; hs_buf_ptr[j++] = pack_ABCC(p2, p3, p4);
         p5 = src[i++];
         p6 = src[i++];
-        p7 = src[i++];
         p7 = src[i++]; hs_buf_ptr[j++] = pack_ABBC(p5, p6, p7);
     }
 }
 
-LOCAL void gfx_hscale_2_0x_np(uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
-                              int cnt)
+TARGET_CLONES(LOCAL void gfx_hscale_2_0x_np(uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
+                              int cnt))
 {
     int i, j;
-    uint_8 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint8_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = src[i++];
@@ -203,15 +177,17 @@ LOCAL void gfx_hscale_2_0x_np(uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_2_5x_np(uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
-                              int cnt)
+TARGET_CLONES(LOCAL void gfx_hscale_2_5x_np(uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
+                              int cnt))
 {
     int i, j;
-    uint_8 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint8_t p0, p1, p2, p3, p4, p5, p6, p7;
+
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = src[i++];
@@ -220,22 +196,21 @@ LOCAL void gfx_hscale_2_5x_np(uint_32 *R hs_buf_ptr,
         p3 = src[i++];
         p4 = src[i++]; hs_buf_ptr[j++] = pack_AABB(p3, p4);
         p5 = src[i++];
-        p6 = src[i++];
         p6 = src[i++]; hs_buf_ptr[j++] = pack_ABBC(p4, p5, p6);
-        p6 = src[i++];
         p7 = src[i++]; hs_buf_ptr[j++] = pack_AABB(p6, p7);
     }
 }
 
-LOCAL void gfx_hscale_3_0x_np(uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
-                              int cnt)
+TARGET_CLONES(LOCAL void gfx_hscale_3_0x_np(uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
+                              int cnt))
 {
     int i, j;
-    uint_8 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint8_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = src[i++];
@@ -249,15 +224,16 @@ LOCAL void gfx_hscale_3_0x_np(uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_3_5x_np(uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
-                              int cnt)
+TARGET_CLONES(LOCAL void gfx_hscale_3_5x_np(uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
+                              int cnt))
 {
     int i, j;
-    uint_8 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint8_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = src[i++]; hs_buf_ptr[j++] = pack_AAAA(p0);
@@ -271,15 +247,16 @@ LOCAL void gfx_hscale_3_5x_np(uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_4_0x_np(uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
-                              int cnt)
+TARGET_CLONES(LOCAL void gfx_hscale_4_0x_np(uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
+                              int cnt))
 {
     int i, j;
-    uint_8 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint8_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = src[i++]; hs_buf_ptr[j++] = pack_AAAA(p0);
@@ -293,15 +270,16 @@ LOCAL void gfx_hscale_4_0x_np(uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_4_5x_np(uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
-                              int cnt)
+TARGET_CLONES(LOCAL void gfx_hscale_4_5x_np(uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
+                              int cnt))
 {
     int i, j;
-    uint_8 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint8_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = src[i++]; hs_buf_ptr[j++] = pack_AAAA(p0);
@@ -316,15 +294,16 @@ LOCAL void gfx_hscale_4_5x_np(uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_5_0x_np(uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
-                              int cnt)
+TARGET_CLONES(LOCAL void gfx_hscale_5_0x_np(uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
+                              int cnt))
 {
     int i, j;
-    uint_8 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint8_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = src[i++]; hs_buf_ptr[j++] = pack_AAAA(p0);
@@ -340,15 +319,16 @@ LOCAL void gfx_hscale_5_0x_np(uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_5_5x_np(uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
-                              int cnt)
+TARGET_CLONES(LOCAL void gfx_hscale_5_5x_np(uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
+                              int cnt))
 {
     int i, j;
-    uint_8 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint8_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = src[i++]; hs_buf_ptr[j++] = pack_AAAA(p0);
@@ -365,15 +345,16 @@ LOCAL void gfx_hscale_5_5x_np(uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_6_0x_np(uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
-                              int cnt)
+TARGET_CLONES(LOCAL void gfx_hscale_6_0x_np(uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
+                              int cnt))
 {
     int i, j;
-    uint_8 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint8_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = src[i++]; hs_buf_ptr[j++] = pack_AAAA(p0);
@@ -391,15 +372,16 @@ LOCAL void gfx_hscale_6_0x_np(uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_6_5x_np(uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
-                              int cnt)
+TARGET_CLONES(LOCAL void gfx_hscale_6_5x_np(uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
+                              int cnt))
 {
     int i, j;
-    uint_8 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint8_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = src[i++]; hs_buf_ptr[j++] = pack_AAAA(p0);
@@ -418,15 +400,16 @@ LOCAL void gfx_hscale_6_5x_np(uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_7_0x_np(uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
-                              int cnt)
+TARGET_CLONES(LOCAL void gfx_hscale_7_0x_np(uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
+                              int cnt))
 {
     int i, j;
-    uint_8 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint8_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = src[i++]; hs_buf_ptr[j++] = pack_AAAA(p0);
@@ -446,12 +429,12 @@ LOCAL void gfx_hscale_7_0x_np(uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_7_5x_np(uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
-                              int cnt)
+TARGET_CLONES(LOCAL void gfx_hscale_7_5x_np(uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
+                              int cnt))
 {
     int i, j;
-    uint_8 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint8_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
@@ -475,15 +458,16 @@ LOCAL void gfx_hscale_7_5x_np(uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_8_0x_np(uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
-                              int cnt)
+TARGET_CLONES(LOCAL void gfx_hscale_8_0x_np(uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
+                              int cnt))
 {
     int i, j;
-    uint_8 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint8_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = src[i++]; hs_buf_ptr[j++] = pack_AAAA(p0);
@@ -505,15 +489,16 @@ LOCAL void gfx_hscale_8_0x_np(uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_8_5x_np(uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
-                              int cnt)
+TARGET_CLONES(LOCAL void gfx_hscale_8_5x_np(uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
+                              int cnt))
 {
     int i, j;
-    uint_8 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint8_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = src[i++]; hs_buf_ptr[j++] = pack_AAAA(p0);
@@ -536,15 +521,16 @@ LOCAL void gfx_hscale_8_5x_np(uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_9_0x_np(uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
-                              int cnt)
+TARGET_CLONES(LOCAL void gfx_hscale_9_0x_np(uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
+                              int cnt))
 {
     int i, j;
-    uint_8 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint8_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = src[i++]; hs_buf_ptr[j++] = pack_AAAA(p0);
@@ -568,15 +554,16 @@ LOCAL void gfx_hscale_9_0x_np(uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_9_5x_np(uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
-                              int cnt)
+TARGET_CLONES(LOCAL void gfx_hscale_9_5x_np(uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
+                              int cnt))
 {
     int i, j;
-    uint_8 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint8_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = src[i++]; hs_buf_ptr[j++] = pack_AAAA(p0);
@@ -601,15 +588,16 @@ LOCAL void gfx_hscale_9_5x_np(uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_10_0x_np(uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
-                              int cnt)
+TARGET_CLONES(LOCAL void gfx_hscale_10_0x_np(uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
+                              int cnt))
 {
     int i, j;
-    uint_8 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint8_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = src[i++]; hs_buf_ptr[j++] = pack_AAAA(p0);
@@ -635,15 +623,16 @@ LOCAL void gfx_hscale_10_0x_np(uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_10_5x_np(uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
-                              int cnt)
+TARGET_CLONES(LOCAL void gfx_hscale_10_5x_np(uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
+                              int cnt))
 {
     int i, j;
-    uint_8 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint8_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = src[i++]; hs_buf_ptr[j++] = pack_AAAA(p0);
@@ -670,15 +659,16 @@ LOCAL void gfx_hscale_10_5x_np(uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_11_0x_np(uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
-                              int cnt)
+TARGET_CLONES(LOCAL void gfx_hscale_11_0x_np(uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
+                              int cnt))
 {
     int i, j;
-    uint_8 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint8_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = src[i++]; hs_buf_ptr[j++] = pack_AAAA(p0);
@@ -706,15 +696,16 @@ LOCAL void gfx_hscale_11_0x_np(uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_11_5x_np(uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
-                              int cnt)
+TARGET_CLONES(LOCAL void gfx_hscale_11_5x_np(uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
+                              int cnt))
 {
     int i, j;
-    uint_8 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint8_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = src[i++]; hs_buf_ptr[j++] = pack_AAAA(p0);
@@ -743,15 +734,16 @@ LOCAL void gfx_hscale_11_5x_np(uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_12_0x_np(uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
-                              int cnt)
+TARGET_CLONES(LOCAL void gfx_hscale_12_0x_np(uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
+                              int cnt))
 {
     int i, j;
-    uint_8 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint8_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = src[i++]; hs_buf_ptr[j++] = pack_AAAA(p0);
@@ -781,15 +773,16 @@ LOCAL void gfx_hscale_12_0x_np(uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_12_5x_np(uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
-                              int cnt)
+TARGET_CLONES(LOCAL void gfx_hscale_12_5x_np(uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
+                              int cnt))
 {
     int i, j;
-    uint_8 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint8_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = src[i++]; hs_buf_ptr[j++] = pack_AAAA(p0);
@@ -820,15 +813,16 @@ LOCAL void gfx_hscale_12_5x_np(uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_13_0x_np(uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
-                              int cnt)
+TARGET_CLONES(LOCAL void gfx_hscale_13_0x_np(uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
+                              int cnt))
 {
     int i, j;
-    uint_8 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint8_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = src[i++]; hs_buf_ptr[j++] = pack_AAAA(p0);
@@ -860,15 +854,16 @@ LOCAL void gfx_hscale_13_0x_np(uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_13_5x_np(uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
-                              int cnt)
+TARGET_CLONES(LOCAL void gfx_hscale_13_5x_np(uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
+                              int cnt))
 {
     int i, j;
-    uint_8 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint8_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = src[i++]; hs_buf_ptr[j++] = pack_AAAA(p0);
@@ -901,15 +896,16 @@ LOCAL void gfx_hscale_13_5x_np(uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_14_0x_np(uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
-                              int cnt)
+TARGET_CLONES(LOCAL void gfx_hscale_14_0x_np(uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
+                              int cnt))
 {
     int i, j;
-    uint_8 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint8_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = src[i++]; hs_buf_ptr[j++] = pack_AAAA(p0);
@@ -943,15 +939,16 @@ LOCAL void gfx_hscale_14_0x_np(uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_14_5x_np(uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
-                              int cnt)
+TARGET_CLONES(LOCAL void gfx_hscale_14_5x_np(uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
+                              int cnt))
 {
     int i, j;
-    uint_8 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint8_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = src[i++]; hs_buf_ptr[j++] = pack_AAAA(p0);
@@ -986,15 +983,16 @@ LOCAL void gfx_hscale_14_5x_np(uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_15_0x_np(uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
-                              int cnt)
+TARGET_CLONES(LOCAL void gfx_hscale_15_0x_np(uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
+                              int cnt))
 {
     int i, j;
-    uint_8 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint8_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = src[i++]; hs_buf_ptr[j++] = pack_AAAA(p0);
@@ -1030,15 +1028,16 @@ LOCAL void gfx_hscale_15_0x_np(uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_15_5x_np(uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
-                              int cnt)
+TARGET_CLONES(LOCAL void gfx_hscale_15_5x_np(uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
+                              int cnt))
 {
     int i, j;
-    uint_8 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint8_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = src[i++]; hs_buf_ptr[j++] = pack_AAAA(p0);
@@ -1075,15 +1074,16 @@ LOCAL void gfx_hscale_15_5x_np(uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_16_0x_np(uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
-                              int cnt)
+TARGET_CLONES(LOCAL void gfx_hscale_16_0x_np(uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
+                              int cnt))
 {
     int i, j;
-    uint_8 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint8_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = src[i++]; hs_buf_ptr[j++] = pack_AAAA(p0);
@@ -1121,15 +1121,16 @@ LOCAL void gfx_hscale_16_0x_np(uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_16_5x_np(uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
-                              int cnt)
+TARGET_CLONES(LOCAL void gfx_hscale_16_5x_np(uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
+                              int cnt))
 {
     int i, j;
-    uint_8 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint8_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = src[i++]; hs_buf_ptr[j++] = pack_AAAA(p0);
@@ -1168,16 +1169,17 @@ LOCAL void gfx_hscale_16_5x_np(uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_1_0x_p (uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
+TARGET_CLONES(LOCAL void gfx_hscale_1_0x_p (uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
                               int cnt,
-                              const uint_32 *R pal)
+                              const uint32_t *R pal))
 {
     int i, j;
-    uint_32 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint32_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = pal[src[i++]]; hs_buf_ptr[j++] = p0;
@@ -1191,16 +1193,17 @@ LOCAL void gfx_hscale_1_0x_p (uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_1_5x_p (uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
+TARGET_CLONES(LOCAL void gfx_hscale_1_5x_p (uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
                               int cnt,
-                              const uint_32 *R pal)
+                              const uint32_t *R pal))
 {
     int i, j;
-    uint_32 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint32_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = pal[src[i++]]; hs_buf_ptr[j++] = p0;
@@ -1218,16 +1221,17 @@ LOCAL void gfx_hscale_1_5x_p (uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_2_0x_p (uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
+TARGET_CLONES(LOCAL void gfx_hscale_2_0x_p (uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
                               int cnt,
-                              const uint_32 *R pal)
+                              const uint32_t *R pal))
 {
     int i, j;
-    uint_32 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint32_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = pal[src[i++]]; hs_buf_ptr[j++] = p0;
@@ -1249,16 +1253,17 @@ LOCAL void gfx_hscale_2_0x_p (uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_2_5x_p (uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
+TARGET_CLONES(LOCAL void gfx_hscale_2_5x_p (uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
                               int cnt,
-                              const uint_32 *R pal)
+                              const uint32_t *R pal))
 {
     int i, j;
-    uint_32 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint32_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = pal[src[i++]]; hs_buf_ptr[j++] = p0;
@@ -1284,16 +1289,17 @@ LOCAL void gfx_hscale_2_5x_p (uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_3_0x_p (uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
+TARGET_CLONES(LOCAL void gfx_hscale_3_0x_p (uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
                               int cnt,
-                              const uint_32 *R pal)
+                              const uint32_t *R pal))
 {
     int i, j;
-    uint_32 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint32_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = pal[src[i++]]; hs_buf_ptr[j++] = p0;
@@ -1323,16 +1329,17 @@ LOCAL void gfx_hscale_3_0x_p (uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_3_5x_p (uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
+TARGET_CLONES(LOCAL void gfx_hscale_3_5x_p (uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
                               int cnt,
-                              const uint_32 *R pal)
+                              const uint32_t *R pal))
 {
     int i, j;
-    uint_32 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint32_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = pal[src[i++]]; hs_buf_ptr[j++] = p0;
@@ -1366,16 +1373,17 @@ LOCAL void gfx_hscale_3_5x_p (uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_4_0x_p (uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
+TARGET_CLONES(LOCAL void gfx_hscale_4_0x_p (uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
                               int cnt,
-                              const uint_32 *R pal)
+                              const uint32_t *R pal))
 {
     int i, j;
-    uint_32 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint32_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = pal[src[i++]]; hs_buf_ptr[j++] = p0;
@@ -1413,16 +1421,17 @@ LOCAL void gfx_hscale_4_0x_p (uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_4_5x_p (uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
+TARGET_CLONES(LOCAL void gfx_hscale_4_5x_p (uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
                               int cnt,
-                              const uint_32 *R pal)
+                              const uint32_t *R pal))
 {
     int i, j;
-    uint_32 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint32_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = pal[src[i++]]; hs_buf_ptr[j++] = p0;
@@ -1464,75 +1473,20 @@ LOCAL void gfx_hscale_4_5x_p (uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_5_0x_p (uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
+TARGET_CLONES(LOCAL void gfx_hscale_5_0x_p (uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
                               int cnt,
-                              const uint_32 *R pal)
+                              const uint32_t *R pal))
 {
     int i, j;
-    uint_32 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint32_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = pal[src[i++]]; hs_buf_ptr[j++] = p0;
-                            hs_buf_ptr[j++] = p0;
-                            hs_buf_ptr[j++] = p0;
-                            hs_buf_ptr[j++] = p0;
-                            hs_buf_ptr[j++] = p0;
-        p1 = pal[src[i++]]; hs_buf_ptr[j++] = p1;
-                            hs_buf_ptr[j++] = p1;
-                            hs_buf_ptr[j++] = p1;
-                            hs_buf_ptr[j++] = p1;
-                            hs_buf_ptr[j++] = p1;
-        p2 = pal[src[i++]]; hs_buf_ptr[j++] = p2;
-                            hs_buf_ptr[j++] = p2;
-                            hs_buf_ptr[j++] = p2;
-                            hs_buf_ptr[j++] = p2;
-                            hs_buf_ptr[j++] = p2;
-        p3 = pal[src[i++]]; hs_buf_ptr[j++] = p3;
-                            hs_buf_ptr[j++] = p3;
-                            hs_buf_ptr[j++] = p3;
-                            hs_buf_ptr[j++] = p3;
-                            hs_buf_ptr[j++] = p3;
-        p4 = pal[src[i++]]; hs_buf_ptr[j++] = p4;
-                            hs_buf_ptr[j++] = p4;
-                            hs_buf_ptr[j++] = p4;
-                            hs_buf_ptr[j++] = p4;
-                            hs_buf_ptr[j++] = p4;
-        p5 = pal[src[i++]]; hs_buf_ptr[j++] = p5;
-                            hs_buf_ptr[j++] = p5;
-                            hs_buf_ptr[j++] = p5;
-                            hs_buf_ptr[j++] = p5;
-                            hs_buf_ptr[j++] = p5;
-        p6 = pal[src[i++]]; hs_buf_ptr[j++] = p6;
-                            hs_buf_ptr[j++] = p6;
-                            hs_buf_ptr[j++] = p6;
-                            hs_buf_ptr[j++] = p6;
-                            hs_buf_ptr[j++] = p6;
-        p7 = pal[src[i++]]; hs_buf_ptr[j++] = p7;
-                            hs_buf_ptr[j++] = p7;
-                            hs_buf_ptr[j++] = p7;
-                            hs_buf_ptr[j++] = p7;
-                            hs_buf_ptr[j++] = p7;
-    }
-}
-
-LOCAL void gfx_hscale_5_5x_p (uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
-                              int cnt,
-                              const uint_32 *R pal)
-{
-    int i, j;
-    uint_32 p0, p1, p2, p3, p4, p5, p6, p7;
-
-    i = j = 0;
-    cnt >>= 3;
-    while (cnt-- != 0)
-    {
-        p0 = pal[src[i++]]; hs_buf_ptr[j++] = p0;
-                            hs_buf_ptr[j++] = p0;
                             hs_buf_ptr[j++] = p0;
                             hs_buf_ptr[j++] = p0;
                             hs_buf_ptr[j++] = p0;
@@ -1547,14 +1501,12 @@ LOCAL void gfx_hscale_5_5x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p2;
                             hs_buf_ptr[j++] = p2;
                             hs_buf_ptr[j++] = p2;
-                            hs_buf_ptr[j++] = p2;
         p3 = pal[src[i++]]; hs_buf_ptr[j++] = p3;
                             hs_buf_ptr[j++] = p3;
                             hs_buf_ptr[j++] = p3;
                             hs_buf_ptr[j++] = p3;
                             hs_buf_ptr[j++] = p3;
         p4 = pal[src[i++]]; hs_buf_ptr[j++] = p4;
-                            hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
@@ -1569,7 +1521,6 @@ LOCAL void gfx_hscale_5_5x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p6;
                             hs_buf_ptr[j++] = p6;
                             hs_buf_ptr[j++] = p6;
-                            hs_buf_ptr[j++] = p6;
         p7 = pal[src[i++]]; hs_buf_ptr[j++] = p7;
                             hs_buf_ptr[j++] = p7;
                             hs_buf_ptr[j++] = p7;
@@ -1578,16 +1529,17 @@ LOCAL void gfx_hscale_5_5x_p (uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_6_0x_p (uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
+TARGET_CLONES(LOCAL void gfx_hscale_5_5x_p (uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
                               int cnt,
-                              const uint_32 *R pal)
+                              const uint32_t *R pal))
 {
     int i, j;
-    uint_32 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint32_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = pal[src[i++]]; hs_buf_ptr[j++] = p0;
@@ -1597,7 +1549,6 @@ LOCAL void gfx_hscale_6_0x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p0;
                             hs_buf_ptr[j++] = p0;
         p1 = pal[src[i++]]; hs_buf_ptr[j++] = p1;
-                            hs_buf_ptr[j++] = p1;
                             hs_buf_ptr[j++] = p1;
                             hs_buf_ptr[j++] = p1;
                             hs_buf_ptr[j++] = p1;
@@ -1613,7 +1564,6 @@ LOCAL void gfx_hscale_6_0x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p3;
                             hs_buf_ptr[j++] = p3;
                             hs_buf_ptr[j++] = p3;
-                            hs_buf_ptr[j++] = p3;
         p4 = pal[src[i++]]; hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
@@ -1621,7 +1571,6 @@ LOCAL void gfx_hscale_6_0x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
         p5 = pal[src[i++]]; hs_buf_ptr[j++] = p5;
-                            hs_buf_ptr[j++] = p5;
                             hs_buf_ptr[j++] = p5;
                             hs_buf_ptr[j++] = p5;
                             hs_buf_ptr[j++] = p5;
@@ -1637,24 +1586,23 @@ LOCAL void gfx_hscale_6_0x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p7;
                             hs_buf_ptr[j++] = p7;
                             hs_buf_ptr[j++] = p7;
-                            hs_buf_ptr[j++] = p7;
     }
 }
 
-LOCAL void gfx_hscale_6_5x_p (uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
+TARGET_CLONES(LOCAL void gfx_hscale_6_0x_p (uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
                               int cnt,
-                              const uint_32 *R pal)
+                              const uint32_t *R pal))
 {
     int i, j;
-    uint_32 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint32_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = pal[src[i++]]; hs_buf_ptr[j++] = p0;
-                            hs_buf_ptr[j++] = p0;
                             hs_buf_ptr[j++] = p0;
                             hs_buf_ptr[j++] = p0;
                             hs_buf_ptr[j++] = p0;
@@ -1672,7 +1620,6 @@ LOCAL void gfx_hscale_6_5x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p2;
                             hs_buf_ptr[j++] = p2;
                             hs_buf_ptr[j++] = p2;
-                            hs_buf_ptr[j++] = p2;
         p3 = pal[src[i++]]; hs_buf_ptr[j++] = p3;
                             hs_buf_ptr[j++] = p3;
                             hs_buf_ptr[j++] = p3;
@@ -1680,7 +1627,6 @@ LOCAL void gfx_hscale_6_5x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p3;
                             hs_buf_ptr[j++] = p3;
         p4 = pal[src[i++]]; hs_buf_ptr[j++] = p4;
-                            hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
@@ -1698,7 +1644,6 @@ LOCAL void gfx_hscale_6_5x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p6;
                             hs_buf_ptr[j++] = p6;
                             hs_buf_ptr[j++] = p6;
-                            hs_buf_ptr[j++] = p6;
         p7 = pal[src[i++]]; hs_buf_ptr[j++] = p7;
                             hs_buf_ptr[j++] = p7;
                             hs_buf_ptr[j++] = p7;
@@ -1708,16 +1653,17 @@ LOCAL void gfx_hscale_6_5x_p (uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_7_0x_p (uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
+TARGET_CLONES(LOCAL void gfx_hscale_6_5x_p (uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
                               int cnt,
-                              const uint_32 *R pal)
+                              const uint32_t *R pal))
 {
     int i, j;
-    uint_32 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint32_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = pal[src[i++]]; hs_buf_ptr[j++] = p0;
@@ -1728,7 +1674,6 @@ LOCAL void gfx_hscale_7_0x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p0;
                             hs_buf_ptr[j++] = p0;
         p1 = pal[src[i++]]; hs_buf_ptr[j++] = p1;
-                            hs_buf_ptr[j++] = p1;
                             hs_buf_ptr[j++] = p1;
                             hs_buf_ptr[j++] = p1;
                             hs_buf_ptr[j++] = p1;
@@ -1747,7 +1692,6 @@ LOCAL void gfx_hscale_7_0x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p3;
                             hs_buf_ptr[j++] = p3;
                             hs_buf_ptr[j++] = p3;
-                            hs_buf_ptr[j++] = p3;
         p4 = pal[src[i++]]; hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
@@ -1756,7 +1700,6 @@ LOCAL void gfx_hscale_7_0x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
         p5 = pal[src[i++]]; hs_buf_ptr[j++] = p5;
-                            hs_buf_ptr[j++] = p5;
                             hs_buf_ptr[j++] = p5;
                             hs_buf_ptr[j++] = p5;
                             hs_buf_ptr[j++] = p5;
@@ -1775,24 +1718,23 @@ LOCAL void gfx_hscale_7_0x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p7;
                             hs_buf_ptr[j++] = p7;
                             hs_buf_ptr[j++] = p7;
-                            hs_buf_ptr[j++] = p7;
     }
 }
 
-LOCAL void gfx_hscale_7_5x_p (uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
+TARGET_CLONES(LOCAL void gfx_hscale_7_0x_p (uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
                               int cnt,
-                              const uint_32 *R pal)
+                              const uint32_t *R pal))
 {
     int i, j;
-    uint_32 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint32_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = pal[src[i++]]; hs_buf_ptr[j++] = p0;
-                            hs_buf_ptr[j++] = p0;
                             hs_buf_ptr[j++] = p0;
                             hs_buf_ptr[j++] = p0;
                             hs_buf_ptr[j++] = p0;
@@ -1813,7 +1755,6 @@ LOCAL void gfx_hscale_7_5x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p2;
                             hs_buf_ptr[j++] = p2;
                             hs_buf_ptr[j++] = p2;
-                            hs_buf_ptr[j++] = p2;
         p3 = pal[src[i++]]; hs_buf_ptr[j++] = p3;
                             hs_buf_ptr[j++] = p3;
                             hs_buf_ptr[j++] = p3;
@@ -1822,7 +1763,6 @@ LOCAL void gfx_hscale_7_5x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p3;
                             hs_buf_ptr[j++] = p3;
         p4 = pal[src[i++]]; hs_buf_ptr[j++] = p4;
-                            hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
@@ -1843,7 +1783,6 @@ LOCAL void gfx_hscale_7_5x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p6;
                             hs_buf_ptr[j++] = p6;
                             hs_buf_ptr[j++] = p6;
-                            hs_buf_ptr[j++] = p6;
         p7 = pal[src[i++]]; hs_buf_ptr[j++] = p7;
                             hs_buf_ptr[j++] = p7;
                             hs_buf_ptr[j++] = p7;
@@ -1854,16 +1793,17 @@ LOCAL void gfx_hscale_7_5x_p (uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_8_0x_p (uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
+TARGET_CLONES(LOCAL void gfx_hscale_7_5x_p (uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
                               int cnt,
-                              const uint_32 *R pal)
+                              const uint32_t *R pal))
 {
     int i, j;
-    uint_32 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint32_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = pal[src[i++]]; hs_buf_ptr[j++] = p0;
@@ -1875,7 +1815,6 @@ LOCAL void gfx_hscale_8_0x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p0;
                             hs_buf_ptr[j++] = p0;
         p1 = pal[src[i++]]; hs_buf_ptr[j++] = p1;
-                            hs_buf_ptr[j++] = p1;
                             hs_buf_ptr[j++] = p1;
                             hs_buf_ptr[j++] = p1;
                             hs_buf_ptr[j++] = p1;
@@ -1897,7 +1836,6 @@ LOCAL void gfx_hscale_8_0x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p3;
                             hs_buf_ptr[j++] = p3;
                             hs_buf_ptr[j++] = p3;
-                            hs_buf_ptr[j++] = p3;
         p4 = pal[src[i++]]; hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
@@ -1907,7 +1845,6 @@ LOCAL void gfx_hscale_8_0x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
         p5 = pal[src[i++]]; hs_buf_ptr[j++] = p5;
-                            hs_buf_ptr[j++] = p5;
                             hs_buf_ptr[j++] = p5;
                             hs_buf_ptr[j++] = p5;
                             hs_buf_ptr[j++] = p5;
@@ -1929,24 +1866,23 @@ LOCAL void gfx_hscale_8_0x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p7;
                             hs_buf_ptr[j++] = p7;
                             hs_buf_ptr[j++] = p7;
-                            hs_buf_ptr[j++] = p7;
     }
 }
 
-LOCAL void gfx_hscale_8_5x_p (uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
+TARGET_CLONES(LOCAL void gfx_hscale_8_0x_p (uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
                               int cnt,
-                              const uint_32 *R pal)
+                              const uint32_t *R pal))
 {
     int i, j;
-    uint_32 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint32_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = pal[src[i++]]; hs_buf_ptr[j++] = p0;
-                            hs_buf_ptr[j++] = p0;
                             hs_buf_ptr[j++] = p0;
                             hs_buf_ptr[j++] = p0;
                             hs_buf_ptr[j++] = p0;
@@ -1970,7 +1906,6 @@ LOCAL void gfx_hscale_8_5x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p2;
                             hs_buf_ptr[j++] = p2;
                             hs_buf_ptr[j++] = p2;
-                            hs_buf_ptr[j++] = p2;
         p3 = pal[src[i++]]; hs_buf_ptr[j++] = p3;
                             hs_buf_ptr[j++] = p3;
                             hs_buf_ptr[j++] = p3;
@@ -1980,7 +1915,6 @@ LOCAL void gfx_hscale_8_5x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p3;
                             hs_buf_ptr[j++] = p3;
         p4 = pal[src[i++]]; hs_buf_ptr[j++] = p4;
-                            hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
@@ -2004,7 +1938,6 @@ LOCAL void gfx_hscale_8_5x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p6;
                             hs_buf_ptr[j++] = p6;
                             hs_buf_ptr[j++] = p6;
-                            hs_buf_ptr[j++] = p6;
         p7 = pal[src[i++]]; hs_buf_ptr[j++] = p7;
                             hs_buf_ptr[j++] = p7;
                             hs_buf_ptr[j++] = p7;
@@ -2016,16 +1949,17 @@ LOCAL void gfx_hscale_8_5x_p (uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_9_0x_p (uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
+TARGET_CLONES(LOCAL void gfx_hscale_8_5x_p (uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
                               int cnt,
-                              const uint_32 *R pal)
+                              const uint32_t *R pal))
 {
     int i, j;
-    uint_32 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint32_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = pal[src[i++]]; hs_buf_ptr[j++] = p0;
@@ -2038,7 +1972,6 @@ LOCAL void gfx_hscale_9_0x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p0;
                             hs_buf_ptr[j++] = p0;
         p1 = pal[src[i++]]; hs_buf_ptr[j++] = p1;
-                            hs_buf_ptr[j++] = p1;
                             hs_buf_ptr[j++] = p1;
                             hs_buf_ptr[j++] = p1;
                             hs_buf_ptr[j++] = p1;
@@ -2063,7 +1996,6 @@ LOCAL void gfx_hscale_9_0x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p3;
                             hs_buf_ptr[j++] = p3;
                             hs_buf_ptr[j++] = p3;
-                            hs_buf_ptr[j++] = p3;
         p4 = pal[src[i++]]; hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
@@ -2074,7 +2006,6 @@ LOCAL void gfx_hscale_9_0x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
         p5 = pal[src[i++]]; hs_buf_ptr[j++] = p5;
-                            hs_buf_ptr[j++] = p5;
                             hs_buf_ptr[j++] = p5;
                             hs_buf_ptr[j++] = p5;
                             hs_buf_ptr[j++] = p5;
@@ -2099,24 +2030,23 @@ LOCAL void gfx_hscale_9_0x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p7;
                             hs_buf_ptr[j++] = p7;
                             hs_buf_ptr[j++] = p7;
-                            hs_buf_ptr[j++] = p7;
     }
 }
 
-LOCAL void gfx_hscale_9_5x_p (uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
+TARGET_CLONES(LOCAL void gfx_hscale_9_0x_p (uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
                               int cnt,
-                              const uint_32 *R pal)
+                              const uint32_t *R pal))
 {
     int i, j;
-    uint_32 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint32_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = pal[src[i++]]; hs_buf_ptr[j++] = p0;
-                            hs_buf_ptr[j++] = p0;
                             hs_buf_ptr[j++] = p0;
                             hs_buf_ptr[j++] = p0;
                             hs_buf_ptr[j++] = p0;
@@ -2143,7 +2073,6 @@ LOCAL void gfx_hscale_9_5x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p2;
                             hs_buf_ptr[j++] = p2;
                             hs_buf_ptr[j++] = p2;
-                            hs_buf_ptr[j++] = p2;
         p3 = pal[src[i++]]; hs_buf_ptr[j++] = p3;
                             hs_buf_ptr[j++] = p3;
                             hs_buf_ptr[j++] = p3;
@@ -2154,7 +2083,6 @@ LOCAL void gfx_hscale_9_5x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p3;
                             hs_buf_ptr[j++] = p3;
         p4 = pal[src[i++]]; hs_buf_ptr[j++] = p4;
-                            hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
@@ -2181,7 +2109,6 @@ LOCAL void gfx_hscale_9_5x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p6;
                             hs_buf_ptr[j++] = p6;
                             hs_buf_ptr[j++] = p6;
-                            hs_buf_ptr[j++] = p6;
         p7 = pal[src[i++]]; hs_buf_ptr[j++] = p7;
                             hs_buf_ptr[j++] = p7;
                             hs_buf_ptr[j++] = p7;
@@ -2194,16 +2121,17 @@ LOCAL void gfx_hscale_9_5x_p (uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_10_0x_p (uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
+TARGET_CLONES(LOCAL void gfx_hscale_9_5x_p (uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
                               int cnt,
-                              const uint_32 *R pal)
+                              const uint32_t *R pal))
 {
     int i, j;
-    uint_32 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint32_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = pal[src[i++]]; hs_buf_ptr[j++] = p0;
@@ -2217,7 +2145,6 @@ LOCAL void gfx_hscale_10_0x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p0;
                             hs_buf_ptr[j++] = p0;
         p1 = pal[src[i++]]; hs_buf_ptr[j++] = p1;
-                            hs_buf_ptr[j++] = p1;
                             hs_buf_ptr[j++] = p1;
                             hs_buf_ptr[j++] = p1;
                             hs_buf_ptr[j++] = p1;
@@ -2245,7 +2172,6 @@ LOCAL void gfx_hscale_10_0x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p3;
                             hs_buf_ptr[j++] = p3;
                             hs_buf_ptr[j++] = p3;
-                            hs_buf_ptr[j++] = p3;
         p4 = pal[src[i++]]; hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
@@ -2257,7 +2183,6 @@ LOCAL void gfx_hscale_10_0x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
         p5 = pal[src[i++]]; hs_buf_ptr[j++] = p5;
-                            hs_buf_ptr[j++] = p5;
                             hs_buf_ptr[j++] = p5;
                             hs_buf_ptr[j++] = p5;
                             hs_buf_ptr[j++] = p5;
@@ -2285,24 +2210,23 @@ LOCAL void gfx_hscale_10_0x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p7;
                             hs_buf_ptr[j++] = p7;
                             hs_buf_ptr[j++] = p7;
-                            hs_buf_ptr[j++] = p7;
     }
 }
 
-LOCAL void gfx_hscale_10_5x_p (uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
+TARGET_CLONES(LOCAL void gfx_hscale_10_0x_p (uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
                               int cnt,
-                              const uint_32 *R pal)
+                              const uint32_t *R pal))
 {
     int i, j;
-    uint_32 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint32_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = pal[src[i++]]; hs_buf_ptr[j++] = p0;
-                            hs_buf_ptr[j++] = p0;
                             hs_buf_ptr[j++] = p0;
                             hs_buf_ptr[j++] = p0;
                             hs_buf_ptr[j++] = p0;
@@ -2332,7 +2256,6 @@ LOCAL void gfx_hscale_10_5x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p2;
                             hs_buf_ptr[j++] = p2;
                             hs_buf_ptr[j++] = p2;
-                            hs_buf_ptr[j++] = p2;
         p3 = pal[src[i++]]; hs_buf_ptr[j++] = p3;
                             hs_buf_ptr[j++] = p3;
                             hs_buf_ptr[j++] = p3;
@@ -2344,7 +2267,6 @@ LOCAL void gfx_hscale_10_5x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p3;
                             hs_buf_ptr[j++] = p3;
         p4 = pal[src[i++]]; hs_buf_ptr[j++] = p4;
-                            hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
@@ -2374,7 +2296,6 @@ LOCAL void gfx_hscale_10_5x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p6;
                             hs_buf_ptr[j++] = p6;
                             hs_buf_ptr[j++] = p6;
-                            hs_buf_ptr[j++] = p6;
         p7 = pal[src[i++]]; hs_buf_ptr[j++] = p7;
                             hs_buf_ptr[j++] = p7;
                             hs_buf_ptr[j++] = p7;
@@ -2388,16 +2309,17 @@ LOCAL void gfx_hscale_10_5x_p (uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_11_0x_p (uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
+TARGET_CLONES(LOCAL void gfx_hscale_10_5x_p (uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
                               int cnt,
-                              const uint_32 *R pal)
+                              const uint32_t *R pal))
 {
     int i, j;
-    uint_32 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint32_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = pal[src[i++]]; hs_buf_ptr[j++] = p0;
@@ -2412,7 +2334,6 @@ LOCAL void gfx_hscale_11_0x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p0;
                             hs_buf_ptr[j++] = p0;
         p1 = pal[src[i++]]; hs_buf_ptr[j++] = p1;
-                            hs_buf_ptr[j++] = p1;
                             hs_buf_ptr[j++] = p1;
                             hs_buf_ptr[j++] = p1;
                             hs_buf_ptr[j++] = p1;
@@ -2443,7 +2364,6 @@ LOCAL void gfx_hscale_11_0x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p3;
                             hs_buf_ptr[j++] = p3;
                             hs_buf_ptr[j++] = p3;
-                            hs_buf_ptr[j++] = p3;
         p4 = pal[src[i++]]; hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
@@ -2456,7 +2376,6 @@ LOCAL void gfx_hscale_11_0x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
         p5 = pal[src[i++]]; hs_buf_ptr[j++] = p5;
-                            hs_buf_ptr[j++] = p5;
                             hs_buf_ptr[j++] = p5;
                             hs_buf_ptr[j++] = p5;
                             hs_buf_ptr[j++] = p5;
@@ -2487,24 +2406,23 @@ LOCAL void gfx_hscale_11_0x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p7;
                             hs_buf_ptr[j++] = p7;
                             hs_buf_ptr[j++] = p7;
-                            hs_buf_ptr[j++] = p7;
     }
 }
 
-LOCAL void gfx_hscale_11_5x_p (uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
+TARGET_CLONES(LOCAL void gfx_hscale_11_0x_p (uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
                               int cnt,
-                              const uint_32 *R pal)
+                              const uint32_t *R pal))
 {
     int i, j;
-    uint_32 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint32_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = pal[src[i++]]; hs_buf_ptr[j++] = p0;
-                            hs_buf_ptr[j++] = p0;
                             hs_buf_ptr[j++] = p0;
                             hs_buf_ptr[j++] = p0;
                             hs_buf_ptr[j++] = p0;
@@ -2537,7 +2455,6 @@ LOCAL void gfx_hscale_11_5x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p2;
                             hs_buf_ptr[j++] = p2;
                             hs_buf_ptr[j++] = p2;
-                            hs_buf_ptr[j++] = p2;
         p3 = pal[src[i++]]; hs_buf_ptr[j++] = p3;
                             hs_buf_ptr[j++] = p3;
                             hs_buf_ptr[j++] = p3;
@@ -2550,7 +2467,6 @@ LOCAL void gfx_hscale_11_5x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p3;
                             hs_buf_ptr[j++] = p3;
         p4 = pal[src[i++]]; hs_buf_ptr[j++] = p4;
-                            hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
@@ -2583,7 +2499,6 @@ LOCAL void gfx_hscale_11_5x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p6;
                             hs_buf_ptr[j++] = p6;
                             hs_buf_ptr[j++] = p6;
-                            hs_buf_ptr[j++] = p6;
         p7 = pal[src[i++]]; hs_buf_ptr[j++] = p7;
                             hs_buf_ptr[j++] = p7;
                             hs_buf_ptr[j++] = p7;
@@ -2598,16 +2513,17 @@ LOCAL void gfx_hscale_11_5x_p (uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_12_0x_p (uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
+TARGET_CLONES(LOCAL void gfx_hscale_11_5x_p (uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
                               int cnt,
-                              const uint_32 *R pal)
+                              const uint32_t *R pal))
 {
     int i, j;
-    uint_32 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint32_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = pal[src[i++]]; hs_buf_ptr[j++] = p0;
@@ -2623,7 +2539,6 @@ LOCAL void gfx_hscale_12_0x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p0;
                             hs_buf_ptr[j++] = p0;
         p1 = pal[src[i++]]; hs_buf_ptr[j++] = p1;
-                            hs_buf_ptr[j++] = p1;
                             hs_buf_ptr[j++] = p1;
                             hs_buf_ptr[j++] = p1;
                             hs_buf_ptr[j++] = p1;
@@ -2657,7 +2572,6 @@ LOCAL void gfx_hscale_12_0x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p3;
                             hs_buf_ptr[j++] = p3;
                             hs_buf_ptr[j++] = p3;
-                            hs_buf_ptr[j++] = p3;
         p4 = pal[src[i++]]; hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
@@ -2671,7 +2585,6 @@ LOCAL void gfx_hscale_12_0x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
         p5 = pal[src[i++]]; hs_buf_ptr[j++] = p5;
-                            hs_buf_ptr[j++] = p5;
                             hs_buf_ptr[j++] = p5;
                             hs_buf_ptr[j++] = p5;
                             hs_buf_ptr[j++] = p5;
@@ -2705,24 +2618,23 @@ LOCAL void gfx_hscale_12_0x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p7;
                             hs_buf_ptr[j++] = p7;
                             hs_buf_ptr[j++] = p7;
-                            hs_buf_ptr[j++] = p7;
     }
 }
 
-LOCAL void gfx_hscale_12_5x_p (uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
+TARGET_CLONES(LOCAL void gfx_hscale_12_0x_p (uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
                               int cnt,
-                              const uint_32 *R pal)
+                              const uint32_t *R pal))
 {
     int i, j;
-    uint_32 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint32_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = pal[src[i++]]; hs_buf_ptr[j++] = p0;
-                            hs_buf_ptr[j++] = p0;
                             hs_buf_ptr[j++] = p0;
                             hs_buf_ptr[j++] = p0;
                             hs_buf_ptr[j++] = p0;
@@ -2758,7 +2670,6 @@ LOCAL void gfx_hscale_12_5x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p2;
                             hs_buf_ptr[j++] = p2;
                             hs_buf_ptr[j++] = p2;
-                            hs_buf_ptr[j++] = p2;
         p3 = pal[src[i++]]; hs_buf_ptr[j++] = p3;
                             hs_buf_ptr[j++] = p3;
                             hs_buf_ptr[j++] = p3;
@@ -2772,7 +2683,6 @@ LOCAL void gfx_hscale_12_5x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p3;
                             hs_buf_ptr[j++] = p3;
         p4 = pal[src[i++]]; hs_buf_ptr[j++] = p4;
-                            hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
@@ -2808,7 +2718,6 @@ LOCAL void gfx_hscale_12_5x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p6;
                             hs_buf_ptr[j++] = p6;
                             hs_buf_ptr[j++] = p6;
-                            hs_buf_ptr[j++] = p6;
         p7 = pal[src[i++]]; hs_buf_ptr[j++] = p7;
                             hs_buf_ptr[j++] = p7;
                             hs_buf_ptr[j++] = p7;
@@ -2824,16 +2733,17 @@ LOCAL void gfx_hscale_12_5x_p (uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_13_0x_p (uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
+TARGET_CLONES(LOCAL void gfx_hscale_12_5x_p (uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
                               int cnt,
-                              const uint_32 *R pal)
+                              const uint32_t *R pal))
 {
     int i, j;
-    uint_32 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint32_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = pal[src[i++]]; hs_buf_ptr[j++] = p0;
@@ -2850,7 +2760,6 @@ LOCAL void gfx_hscale_13_0x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p0;
                             hs_buf_ptr[j++] = p0;
         p1 = pal[src[i++]]; hs_buf_ptr[j++] = p1;
-                            hs_buf_ptr[j++] = p1;
                             hs_buf_ptr[j++] = p1;
                             hs_buf_ptr[j++] = p1;
                             hs_buf_ptr[j++] = p1;
@@ -2887,7 +2796,6 @@ LOCAL void gfx_hscale_13_0x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p3;
                             hs_buf_ptr[j++] = p3;
                             hs_buf_ptr[j++] = p3;
-                            hs_buf_ptr[j++] = p3;
         p4 = pal[src[i++]]; hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
@@ -2902,7 +2810,6 @@ LOCAL void gfx_hscale_13_0x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
         p5 = pal[src[i++]]; hs_buf_ptr[j++] = p5;
-                            hs_buf_ptr[j++] = p5;
                             hs_buf_ptr[j++] = p5;
                             hs_buf_ptr[j++] = p5;
                             hs_buf_ptr[j++] = p5;
@@ -2939,24 +2846,23 @@ LOCAL void gfx_hscale_13_0x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p7;
                             hs_buf_ptr[j++] = p7;
                             hs_buf_ptr[j++] = p7;
-                            hs_buf_ptr[j++] = p7;
     }
 }
 
-LOCAL void gfx_hscale_13_5x_p (uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
+TARGET_CLONES(LOCAL void gfx_hscale_13_0x_p (uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
                               int cnt,
-                              const uint_32 *R pal)
+                              const uint32_t *R pal))
 {
     int i, j;
-    uint_32 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint32_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = pal[src[i++]]; hs_buf_ptr[j++] = p0;
-                            hs_buf_ptr[j++] = p0;
                             hs_buf_ptr[j++] = p0;
                             hs_buf_ptr[j++] = p0;
                             hs_buf_ptr[j++] = p0;
@@ -2995,7 +2901,6 @@ LOCAL void gfx_hscale_13_5x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p2;
                             hs_buf_ptr[j++] = p2;
                             hs_buf_ptr[j++] = p2;
-                            hs_buf_ptr[j++] = p2;
         p3 = pal[src[i++]]; hs_buf_ptr[j++] = p3;
                             hs_buf_ptr[j++] = p3;
                             hs_buf_ptr[j++] = p3;
@@ -3010,7 +2915,6 @@ LOCAL void gfx_hscale_13_5x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p3;
                             hs_buf_ptr[j++] = p3;
         p4 = pal[src[i++]]; hs_buf_ptr[j++] = p4;
-                            hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
@@ -3049,7 +2953,6 @@ LOCAL void gfx_hscale_13_5x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p6;
                             hs_buf_ptr[j++] = p6;
                             hs_buf_ptr[j++] = p6;
-                            hs_buf_ptr[j++] = p6;
         p7 = pal[src[i++]]; hs_buf_ptr[j++] = p7;
                             hs_buf_ptr[j++] = p7;
                             hs_buf_ptr[j++] = p7;
@@ -3066,16 +2969,17 @@ LOCAL void gfx_hscale_13_5x_p (uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_14_0x_p (uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
+TARGET_CLONES(LOCAL void gfx_hscale_13_5x_p (uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
                               int cnt,
-                              const uint_32 *R pal)
+                              const uint32_t *R pal))
 {
     int i, j;
-    uint_32 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint32_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = pal[src[i++]]; hs_buf_ptr[j++] = p0;
@@ -3093,7 +2997,6 @@ LOCAL void gfx_hscale_14_0x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p0;
                             hs_buf_ptr[j++] = p0;
         p1 = pal[src[i++]]; hs_buf_ptr[j++] = p1;
-                            hs_buf_ptr[j++] = p1;
                             hs_buf_ptr[j++] = p1;
                             hs_buf_ptr[j++] = p1;
                             hs_buf_ptr[j++] = p1;
@@ -3133,7 +3036,6 @@ LOCAL void gfx_hscale_14_0x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p3;
                             hs_buf_ptr[j++] = p3;
                             hs_buf_ptr[j++] = p3;
-                            hs_buf_ptr[j++] = p3;
         p4 = pal[src[i++]]; hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
@@ -3149,7 +3051,6 @@ LOCAL void gfx_hscale_14_0x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
         p5 = pal[src[i++]]; hs_buf_ptr[j++] = p5;
-                            hs_buf_ptr[j++] = p5;
                             hs_buf_ptr[j++] = p5;
                             hs_buf_ptr[j++] = p5;
                             hs_buf_ptr[j++] = p5;
@@ -3189,24 +3090,23 @@ LOCAL void gfx_hscale_14_0x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p7;
                             hs_buf_ptr[j++] = p7;
                             hs_buf_ptr[j++] = p7;
-                            hs_buf_ptr[j++] = p7;
     }
 }
 
-LOCAL void gfx_hscale_14_5x_p (uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
+TARGET_CLONES(LOCAL void gfx_hscale_14_0x_p (uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
                               int cnt,
-                              const uint_32 *R pal)
+                              const uint32_t *R pal))
 {
     int i, j;
-    uint_32 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint32_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = pal[src[i++]]; hs_buf_ptr[j++] = p0;
-                            hs_buf_ptr[j++] = p0;
                             hs_buf_ptr[j++] = p0;
                             hs_buf_ptr[j++] = p0;
                             hs_buf_ptr[j++] = p0;
@@ -3248,7 +3148,6 @@ LOCAL void gfx_hscale_14_5x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p2;
                             hs_buf_ptr[j++] = p2;
                             hs_buf_ptr[j++] = p2;
-                            hs_buf_ptr[j++] = p2;
         p3 = pal[src[i++]]; hs_buf_ptr[j++] = p3;
                             hs_buf_ptr[j++] = p3;
                             hs_buf_ptr[j++] = p3;
@@ -3264,7 +3163,6 @@ LOCAL void gfx_hscale_14_5x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p3;
                             hs_buf_ptr[j++] = p3;
         p4 = pal[src[i++]]; hs_buf_ptr[j++] = p4;
-                            hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
@@ -3306,7 +3204,6 @@ LOCAL void gfx_hscale_14_5x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p6;
                             hs_buf_ptr[j++] = p6;
                             hs_buf_ptr[j++] = p6;
-                            hs_buf_ptr[j++] = p6;
         p7 = pal[src[i++]]; hs_buf_ptr[j++] = p7;
                             hs_buf_ptr[j++] = p7;
                             hs_buf_ptr[j++] = p7;
@@ -3324,16 +3221,17 @@ LOCAL void gfx_hscale_14_5x_p (uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_15_0x_p (uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
+TARGET_CLONES(LOCAL void gfx_hscale_14_5x_p (uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
                               int cnt,
-                              const uint_32 *R pal)
+                              const uint32_t *R pal))
 {
     int i, j;
-    uint_32 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint32_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = pal[src[i++]]; hs_buf_ptr[j++] = p0;
@@ -3352,7 +3250,6 @@ LOCAL void gfx_hscale_15_0x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p0;
                             hs_buf_ptr[j++] = p0;
         p1 = pal[src[i++]]; hs_buf_ptr[j++] = p1;
-                            hs_buf_ptr[j++] = p1;
                             hs_buf_ptr[j++] = p1;
                             hs_buf_ptr[j++] = p1;
                             hs_buf_ptr[j++] = p1;
@@ -3395,7 +3292,6 @@ LOCAL void gfx_hscale_15_0x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p3;
                             hs_buf_ptr[j++] = p3;
                             hs_buf_ptr[j++] = p3;
-                            hs_buf_ptr[j++] = p3;
         p4 = pal[src[i++]]; hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
@@ -3412,7 +3308,6 @@ LOCAL void gfx_hscale_15_0x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
         p5 = pal[src[i++]]; hs_buf_ptr[j++] = p5;
-                            hs_buf_ptr[j++] = p5;
                             hs_buf_ptr[j++] = p5;
                             hs_buf_ptr[j++] = p5;
                             hs_buf_ptr[j++] = p5;
@@ -3455,24 +3350,23 @@ LOCAL void gfx_hscale_15_0x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p7;
                             hs_buf_ptr[j++] = p7;
                             hs_buf_ptr[j++] = p7;
-                            hs_buf_ptr[j++] = p7;
     }
 }
 
-LOCAL void gfx_hscale_15_5x_p (uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
+TARGET_CLONES(LOCAL void gfx_hscale_15_0x_p (uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
                               int cnt,
-                              const uint_32 *R pal)
+                              const uint32_t *R pal))
 {
     int i, j;
-    uint_32 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint32_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = pal[src[i++]]; hs_buf_ptr[j++] = p0;
-                            hs_buf_ptr[j++] = p0;
                             hs_buf_ptr[j++] = p0;
                             hs_buf_ptr[j++] = p0;
                             hs_buf_ptr[j++] = p0;
@@ -3517,7 +3411,6 @@ LOCAL void gfx_hscale_15_5x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p2;
                             hs_buf_ptr[j++] = p2;
                             hs_buf_ptr[j++] = p2;
-                            hs_buf_ptr[j++] = p2;
         p3 = pal[src[i++]]; hs_buf_ptr[j++] = p3;
                             hs_buf_ptr[j++] = p3;
                             hs_buf_ptr[j++] = p3;
@@ -3534,7 +3427,6 @@ LOCAL void gfx_hscale_15_5x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p3;
                             hs_buf_ptr[j++] = p3;
         p4 = pal[src[i++]]; hs_buf_ptr[j++] = p4;
-                            hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
@@ -3579,7 +3471,6 @@ LOCAL void gfx_hscale_15_5x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p6;
                             hs_buf_ptr[j++] = p6;
                             hs_buf_ptr[j++] = p6;
-                            hs_buf_ptr[j++] = p6;
         p7 = pal[src[i++]]; hs_buf_ptr[j++] = p7;
                             hs_buf_ptr[j++] = p7;
                             hs_buf_ptr[j++] = p7;
@@ -3598,16 +3489,17 @@ LOCAL void gfx_hscale_15_5x_p (uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_16_0x_p (uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
+TARGET_CLONES(LOCAL void gfx_hscale_15_5x_p (uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
                               int cnt,
-                              const uint_32 *R pal)
+                              const uint32_t *R pal))
 {
     int i, j;
-    uint_32 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint32_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = pal[src[i++]]; hs_buf_ptr[j++] = p0;
@@ -3627,7 +3519,6 @@ LOCAL void gfx_hscale_16_0x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p0;
                             hs_buf_ptr[j++] = p0;
         p1 = pal[src[i++]]; hs_buf_ptr[j++] = p1;
-                            hs_buf_ptr[j++] = p1;
                             hs_buf_ptr[j++] = p1;
                             hs_buf_ptr[j++] = p1;
                             hs_buf_ptr[j++] = p1;
@@ -3673,7 +3564,6 @@ LOCAL void gfx_hscale_16_0x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p3;
                             hs_buf_ptr[j++] = p3;
                             hs_buf_ptr[j++] = p3;
-                            hs_buf_ptr[j++] = p3;
         p4 = pal[src[i++]]; hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
@@ -3691,7 +3581,6 @@ LOCAL void gfx_hscale_16_0x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p4;
                             hs_buf_ptr[j++] = p4;
         p5 = pal[src[i++]]; hs_buf_ptr[j++] = p5;
-                            hs_buf_ptr[j++] = p5;
                             hs_buf_ptr[j++] = p5;
                             hs_buf_ptr[j++] = p5;
                             hs_buf_ptr[j++] = p5;
@@ -3737,24 +3626,23 @@ LOCAL void gfx_hscale_16_0x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p7;
                             hs_buf_ptr[j++] = p7;
                             hs_buf_ptr[j++] = p7;
-                            hs_buf_ptr[j++] = p7;
     }
 }
 
-LOCAL void gfx_hscale_16_5x_p (uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
+TARGET_CLONES(LOCAL void gfx_hscale_16_0x_p (uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
                               int cnt,
-                              const uint_32 *R pal)
+                              const uint32_t *R pal))
 {
     int i, j;
-    uint_32 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint32_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = pal[src[i++]]; hs_buf_ptr[j++] = p0;
-                            hs_buf_ptr[j++] = p0;
                             hs_buf_ptr[j++] = p0;
                             hs_buf_ptr[j++] = p0;
                             hs_buf_ptr[j++] = p0;
@@ -3802,6 +3690,151 @@ LOCAL void gfx_hscale_16_5x_p (uint_32 *R hs_buf_ptr,
                             hs_buf_ptr[j++] = p2;
                             hs_buf_ptr[j++] = p2;
                             hs_buf_ptr[j++] = p2;
+        p3 = pal[src[i++]]; hs_buf_ptr[j++] = p3;
+                            hs_buf_ptr[j++] = p3;
+                            hs_buf_ptr[j++] = p3;
+                            hs_buf_ptr[j++] = p3;
+                            hs_buf_ptr[j++] = p3;
+                            hs_buf_ptr[j++] = p3;
+                            hs_buf_ptr[j++] = p3;
+                            hs_buf_ptr[j++] = p3;
+                            hs_buf_ptr[j++] = p3;
+                            hs_buf_ptr[j++] = p3;
+                            hs_buf_ptr[j++] = p3;
+                            hs_buf_ptr[j++] = p3;
+                            hs_buf_ptr[j++] = p3;
+                            hs_buf_ptr[j++] = p3;
+                            hs_buf_ptr[j++] = p3;
+                            hs_buf_ptr[j++] = p3;
+        p4 = pal[src[i++]]; hs_buf_ptr[j++] = p4;
+                            hs_buf_ptr[j++] = p4;
+                            hs_buf_ptr[j++] = p4;
+                            hs_buf_ptr[j++] = p4;
+                            hs_buf_ptr[j++] = p4;
+                            hs_buf_ptr[j++] = p4;
+                            hs_buf_ptr[j++] = p4;
+                            hs_buf_ptr[j++] = p4;
+                            hs_buf_ptr[j++] = p4;
+                            hs_buf_ptr[j++] = p4;
+                            hs_buf_ptr[j++] = p4;
+                            hs_buf_ptr[j++] = p4;
+                            hs_buf_ptr[j++] = p4;
+                            hs_buf_ptr[j++] = p4;
+                            hs_buf_ptr[j++] = p4;
+                            hs_buf_ptr[j++] = p4;
+        p5 = pal[src[i++]]; hs_buf_ptr[j++] = p5;
+                            hs_buf_ptr[j++] = p5;
+                            hs_buf_ptr[j++] = p5;
+                            hs_buf_ptr[j++] = p5;
+                            hs_buf_ptr[j++] = p5;
+                            hs_buf_ptr[j++] = p5;
+                            hs_buf_ptr[j++] = p5;
+                            hs_buf_ptr[j++] = p5;
+                            hs_buf_ptr[j++] = p5;
+                            hs_buf_ptr[j++] = p5;
+                            hs_buf_ptr[j++] = p5;
+                            hs_buf_ptr[j++] = p5;
+                            hs_buf_ptr[j++] = p5;
+                            hs_buf_ptr[j++] = p5;
+                            hs_buf_ptr[j++] = p5;
+                            hs_buf_ptr[j++] = p5;
+        p6 = pal[src[i++]]; hs_buf_ptr[j++] = p6;
+                            hs_buf_ptr[j++] = p6;
+                            hs_buf_ptr[j++] = p6;
+                            hs_buf_ptr[j++] = p6;
+                            hs_buf_ptr[j++] = p6;
+                            hs_buf_ptr[j++] = p6;
+                            hs_buf_ptr[j++] = p6;
+                            hs_buf_ptr[j++] = p6;
+                            hs_buf_ptr[j++] = p6;
+                            hs_buf_ptr[j++] = p6;
+                            hs_buf_ptr[j++] = p6;
+                            hs_buf_ptr[j++] = p6;
+                            hs_buf_ptr[j++] = p6;
+                            hs_buf_ptr[j++] = p6;
+                            hs_buf_ptr[j++] = p6;
+                            hs_buf_ptr[j++] = p6;
+        p7 = pal[src[i++]]; hs_buf_ptr[j++] = p7;
+                            hs_buf_ptr[j++] = p7;
+                            hs_buf_ptr[j++] = p7;
+                            hs_buf_ptr[j++] = p7;
+                            hs_buf_ptr[j++] = p7;
+                            hs_buf_ptr[j++] = p7;
+                            hs_buf_ptr[j++] = p7;
+                            hs_buf_ptr[j++] = p7;
+                            hs_buf_ptr[j++] = p7;
+                            hs_buf_ptr[j++] = p7;
+                            hs_buf_ptr[j++] = p7;
+                            hs_buf_ptr[j++] = p7;
+                            hs_buf_ptr[j++] = p7;
+                            hs_buf_ptr[j++] = p7;
+                            hs_buf_ptr[j++] = p7;
+                            hs_buf_ptr[j++] = p7;
+    }
+}
+
+TARGET_CLONES(LOCAL void gfx_hscale_16_5x_p (uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
+                              int cnt,
+                              const uint32_t *R pal))
+{
+    int i, j;
+    uint32_t p0, p1, p2, p3, p4, p5, p6, p7;
+
+    i = j = 0;
+    cnt >>= 3;
+    assert(cnt >= 20);
+    while (cnt-- != 0)
+    {
+        p0 = pal[src[i++]]; hs_buf_ptr[j++] = p0;
+                            hs_buf_ptr[j++] = p0;
+                            hs_buf_ptr[j++] = p0;
+                            hs_buf_ptr[j++] = p0;
+                            hs_buf_ptr[j++] = p0;
+                            hs_buf_ptr[j++] = p0;
+                            hs_buf_ptr[j++] = p0;
+                            hs_buf_ptr[j++] = p0;
+                            hs_buf_ptr[j++] = p0;
+                            hs_buf_ptr[j++] = p0;
+                            hs_buf_ptr[j++] = p0;
+                            hs_buf_ptr[j++] = p0;
+                            hs_buf_ptr[j++] = p0;
+                            hs_buf_ptr[j++] = p0;
+                            hs_buf_ptr[j++] = p0;
+                            hs_buf_ptr[j++] = p0;
+                            hs_buf_ptr[j++] = p0;
+        p1 = pal[src[i++]]; hs_buf_ptr[j++] = p1;
+                            hs_buf_ptr[j++] = p1;
+                            hs_buf_ptr[j++] = p1;
+                            hs_buf_ptr[j++] = p1;
+                            hs_buf_ptr[j++] = p1;
+                            hs_buf_ptr[j++] = p1;
+                            hs_buf_ptr[j++] = p1;
+                            hs_buf_ptr[j++] = p1;
+                            hs_buf_ptr[j++] = p1;
+                            hs_buf_ptr[j++] = p1;
+                            hs_buf_ptr[j++] = p1;
+                            hs_buf_ptr[j++] = p1;
+                            hs_buf_ptr[j++] = p1;
+                            hs_buf_ptr[j++] = p1;
+                            hs_buf_ptr[j++] = p1;
+                            hs_buf_ptr[j++] = p1;
+        p2 = pal[src[i++]]; hs_buf_ptr[j++] = p2;
+                            hs_buf_ptr[j++] = p2;
+                            hs_buf_ptr[j++] = p2;
+                            hs_buf_ptr[j++] = p2;
+                            hs_buf_ptr[j++] = p2;
+                            hs_buf_ptr[j++] = p2;
+                            hs_buf_ptr[j++] = p2;
+                            hs_buf_ptr[j++] = p2;
+                            hs_buf_ptr[j++] = p2;
+                            hs_buf_ptr[j++] = p2;
+                            hs_buf_ptr[j++] = p2;
+                            hs_buf_ptr[j++] = p2;
+                            hs_buf_ptr[j++] = p2;
+                            hs_buf_ptr[j++] = p2;
+                            hs_buf_ptr[j++] = p2;
+                            hs_buf_ptr[j++] = p2;
                             hs_buf_ptr[j++] = p2;
         p3 = pal[src[i++]]; hs_buf_ptr[j++] = p3;
                             hs_buf_ptr[j++] = p3;
@@ -3888,16 +3921,17 @@ LOCAL void gfx_hscale_16_5x_p (uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_1_0x_16 (uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
+TARGET_CLONES(LOCAL void gfx_hscale_1_0x_16 (uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
                               int cnt,
-                              const uint_32 *R pal)
+                              const uint32_t *R pal))
 {
     int i, j;
-    uint_32 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint32_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = pal[src[i++]];
@@ -3911,16 +3945,17 @@ LOCAL void gfx_hscale_1_0x_16 (uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_1_5x_16 (uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
+TARGET_CLONES(LOCAL void gfx_hscale_1_5x_16 (uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
                               int cnt,
-                              const uint_32 *R pal)
+                              const uint32_t *R pal))
 {
     int i, j;
-    uint_32 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint32_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = pal[src[i++]]; hs_buf_ptr[j++] = p0;
@@ -3935,16 +3970,17 @@ LOCAL void gfx_hscale_1_5x_16 (uint_32 *R hs_buf_ptr,
 }
 
 
-LOCAL void gfx_hscale_2_5x_16 (uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
+TARGET_CLONES(LOCAL void gfx_hscale_2_5x_16 (uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
                               int cnt,
-                              const uint_32 *R pal)
+                              const uint32_t *R pal))
 {
     int i, j;
-    uint_32 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint32_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = pal[src[i++]]; hs_buf_ptr[j++] = p0;
@@ -3960,16 +3996,17 @@ LOCAL void gfx_hscale_2_5x_16 (uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_3_0x_16 (uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
+TARGET_CLONES(LOCAL void gfx_hscale_3_0x_16 (uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
                               int cnt,
-                              const uint_32 *R pal)
+                              const uint32_t *R pal))
 {
     int i, j;
-    uint_32 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint32_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = pal[src[i++]]; hs_buf_ptr[j++] = p0;
@@ -3987,16 +4024,17 @@ LOCAL void gfx_hscale_3_0x_16 (uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_3_5x_16 (uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
+TARGET_CLONES(LOCAL void gfx_hscale_3_5x_16 (uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
                               int cnt,
-                              const uint_32 *R pal)
+                              const uint32_t *R pal))
 {
     int i, j;
-    uint_32 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint32_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = pal[src[i++]]; hs_buf_ptr[j++] = p0;
@@ -4017,16 +4055,17 @@ LOCAL void gfx_hscale_3_5x_16 (uint_32 *R hs_buf_ptr,
 }
 
 
-LOCAL void gfx_hscale_4_5x_16 (uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
+TARGET_CLONES(LOCAL void gfx_hscale_4_5x_16 (uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
                               int cnt,
-                              const uint_32 *R pal)
+                              const uint32_t *R pal))
 {
     int i, j;
-    uint_32 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint32_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = pal[src[i++]]; hs_buf_ptr[j++] = p0;
@@ -4050,16 +4089,17 @@ LOCAL void gfx_hscale_4_5x_16 (uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_5_0x_16 (uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
+TARGET_CLONES(LOCAL void gfx_hscale_5_0x_16 (uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
                               int cnt,
-                              const uint_32 *R pal)
+                              const uint32_t *R pal))
 {
     int i, j;
-    uint_32 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint32_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = pal[src[i++]]; hs_buf_ptr[j++] = p0;
@@ -4085,16 +4125,17 @@ LOCAL void gfx_hscale_5_0x_16 (uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_5_5x_16 (uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
+TARGET_CLONES(LOCAL void gfx_hscale_5_5x_16 (uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
                               int cnt,
-                              const uint_32 *R pal)
+                              const uint32_t *R pal))
 {
     int i, j;
-    uint_32 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint32_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = pal[src[i++]]; hs_buf_ptr[j++] = p0;
@@ -4123,16 +4164,17 @@ LOCAL void gfx_hscale_5_5x_16 (uint_32 *R hs_buf_ptr,
 }
 
 
-LOCAL void gfx_hscale_6_5x_16 (uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
+TARGET_CLONES(LOCAL void gfx_hscale_6_5x_16 (uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
                               int cnt,
-                              const uint_32 *R pal)
+                              const uint32_t *R pal))
 {
     int i, j;
-    uint_32 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint32_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = pal[src[i++]]; hs_buf_ptr[j++] = p0;
@@ -4164,16 +4206,17 @@ LOCAL void gfx_hscale_6_5x_16 (uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_7_0x_16 (uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
+TARGET_CLONES(LOCAL void gfx_hscale_7_0x_16 (uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
                               int cnt,
-                              const uint_32 *R pal)
+                              const uint32_t *R pal))
 {
     int i, j;
-    uint_32 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint32_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = pal[src[i++]]; hs_buf_ptr[j++] = p0;
@@ -4207,16 +4250,17 @@ LOCAL void gfx_hscale_7_0x_16 (uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_7_5x_16 (uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
+TARGET_CLONES(LOCAL void gfx_hscale_7_5x_16 (uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
                               int cnt,
-                              const uint_32 *R pal)
+                              const uint32_t *R pal))
 {
     int i, j;
-    uint_32 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint32_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = pal[src[i++]]; hs_buf_ptr[j++] = p0;
@@ -4253,16 +4297,17 @@ LOCAL void gfx_hscale_7_5x_16 (uint_32 *R hs_buf_ptr,
 }
 
 
-LOCAL void gfx_hscale_8_5x_16 (uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
+TARGET_CLONES(LOCAL void gfx_hscale_8_5x_16 (uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
                               int cnt,
-                              const uint_32 *R pal)
+                              const uint32_t *R pal))
 {
     int i, j;
-    uint_32 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint32_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = pal[src[i++]]; hs_buf_ptr[j++] = p0;
@@ -4302,16 +4347,17 @@ LOCAL void gfx_hscale_8_5x_16 (uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_9_0x_16 (uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
+TARGET_CLONES(LOCAL void gfx_hscale_9_0x_16 (uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
                               int cnt,
-                              const uint_32 *R pal)
+                              const uint32_t *R pal))
 {
     int i, j;
-    uint_32 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint32_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = pal[src[i++]]; hs_buf_ptr[j++] = p0;
@@ -4353,16 +4399,17 @@ LOCAL void gfx_hscale_9_0x_16 (uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_9_5x_16 (uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
+TARGET_CLONES(LOCAL void gfx_hscale_9_5x_16 (uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
                               int cnt,
-                              const uint_32 *R pal)
+                              const uint32_t *R pal))
 {
     int i, j;
-    uint_32 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint32_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = pal[src[i++]]; hs_buf_ptr[j++] = p0;
@@ -4407,16 +4454,17 @@ LOCAL void gfx_hscale_9_5x_16 (uint_32 *R hs_buf_ptr,
 }
 
 
-LOCAL void gfx_hscale_10_5x_16 (uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
+TARGET_CLONES(LOCAL void gfx_hscale_10_5x_16 (uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
                               int cnt,
-                              const uint_32 *R pal)
+                              const uint32_t *R pal))
 {
     int i, j;
-    uint_32 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint32_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = pal[src[i++]]; hs_buf_ptr[j++] = p0;
@@ -4464,16 +4512,17 @@ LOCAL void gfx_hscale_10_5x_16 (uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_11_0x_16 (uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
+TARGET_CLONES(LOCAL void gfx_hscale_11_0x_16 (uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
                               int cnt,
-                              const uint_32 *R pal)
+                              const uint32_t *R pal))
 {
     int i, j;
-    uint_32 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint32_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = pal[src[i++]]; hs_buf_ptr[j++] = p0;
@@ -4523,16 +4572,17 @@ LOCAL void gfx_hscale_11_0x_16 (uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_11_5x_16 (uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
+TARGET_CLONES(LOCAL void gfx_hscale_11_5x_16 (uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
                               int cnt,
-                              const uint_32 *R pal)
+                              const uint32_t *R pal))
 {
     int i, j;
-    uint_32 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint32_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = pal[src[i++]]; hs_buf_ptr[j++] = p0;
@@ -4585,16 +4635,17 @@ LOCAL void gfx_hscale_11_5x_16 (uint_32 *R hs_buf_ptr,
 }
 
 
-LOCAL void gfx_hscale_12_5x_16 (uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
+TARGET_CLONES(LOCAL void gfx_hscale_12_5x_16 (uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
                               int cnt,
-                              const uint_32 *R pal)
+                              const uint32_t *R pal))
 {
     int i, j;
-    uint_32 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint32_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = pal[src[i++]]; hs_buf_ptr[j++] = p0;
@@ -4650,16 +4701,17 @@ LOCAL void gfx_hscale_12_5x_16 (uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_13_0x_16 (uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
+TARGET_CLONES(LOCAL void gfx_hscale_13_0x_16 (uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
                               int cnt,
-                              const uint_32 *R pal)
+                              const uint32_t *R pal))
 {
     int i, j;
-    uint_32 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint32_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = pal[src[i++]]; hs_buf_ptr[j++] = p0;
@@ -4717,16 +4769,17 @@ LOCAL void gfx_hscale_13_0x_16 (uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_13_5x_16 (uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
+TARGET_CLONES(LOCAL void gfx_hscale_13_5x_16 (uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
                               int cnt,
-                              const uint_32 *R pal)
+                              const uint32_t *R pal))
 {
     int i, j;
-    uint_32 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint32_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = pal[src[i++]]; hs_buf_ptr[j++] = p0;
@@ -4787,16 +4840,17 @@ LOCAL void gfx_hscale_13_5x_16 (uint_32 *R hs_buf_ptr,
 }
 
 
-LOCAL void gfx_hscale_14_5x_16 (uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
+TARGET_CLONES(LOCAL void gfx_hscale_14_5x_16 (uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
                               int cnt,
-                              const uint_32 *R pal)
+                              const uint32_t *R pal))
 {
     int i, j;
-    uint_32 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint32_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = pal[src[i++]]; hs_buf_ptr[j++] = p0;
@@ -4860,16 +4914,17 @@ LOCAL void gfx_hscale_14_5x_16 (uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_15_0x_16 (uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
+TARGET_CLONES(LOCAL void gfx_hscale_15_0x_16 (uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
                               int cnt,
-                              const uint_32 *R pal)
+                              const uint32_t *R pal))
 {
     int i, j;
-    uint_32 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint32_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = pal[src[i++]]; hs_buf_ptr[j++] = p0;
@@ -4935,16 +4990,17 @@ LOCAL void gfx_hscale_15_0x_16 (uint_32 *R hs_buf_ptr,
     }
 }
 
-LOCAL void gfx_hscale_15_5x_16 (uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
+TARGET_CLONES(LOCAL void gfx_hscale_15_5x_16 (uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
                               int cnt,
-                              const uint_32 *R pal)
+                              const uint32_t *R pal))
 {
     int i, j;
-    uint_32 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint32_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = pal[src[i++]]; hs_buf_ptr[j++] = p0;
@@ -5013,16 +5069,17 @@ LOCAL void gfx_hscale_15_5x_16 (uint_32 *R hs_buf_ptr,
 }
 
 
-LOCAL void gfx_hscale_16_5x_16 (uint_32 *R hs_buf_ptr,
-                              const uint_8  *R src,
+TARGET_CLONES(LOCAL void gfx_hscale_16_5x_16 (uint32_t *R hs_buf_ptr,
+                              const uint8_t  *R src,
                               int cnt,
-                              const uint_32 *R pal)
+                              const uint32_t *R pal))
 {
     int i, j;
-    uint_32 p0, p1, p2, p3, p4, p5, p6, p7;
+    uint32_t p0, p1, p2, p3, p4, p5, p6, p7;
 
     i = j = 0;
     cnt >>= 3;
+    assert(cnt >= 20);
     while (cnt-- != 0)
     {
         p0 = pal[src[i++]]; hs_buf_ptr[j++] = p0;
@@ -5098,25 +5155,27 @@ LOCAL void gfx_hscale_16_5x_16 (uint_32 *R hs_buf_ptr,
 /*  "Extended" horizontal scale modes that stack gfx_hscale_2_0x_xx, or     */
 /*  gfx_hscale_4_0x_xx on other scalers to get scale factors up to 66x.     */
 /* ======================================================================== */
-LOCAL uint_32 iscale_buf[4096] ALIGN16;
+LOCAL uint32_t iscale_buf[4096] ALIGN16;
 
 #define HS_TWICE_NP(sf,sa,sb) \
-    LOCAL void gfx_hscale_##sf##_0x_np(uint_32 *R hs_buf_ptr,               \
-                                        const uint_8  *R src,               \
-                                        int cnt)                            \
+    TARGET_CLONES(                                                          \
+    LOCAL void gfx_hscale_##sf##_0x_np(uint32_t *R hs_buf_ptr,              \
+                                        const uint8_t  *R src,              \
+                                        int cnt))                           \
     {                                                                       \
         gfx_hscale_##sa##_0x_np(iscale_buf, src, cnt);                      \
-        gfx_hscale_##sb##x_np(hs_buf_ptr, (uint_8*)iscale_buf, cnt * 2);    \
+        gfx_hscale_##sb##x_np(hs_buf_ptr, (uint8_t*)iscale_buf, cnt * 2);   \
     }
 
 #define HS_TWICE(m,sf,sa,sb) \
-    LOCAL void gfx_hscale_##sf##_0x_##m(uint_32 *R hs_buf_ptr,              \
-                                        const uint_8  *R src,               \
-                                        int cnt,                            \
-                                        const uint_32 *R pal)               \
-    {                                                                       \
-        gfx_hscale_##sa##_0x_np(iscale_buf, src, cnt);                      \
-        gfx_hscale_##sb##x_##m(hs_buf_ptr, (uint_8*)iscale_buf, cnt*2,pal); \
+    TARGET_CLONES(                                                           \
+    LOCAL void gfx_hscale_##sf##_0x_##m(uint32_t *R hs_buf_ptr,              \
+                                        const uint8_t  *R src,               \
+                                        int cnt,                             \
+                                        const uint32_t *R pal))              \
+    {                                                                        \
+        gfx_hscale_##sa##_0x_np(iscale_buf, src, cnt);                       \
+        gfx_hscale_##sb##x_##m(hs_buf_ptr, (uint8_t*)iscale_buf, cnt*2,pal); \
     }
 
 HS_TWICE_NP(17, 2,  8_5)     HS_TWICE_NP(34, 4,  8_5)
@@ -5188,7 +5247,7 @@ HS_TWICE(16, 33, 2, 16_5)    HS_TWICE(16, 66, 4, 16_5)
 /*  Lookup tables for all this fun...                                       */
 /* ======================================================================== */
 
-LOCAL const gfx_hscale_np_t gfx_hscale_np[] =
+LOCAL gfx_hscale_np_t *const gfx_hscale_np[] =
 {
     gfx_hscale_1_0x_np,
     gfx_hscale_1_5x_np,
@@ -5250,26 +5309,26 @@ LOCAL const gfx_hscale_np_t gfx_hscale_np[] =
     gfx_hscale_36_0x_np, NULL, NULL, NULL,
     gfx_hscale_38_0x_np, NULL, NULL, NULL,
     gfx_hscale_40_0x_np, NULL, NULL, NULL,
-                                    
+
     gfx_hscale_42_0x_np, NULL, NULL, NULL,
     gfx_hscale_44_0x_np, NULL, NULL, NULL,
     gfx_hscale_46_0x_np, NULL, NULL, NULL,
     gfx_hscale_48_0x_np, NULL, NULL, NULL,
-                                    
+
     gfx_hscale_50_0x_np, NULL, NULL, NULL,
     gfx_hscale_52_0x_np, NULL, NULL, NULL,
     gfx_hscale_54_0x_np, NULL, NULL, NULL,
     gfx_hscale_56_0x_np, NULL, NULL, NULL,
-                                    
+
     gfx_hscale_58_0x_np, NULL, NULL, NULL,
     gfx_hscale_60_0x_np, NULL, NULL, NULL,
     gfx_hscale_62_0x_np, NULL, NULL, NULL,
     gfx_hscale_64_0x_np, NULL, NULL, NULL,
-                                    
+
     gfx_hscale_66_0x_np, NULL, NULL, NULL
 };
 
-LOCAL const gfx_hscale_p_t gfx_hscale_p[] =
+LOCAL gfx_hscale_p_t *const gfx_hscale_p[] =
 {
     gfx_hscale_1_0x_p,
     gfx_hscale_1_5x_p,
@@ -5331,26 +5390,26 @@ LOCAL const gfx_hscale_p_t gfx_hscale_p[] =
     gfx_hscale_36_0x_p, NULL, NULL, NULL,
     gfx_hscale_38_0x_p, NULL, NULL, NULL,
     gfx_hscale_40_0x_p, NULL, NULL, NULL,
-                                    
+
     gfx_hscale_42_0x_p, NULL, NULL, NULL,
     gfx_hscale_44_0x_p, NULL, NULL, NULL,
     gfx_hscale_46_0x_p, NULL, NULL, NULL,
     gfx_hscale_48_0x_p, NULL, NULL, NULL,
-                                    
+
     gfx_hscale_50_0x_p, NULL, NULL, NULL,
     gfx_hscale_52_0x_p, NULL, NULL, NULL,
     gfx_hscale_54_0x_p, NULL, NULL, NULL,
     gfx_hscale_56_0x_p, NULL, NULL, NULL,
-                                    
+
     gfx_hscale_58_0x_p, NULL, NULL, NULL,
     gfx_hscale_60_0x_p, NULL, NULL, NULL,
     gfx_hscale_62_0x_p, NULL, NULL, NULL,
     gfx_hscale_64_0x_p, NULL, NULL, NULL,
-                                    
+
     gfx_hscale_66_0x_p, NULL, NULL, NULL
 };
 
-LOCAL const gfx_hscale_p_t gfx_hscale_16[] =
+LOCAL gfx_hscale_p_t *const gfx_hscale_16[] =
 {
     gfx_hscale_1_0x_16,
     gfx_hscale_1_5x_16,
@@ -5412,22 +5471,22 @@ LOCAL const gfx_hscale_p_t gfx_hscale_16[] =
     gfx_hscale_36_0x_16, NULL, NULL, NULL,
     gfx_hscale_38_0x_16, NULL, NULL, NULL,
     gfx_hscale_40_0x_16, NULL, NULL, NULL,
-                                    
+
     gfx_hscale_42_0x_16, NULL, NULL, NULL,
     gfx_hscale_44_0x_16, NULL, NULL, NULL,
     gfx_hscale_46_0x_16, NULL, NULL, NULL,
     gfx_hscale_48_0x_16, NULL, NULL, NULL,
-                                    
+
     gfx_hscale_50_0x_16, NULL, NULL, NULL,
     gfx_hscale_52_0x_16, NULL, NULL, NULL,
     gfx_hscale_54_0x_16, NULL, NULL, NULL,
     gfx_hscale_56_0x_16, NULL, NULL, NULL,
-                                    
+
     gfx_hscale_58_0x_16, NULL, NULL, NULL,
     gfx_hscale_60_0x_16, NULL, NULL, NULL,
     gfx_hscale_62_0x_16, NULL, NULL, NULL,
     gfx_hscale_64_0x_16, NULL, NULL, NULL,
-                                    
+
     gfx_hscale_66_0x_16, NULL, NULL, NULL
 };
 
@@ -5444,7 +5503,7 @@ int gfx_scale_init_spec
     int                  bpp
 )
 {
-    int actual_x, actual_y;   
+    int actual_x, actual_y;
     int x_ratio_2x;
     int error, i, dest_y;
 
@@ -5515,15 +5574,28 @@ int gfx_scale_init_spec
     return 0;
 }
 
+/* ======================================================================== */
+/*  GFX_SCALE_DTOR                                                          */
+/* ======================================================================== */
+void gfx_scale_dtor(gfx_scale_spec_t *spec)
+{
+    if (!spec) return;
+
+    CONDFREE(spec->scaled_x);
+    CONDFREE(spec->scaled_y);
+
+    spec->scaled_x = NULL;
+    spec->scaled_y = NULL;
+}
 
 /* ======================================================================== */
 /*  GFX_SCALE_SET_PALETTE                                                   */
 /* ======================================================================== */
 void gfx_scale_set_palette
 (
-    gfx_scale_spec_t    *spec, 
+    gfx_scale_spec_t    *spec,
     int                  idx,
-    uint_32              color
+    uint32_t             color
 )
 {
     if (spec->bpp == 16)
@@ -5533,7 +5605,7 @@ void gfx_scale_set_palette
 }
 
 
-LOCAL uint_32 hscale_buf[8192] ALIGN16;
+LOCAL uint32_t hscale_buf[8192] ALIGN16;
 
 /* ======================================================================== */
 /*  GFX_SCALE                                                               */
@@ -5541,10 +5613,10 @@ LOCAL uint_32 hscale_buf[8192] ALIGN16;
 void gfx_scale
 (
     const gfx_scale_spec_t *RESTRICT spec,
-    const uint_8           *RESTRICT src,
-    uint_8                 *RESTRICT dst,
+    const uint8_t          *RESTRICT src,
+    uint8_t                *RESTRICT dst,
     int                              pitch,
-    const uint_32          *RESTRICT dirty_rows
+    const uint32_t         *RESTRICT dirty_rows
 )
 {
     int error, i, repeats, bytes;
@@ -5564,7 +5636,7 @@ void gfx_scale
                 repeats++;
             }
 
-            if ((dirty_rows[i >> 5] & (1 << (i & 31))) == 0)
+            if ((dirty_rows[i >> 5] & (1u << (i & 31))) == 0)
             {
                 dst += repeats * pitch;
                 src += spec->source_x;
@@ -5596,7 +5668,7 @@ void gfx_scale
                 repeats++;
             }
 
-            if ((dirty_rows[i >> 5] & (1 << (i & 31))) == 0)
+            if ((dirty_rows[i >> 5] & (1u << (i & 31))) == 0)
             {
                 dst += repeats * pitch;
                 src += spec->source_x;

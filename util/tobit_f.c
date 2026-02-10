@@ -41,7 +41,7 @@ int main(int argc, char *argv[])
     /* ==================================================================== */
     /*  Check to see if the user is asking for help.                        */
     /* ==================================================================== */
-    if (argc>1 && (!strcmp(argv[1],"-?")     || 
+    if (argc>1 && (!strcmp(argv[1],"-?")     ||
                    !strcmp(argv[1],"-h")     ||
                    !strcmp(argv[1],"--help")))
     {
@@ -56,7 +56,7 @@ int main(int argc, char *argv[])
     /* ==================================================================== */
     /*  Open the input file (if specified).                                 */
     /* ==================================================================== */
-    if (argc>1 && argv[1][0] != '-') 
+    if (argc>1 && argv[1][0] != '-')
     {
         fi=fopen(argv[1],"rb");
 
@@ -71,7 +71,7 @@ int main(int argc, char *argv[])
     /* ==================================================================== */
     /*  Open the output file (if specified).                                */
     /* ==================================================================== */
-    if (argc>2) 
+    if (argc>2)
     {
         fo=fopen(argv[2],"wb");
 
@@ -127,9 +127,9 @@ int main(int argc, char *argv[])
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                 Copyright (c) 1998-2001, Joseph Zbiciak                  */
 /* ======================================================================== */

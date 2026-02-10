@@ -11,10 +11,10 @@
 /* ------------------------------------------------------------------------ */
 typedef struct symtab_ent_t
 {
-    char        *symbol;
-    uint_32     address;
+    char       *symbol;
+    uint32_t    address;
     int         addrseq;
-    uint_32     *xref;
+    uint32_t   *xref;
     int         xrefs, xrsize;
     int         drefs;
 } symtab_ent_t;
@@ -46,16 +46,16 @@ typedef struct symtab_t
 /* ------------------------------------------------------------------------ */
 symtab_t *symtab_create      (void);
 void      symtab_destroy     (symtab_t *symtab);
-const char*symtab_defsym     (symtab_t *symtab, const char *sym, uint_32 addr);
-const char*symtab_getsym     (symtab_t *symtab, uint_32 addr, int attr, int w);
-int       symtab_getaddr     (symtab_t *symtab, const char *sym,uint_32 *addr);
-void      symtab_xref_addr   (symtab_t *symtab, uint_32 addr, uint_32 xref);
-void      symtab_dref_addr   (symtab_t *symtab, uint_32 addr);
+const char*symtab_defsym     (symtab_t *symtab, const char *sym, uint32_t addr);
+const char*symtab_getsym     (symtab_t *symtab, uint32_t addr, int attr, int w);
+int       symtab_getaddr     (symtab_t *symtab, const char *sym,uint32_t *addr);
+void      symtab_xref_addr   (symtab_t *symtab, uint32_t addr, uint32_t xref);
+void      symtab_dref_addr   (symtab_t *symtab, uint32_t addr);
 void      symtab_dump_by_syms(symtab_t *symtab, FILE *f);
 void      symtab_dump_by_addr(symtab_t *symtab, FILE *f);
 void      symtab_dump_xrefs  (symtab_t *symtab, FILE *f);
 
-typedef void (*symtab_grep_callback_t)(const char *, uint_32, int);
+typedef void (*symtab_grep_callback_t)(const char *, uint32_t, int);
 
 void symtab_grep_for_symbol(symtab_t*, symtab_grep_callback_t, const char*);
 
@@ -72,9 +72,9 @@ void symtab_grep_for_symbol(symtab_t*, symtab_grep_callback_t, const char*);
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                 Copyright (c) 1998-2001, Joseph Zbiciak                  */
 /* ======================================================================== */

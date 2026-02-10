@@ -15,52 +15,62 @@
 #include "periph/periph.h"
 #include "cp1600/cp1600.h"
 #include "cp1600/op_decode.h"
+#include "lzoe/lzoe.h"
+#include "file/file.h"
 #include "gfx/gfx.h"
 #include "demo/demo.h"
 #include "stic/stic.h"
 #include "speed/speed.h"
+#include "event/event.h"
 #include "util/symtab.h"
+#include "event/event.h"
 #include "debug_.h"
+#include "debug_if.h"
 #include "debug_tag.h"
 #include "debug_dasm1600.h"
-#include "file/file.h"
 #include "debug/source.h"
+
+#ifdef USE_GNU_READLINE
+# include <readline/readline.h>
+# include <readline/history.h>
+  LOCAL debug_t *readline_hook = NULL;  /* Ugh, readline uses globals */
+#endif
 
 #define HISTSIZE (0x10000)
 #define HISTMASK (HISTSIZE-1)
 #define RH_RECSIZE (16)
 
 LOCAL void debug_write_memattr(const char *fname);
-LOCAL uint_32 debug_peek(periph_t *p, periph_t *r, uint_32 a, uint_32 d);
-LOCAL void debug_poke(periph_t *p, periph_t *r, uint_32 a, uint_32 d);
+LOCAL uint32_t debug_peek(periph_t *p, periph_t *r, uint32_t a, uint32_t d);
+LOCAL void debug_poke(periph_t *p, periph_t *r, uint32_t a, uint32_t d);
 LOCAL void debug_disasm_cache_inval(void);
 LOCAL void debug_print_reghist(int count, int offset);
 
-LOCAL int dc_hits = 0, dc_miss = 0, dc_nocache = 0; 
+LOCAL int dc_hits = 0, dc_miss = 0, dc_nocache = 0;
 LOCAL int dc_unhook_ok = 0, dc_unhook_odd = 0;
 
-LOCAL uint_16 *debug_reghist = NULL;
-LOCAL uint_32 *debug_profile = NULL;
-LOCAL uint_8  *debug_memattr = NULL;
-LOCAL uint_16 *debug_mempc   = NULL;
-LOCAL int      debug_rh_ptr = -1;
-LOCAL int      debug_histinit = 0;
-LOCAL void debug_write_reghist(const char *, periph_p, cp1600_t *);
+LOCAL uint16_t *debug_reghist = NULL;
+LOCAL uint32_t *debug_profile = NULL;
+LOCAL uint8_t  *debug_memattr = NULL;
+LOCAL uint16_t *debug_mempc   = NULL;
+LOCAL int       debug_rh_ptr = -1;
+LOCAL int       debug_histinit = 0;
+LOCAL void debug_write_reghist(const char *, periph_t *, cp1600_t *);
 LOCAL symtab_t *debug_symtab;
 LOCAL int disasm_mode = 0;  /* -1 is disasm only, 0 is mixed, 1 is src only */
 
-LOCAL uint_32 debug_watch_w[0x10000 >> 5];
-LOCAL uint_32 debug_watch_r[0x10000 >> 5];
+LOCAL uint32_t debug_watch_w[0x10000 >> 5];
+LOCAL uint32_t debug_watch_r[0x10000 >> 5];
 #define WATCHING(x,y) ((int)((debug_watch_##y[(x) >> 5] >> ((x) & 31)) & 1))
-#define WATCHTOG(x,y) ((debug_watch_##y[(x) >> 5] ^= 1 << ((x) & 31)))
+#define WATCHTOG(x,y) ((debug_watch_##y[(x) >> 5] ^= 1u << ((x) & 31)))
 
-/* JSR table:  The first address is the address of the JSR and the second is 
+/* JSR table:  The first address is the address of the JSR and the second is
  * the return address.  JSR_RET_WINDOW is the lookahead window for watching
  * reads past the address of a JSR instruction to detect data-after-JSR.
  */
 #define MAX_JSRS (128)
-#define JSR_RET_WINDOW (3)  
-LOCAL uint_16 debug_jsrs[MAX_JSRS][2];
+#define JSR_RET_WINDOW (3)
+LOCAL uint16_t debug_jsrs[MAX_JSRS][2];
 LOCAL int debug_num_jsrs = 0;
 
 int debug_fault_detected = 0;
@@ -72,10 +82,10 @@ LOCAL char str_null[] = "(null)";
 
 #define MAX_STK (256)
 
-LOCAL uint_16 stk_pc[MAX_STK];
-LOCAL uint_32 stk_deep = 0;
-LOCAL uint_32 stk_base = 0;
-LOCAL uint_32 stk_wr   = 0;
+LOCAL uint16_t stk_pc[MAX_STK];
+LOCAL uint32_t stk_deep = 0;
+LOCAL uint32_t stk_base = 0;
+LOCAL uint32_t stk_wr   = 0;
 
 LOCAL FILE *stk_trc = NULL;
 
@@ -91,100 +101,129 @@ LOCAL void debug_print_usage(void)
 "jzIntv Debugger Commands\n"
 "\n"
 "Running the game:\n"
-"   r<#>        'R'un <#> cycles.  <#> defaults to \"infinity\"\n"
-"   s<#>        'S'tep <#> cycles showing disassembly as it runs.  \n"
+"  r <#>        'R'un <#> cycles.  <#> defaults to \"infinity\"\n"
+"  s <#>        'S'tep <#> cycles showing disassembly as it runs.  \n"
 "               <#> defaults to 1 cycle. -1 means \"forever.\"\n"
-"   t<#>        'T'race-over a JSR.  Similar to \"step\" except it attempts\n"
+"  t <#>        'T'race-over a JSR.  Similar to \"step\" except it attempts\n"
 "               to step over functions called by JSR.\n"
-"   [enter]     [enter] with no command is the same as \"s1\" or \"t1\",\n"
+"  t?           List active tracepoints.\n"
+"  [enter]      [enter] with no command is the same as \"s1\" or \"t1\",\n"
 "               depending on whether \"s\" or \"t\" was used most recently\n"
-"   f<#>        'F'ast forward to <#>.  When running in fast-forward mode,\n"
+"  f <#>        'F'ast forward to <#>.  When running in fast-forward mode,\n"
 "               the debugger skips all breakpoints and will only stop at the\n"
 "               target address or when the user pushes the BREAK key.  <#>\n"
 "               defaults to the current program counter\n"
-"   z           Toggle showing timestamps during 'step'\n"
-"   x           Toggle showing CPU reads and writes during 'step'\n"
-"   b<#>        Set a 'B'reakpoint at <#>.  <#> defaults to the current PC.\n"
-"   n<#>        u'N'set a breakpoint at <#>.  <#> defaults to the current PC \n"
+"  z            Toggle showing timestamps during 'step'\n"
+"  x            Toggle showing CPU reads and writes during 'step'\n"
+"  b <#>        Set a 'B'reakpoint at <#>.  <#> defaults to the current PC.\n"
+"  b?           List active breakpoints.\n"
+"  n <#>        u'N'set a breakpoint at <#>.  <#> defaults to the current PC \n"
+"  rs           'R'e'S'et the machine.\n"
 "\n"
+    );
+    jzp_printf(
 ">> Note:  Pressing the BREAK key while running or stepping will drop jzIntv\n"
 ">>        back to the debugger prompt.  BREAK is usually bound to F4.\n"
 "\n"
 "Viewing / changing state:\n"
-"   u<#1> <#2>  'U'nassemble <#2> instructions starting at <#1>.  <#2>\n"
+"  u <#1> <#2>  'U'nassemble <#2> instructions starting at <#1>.  <#2>\n"
 "               defaults to 10.  <#1> defaults to the current PC after 'r'un\n"
 "               or 's'tep, or to the next address after 'u'nassemble.\n"
-"   m<#1> <#2>  Show <#2> 'm'emory locations starting at <#1>.  <#2> defaults\n"
+"  m <#1> <#2>  Show <#2> 'm'emory locations starting at <#1>.  <#2> defaults\n"
 "               to 40 (hex).  <#1> defaults to the first undisplayed location\n"
 "               after the last 'm' command.\n"
-"   g<#1> <#2>  Write the value <#2> to re'G'ister <#1>.\n"
-"   e<#1> <#2>  'E'nter the value <#2> to memory location <#1>.\n"
-"   p<#1> <#2>  'P'oke the value <#2> to memory location <#1>.  'P'oke can\n"
+"  g <#1> <#2>  Write the value <#2> to re'G'ister <#1>.\n"
+"               Register numbers 8 - 13 manipulate the flags S, Z, O, C, I, D\n"
+"               according to the LSB of <#2>.\n"
+"  e <#1> <#2>  'E'nter the value <#2> to memory location <#1>.\n"
+"  p <#1> <#2>  'P'oke the value <#2> to memory location <#1>.  'P'oke can\n"
 "               always write to GRAM and STIC registers whereas 'E'nter\n"
 "               has the same restrictions as the CPU.\n"
-"   w<#1> <#2>  Toggle write 'w'atching on range from <#1> through <#2>,\n"
+"  w <#1> <#2>  Toggle write 'w'atching on range from <#1> through <#2>,\n"
 "               inclusive.  If <#2> is omitted, it toggles the watch flag for\n"
 "               a single location\n"
-"   @<#1> <#2>  Toggle read watching on range from <#1> through <#2>,\n"
+"  w?           List active write watches.\n"
+"  @ <#1> <#2>  Toggle read watching on range from <#1> through <#2>,\n"
 "               inclusive.  If <#2> is omitted, it toggles the watch flag for\n"
 "               a single location\n"
+"  @?           List active read watches.\n"
+"  v <#1> <#2>  Show source code in 'V'icinity of <#1>.  Range: +/- <#2>\n"
+"               addresses. <#1> defaults to current PC, <#2> defaults to 16.\n"
 "\n"
+    );
+    jzp_printf(
 "STIC Specific\n"
-"   ^           Toggle displaying dropped writes to STIC registers or GRAM\n"
-"   %%           Toggle displaying dropped reads of STIC registers or GRAM\n"
-"   $           Toggle displaying STIC video FIFO loads\n"
-"   #           Toggle halting when display blanks\n"
+"  ^            Toggle displaying dropped writes to STIC registers or GRAM\n"
+"  %%            Toggle displaying dropped reads of STIC registers or GRAM\n"
+"  $            Toggle displaying STIC video FIFO loads\n"
+"  #            Toggle halting when display blanks\n"
+"  gs           Write a GRAM snapshot to gram_XXXX.gif\n"
+"  gt <#1> <#2> Display a textual representation of GRAM starting at <#1> and\n"
+"               showing <#2> tiles.  Defaults to 0 64 (entire GRAM).\n"
+"  ni <#1>      Set the Non-Interruptible Instruction threshold to <#1>\n"
+"  bb           Halt on dropped BUSRQ\n"
+"  bi           Halt on dropped INTRM\n"
 /*
 "   $<path>     Enable STIC video FIFO checks with bitmap in <path>\n"
 "   $           Disable STIC video FIFO checks\n"
 */
 "\n"
+    );
+    jzp_printf(
 "Statistics / History tracking:\n"
-"   d           Dump CPU and memory state to a series of files.  Requires\n"
+"  d            Dump CPU and memory state to a series of files.  Requires\n"
 "               history or attribute logging to be enabled.\n"
-"   h           Toggle history logging.  Use \"d\" to dump to \"dump.hst\"\n"
+"  h            Toggle history logging.  Use \"d\" to dump to \"dump.hst\"\n"
 "               and \"dump.cpu\"\n"
-"   a           Toggle memory attribute logging.  Use \"d\" to dump to \n"
+"  a            Toggle memory attribute logging.  Use \"d\" to dump to \n"
 "               \"dump.atr\"\n"
-"   !<#1> <#2>  Print the last <#1> instructions that ran, ending <#2>\n"
+"  ! <#1> <#2>  Print the last <#1> instructions that ran, ending <#2>\n"
 "               cycles back. <#1> defaults to 40, <#2> defaults to 0.\n"
 "\n"
+    );
+    jzp_printf(
 "Miscellaneous commands:\n"
-"   l<path>     Load symbol table from <path>.  Format must be same as that\n"
+"  vs           Take a screen shot.\n"
+"  vm           Toggle movie recording.\n"
+"  va           Toggle AVI recording.\n"
+"  l <path>     Load symbol table from <path>.  Format must be same as that\n"
 "               output by as1600's -s flag\n"
-"   /<string>   Look for symbols containing <string>.  If <string> is also a\n"
+"  / <string>   Look for symbols containing <string>.  If <string> is also a\n"
 "               valid hex number, look for symbols at that address.  To only\n"
 "               look for symbols at an address use /$<addr>\n"
-"   o<#>        Set label/address 'o'utput format.  # is one of:\n"
+"  o <#>        Set label/address 'o'utput format.  # is one of:\n"
 "                   0 => LABEL ($1234)       <--- default\n"
 "                   1 => LABEL\n"
 "                   2 => $1234 (LABEL)\n"
 "                   3 => $1234\n"
-"   < <path>    Execute a script from <path>. Scripts are just collections of\n"
+"  < <path>     Execute a script from <path>. Scripts are just collections of\n"
 "               debugger commands, one per line.\n"
 #ifdef WIN32
-"   > <#>       Change the command window width to <#>\n"
+"  > <#>        Change the command window width to <#>\n"
 #endif
-"   q           Quit jzIntv\n"
-"   ?           Print this usage information\n"
+"  q            Quit jzIntv\n"
+"  ?            Print this usage information\n"
+"  ??           Print debugger status information\n"
+    );
+    jzp_printf(
 "\n"
 ">> Most commands that take an address can also take a symbol defined by a\n"
 ">> symbol table file.  These are output by as1600's -s flag.  You can load a\n"
 ">> symbol table into jzIntv with the --sym-file=<path> command line flag or\n"
 ">> with the 'L'oad command shown above\n"
 "\n"
-);
+    );
 }
 
 /* ======================================================================== */
 /*  DEBUG_TAG_RANGE                                                         */
 /* ======================================================================== */
-void debug_tag_range(uint_32 lo, uint_32 hi, uint_32 flags)
+void debug_tag_range(uint32_t lo, uint32_t hi, uint32_t flags)
 {
     if (!debug_memattr)
     {
-        debug_memattr = CALLOC(uint_8 ,  0x10000);
-        debug_mempc   = CALLOC(uint_16,  0x10000);
+        debug_memattr = CALLOC(uint8_t ,  0x10000);
+        debug_mempc   = CALLOC(uint16_t,  0x10000);
         if (!debug_memattr || !debug_mempc)
         {
             CONDFREE(debug_memattr);
@@ -204,10 +243,10 @@ void debug_tag_range(uint_32 lo, uint_32 hi, uint_32 flags)
 /* ======================================================================== */
 LOCAL void debug_read_symtbl(const char *fname)
 {
-    FILE *f;
+    LZFILE *f;
     char buf[512], symb[512];
 
-    if ((f = fopen(fname, "r")) == NULL)
+    if ((f = lzoe_fopen(fname, "r")) == NULL)
     {
         jzp_printf("debug: Could not open symbol table file '%s' for reading\n",
                     fname);
@@ -229,16 +268,16 @@ LOCAL void debug_read_symtbl(const char *fname)
     /*                                                                      */
     /*  Ignore undefined symbols and symbols outside the range 0000 - FFFF. */
     /* -------------------------------------------------------------------- */
-    while (fgets(buf, 512, f) != NULL)
+    while (lzoe_fgets(buf, 512, f) != NULL)
     {
-        uint_32 addr = 0, old_addr;
+        uint32_t addr = 0, old_addr;
 
         if (buf[0] == '?')
             continue;
 
         addr = 0xFFFFFFFF;
         symb[0] = 0;
-        if (sscanf(buf, "%x %s", &addr, symb) != 2)
+        if (sscanf(buf, "%x %511s", &addr, symb) != 2)
             continue;
 
         if (addr > 0xFFFF || symb[0] == 0)
@@ -258,20 +297,20 @@ LOCAL void debug_read_symtbl(const char *fname)
         }
     }
 
-    fclose(f);
+    lzoe_fclose(f);
 }
 
 /* ======================================================================== */
 /*  DEBUG_DECODE_VAL -- Decide if a string is a label or a hex constant     */
 /*                      and return the value.                               */
 /* ======================================================================== */
-LOCAL int debug_decode_val(const char *str, uint_32 maxval)
+LOCAL int debug_decode_val(const char *str, uint32_t maxval)
 {
-    uint_32 val;
+    uint32_t val;
     const char *x;
     const char *s = str;
     int must_hex = 0;
-    
+
     if (s[0] == '$') { s++; must_hex = 1; }
     else if (debug_symtab && (symtab_getaddr(debug_symtab, s, &val) == 0))
         goto got_it;
@@ -279,7 +318,7 @@ LOCAL int debug_decode_val(const char *str, uint_32 maxval)
     for (x = s; *x; x++)
         if (!(isdigit(*x) || (toupper(*x) >= 'A' && toupper(*x) <= 'F')))
         {
-            jzp_printf(must_hex ? "Error parsing: %s\n" 
+            jzp_printf(must_hex ? "Error parsing: %s\n"
                                 : "Could not find symbol named '%s'\n", str);
             return -1;
         }
@@ -302,18 +341,56 @@ got_it:
 }
 
 /* ======================================================================== */
-/*  DEBUG_SYMB_FOR_ADDR  -- Return a parenthesized string associated with   */
-/*                          an address, if any, else an empty string.       */
+/*  DEBUG_SYMB_FOR_ADDR  -- Returns symbol associated with and address, or  */
+/*                          NULL if there is none.  Performs no formatting. */
+/*                                                                          */
+/*  Prefers symbols that start w/out a '.' if available.                    */
 /* ======================================================================== */
-LOCAL char *debug_symb_for_addr(debug_t *debug, uint_32 addr, char *s4a_buf)
+const char *debug_symb_for_addr
+(
+    const uint32_t addr
+)
 {
-    const char *symb;
-    const char *temp;
-    int which;
+    if (!debug_symtab)
+        return NULL;
+
+    const char *best_symb = NULL;
+    const char *curr_symb = NULL;
+    int which = 0;
+
+    do {
+        curr_symb = symtab_getsym(debug_symtab, addr, 0, which);
+        if (curr_symb)
+        {
+            if (!best_symb || curr_symb[0] != '.')
+                best_symb = curr_symb;
+        }
+        which++;
+    } while (curr_symb && best_symb[0] == '.');
+
+    return best_symb;
+}
+
+/* ======================================================================== */
+/*  DEBUG_FORMAT_ADDR    -- Format an address with label information if     */
+/*                          available, according to the current address     */
+/*                          format, in the provided buffer.                 */
+/*                                                                          */
+/*  Note:  Buffer must be at least 10 characters long.                      */
+/* ======================================================================== */
+LOCAL char *debug_format_addr
+(
+    const debug_t *const debug, 
+    const uint32_t addr, 
+    char *const s4a_buf,
+    const int s4a_len
+)
+{
+    const char *const symb = debug_symb_for_addr(addr);
     int fmt = debug->symb_addr_format;
     int len;
 
-    if (!debug_symtab || !(symb = symtab_getsym(debug_symtab, addr, 0, 0)))
+    if (!symb)
     {
         fmt = 3;
         len = 0;
@@ -321,38 +398,26 @@ LOCAL char *debug_symb_for_addr(debug_t *debug, uint_32 addr, char *s4a_buf)
     {
         len = strlen(symb);
     }
-
-    if (fmt < 3)
-    {
-        /* Skip symbol names that start with "." if there are alternatives. */
-        which = 1;
-        while (symb[0] == '.' && 
-               (temp = symtab_getsym(debug_symtab, addr, 0, which)) != NULL)
-        {
-            symb = temp;
-            which++;
-        }
-    }
-    
+     
     switch (fmt)
     {
         case 0:
-            if (len > 27)
-                len = 27;
+            if (len > s4a_len - 9)
+                len = s4a_len - 9;
 
             sprintf(s4a_buf, "%*s ($%.4X)", len, symb, addr);
             break;
 
         case 1:
-            if (len > 35)
-                len = 35;
+            if (len > s4a_len - 1)
+                len = s4a_len - 1;
 
             sprintf(s4a_buf, "%*s", len, symb);
             break;
 
         case 2:
-            if (len > 27)
-                len = 27;
+            if (len > s4a_len - 9)
+                len = s4a_len - 9;
 
             sprintf(s4a_buf, "$%.4X (%*s)", addr, len, symb);
             break;
@@ -368,7 +433,7 @@ LOCAL char *debug_symb_for_addr(debug_t *debug, uint_32 addr, char *s4a_buf)
 /* ======================================================================== */
 /*  DEBUG_SEARCH_SYMBOL  -- Search for symbols matching a string.           */
 /* ======================================================================== */
-LOCAL void print_symbol(const char *symbol, uint_32 addr, int which)
+LOCAL void print_symbol(const char *symbol, uint32_t addr, int which)
 {
     UNUSED(which);
     jzp_printf(" $%.4X %s\n", addr, symbol);
@@ -378,7 +443,7 @@ LOCAL void debug_search_symbol(const char *search_string)
 {
     char *copy;
     char *s, *start;
-    uint_32 addr;
+    uint32_t addr;
 
     if (!debug_symtab)
         return;
@@ -429,10 +494,10 @@ not_hex:
 /*  DEBUG_HIT_JSR_RET -- Get JSR address for apparent "step over" PC addr,  */
 /*                       and remove address from list of active tracepoints */
 /* ======================================================================== */
-LOCAL uint_32 debug_get_jsr_addr(uint_32 ret_addr)
+LOCAL uint32_t debug_get_jsr_addr(uint32_t ret_addr)
 {
     int i, j;
-    uint_32 jsr_addr = 0;
+    uint32_t jsr_addr = 0;
 
     for (i = 0; i < debug_num_jsrs; i++)
     {
@@ -455,7 +520,7 @@ LOCAL uint_32 debug_get_jsr_addr(uint_32 ret_addr)
 /*  DEBUG_SET_JSR_RET -- Set JSR address and return address when stepping   */
 /*                       over a JSR instruction.                            */
 /* ======================================================================== */
-LOCAL void debug_set_jsr_ret(uint_32 jsr_addr, uint_32 ret_addr)
+LOCAL void debug_set_jsr_ret(uint32_t jsr_addr, uint32_t ret_addr)
 {
     int i;
 
@@ -482,7 +547,7 @@ LOCAL void debug_set_jsr_ret(uint_32 jsr_addr, uint_32 ret_addr)
 /*                       them forward if they're seen.  This is intended to */
 /*                       catch functions that have arguments after the JSR  */
 /* ======================================================================== */
-LOCAL void debug_chk_jsr_ret(cp1600_t *cp, uint_32 read_addr)
+LOCAL void debug_chk_jsr_ret(cp1600_t *cp, uint32_t read_addr)
 {
     int i;
 
@@ -503,8 +568,8 @@ LOCAL void debug_chk_jsr_ret(cp1600_t *cp, uint_32 read_addr)
     /* -------------------------------------------------------------------- */
     for (i = 0; i < debug_num_jsrs; i++)
     {
-        if (read_addr >=           debug_jsrs[i][1] && 
-            read_addr <= (uint_16)(debug_jsrs[i][1] + JSR_RET_WINDOW))
+        if (read_addr >=            debug_jsrs[i][1] &&
+            read_addr <= (uint16_t)(debug_jsrs[i][1] + JSR_RET_WINDOW))
         {
             cp1600_clr_breakpt(cp, debug_jsrs[i][1], CP1600_BKPT_ONCE);
             cp1600_set_breakpt(cp, read_addr + 1,    CP1600_BKPT_ONCE);
@@ -520,13 +585,13 @@ LOCAL void debug_chk_jsr_ret(cp1600_t *cp, uint_32 read_addr)
 /*  DEBUG_FIND_JSRS  -- If we're stepping over JSRs, handle any JSR at the  */
 /*                      current PC.                                         */
 /* ======================================================================== */
-LOCAL int debug_find_jsrs(periph_t *p, cp1600_t *cp, uint_32 pc)
+LOCAL int debug_find_jsrs(periph_t *p, cp1600_t *cp, uint32_t pc)
 {
-    uint_16 n1, n2;
+    uint16_t n1, n2;
 
     /* Is this a JUMP family instruction? */
-    n1 = periph_peek((periph_t*)p->bus, p, (pc + 0) & 0xFFFF, ~0) & 0x3FF;
-    n2 = periph_peek((periph_t*)p->bus, p, (pc + 1) & 0xFFFF, ~0) & 0x3FF;
+    n1 = periph_peek(AS_PERIPH(p->bus), p, (pc + 0) & 0xFFFF, ~0) & 0x3FF;
+    n2 = periph_peek(AS_PERIPH(p->bus), p, (pc + 1) & 0xFFFF, ~0) & 0x3FF;
     if (n1 == 0x0004 && (n2 & 0x300) != 0x300)
     {
         cp1600_set_breakpt(cp, pc + 3, CP1600_BKPT_ONCE);
@@ -544,7 +609,7 @@ LOCAL void debug_open_script(debug_t *debug, const char *script)
 {
     if (debug->filestk_depth < DEBUG_MAX_FILESTK - 1)
     {
-        FILE *f = fopen(script, "r");
+        LZFILE *f = lzoe_fopen(script, "r");
         if (!f)
             jzp_printf("debug: Could not open script file '%s'\n", script);
         else
@@ -552,12 +617,12 @@ LOCAL void debug_open_script(debug_t *debug, const char *script)
     } else
         jzp_printf("debug: Script files nested too deeply\n");
 }
-                                    
+
 /* ======================================================================== */
 /*  DEBUG_SHOW_VICINITY  -- Show the source code in the vicinity of an      */
 /*                          address, if available.                          */
 /* ======================================================================== */
-LOCAL void debug_show_vicinity(uint_32 addr, int range)
+LOCAL void debug_show_vicinity(uint32_t addr, int range)
 {
     int file, line;
     int i;
@@ -584,9 +649,9 @@ LOCAL void debug_show_vicinity(uint_32 addr, int range)
 /*  DEBUG_INFER_STACK    -- Try to figure out a reasonable base for the     */
 /*                          stack.                                          */
 /* ======================================================================== */
-LOCAL uint_16 debug_infer_stack(cp1600_t *cp)
+LOCAL uint16_t debug_infer_stack(cp1600_t *const cp)
 {
-    uint_32 val;
+    uint32_t val;
 
     /* First look for the symbol _m.stk */
     if (debug_symtab && (symtab_getaddr(debug_symtab, "_m.stk", &val) == 0))
@@ -601,6 +666,191 @@ LOCAL uint_16 debug_infer_stack(cp1600_t *cp)
 }
 #endif
 
+/* ======================================================================== */
+/*  DEBUG_PRINT_BREAKPT_CB   -- Callback for printing out a breakpoint.     */
+/* ======================================================================== */
+LOCAL void debug_print_breakpt_cb(void *opaque, uint32_t addr)
+{
+    debug_t *const debug = (debug_t *)opaque;
+    char lblbuf[1024];
+    jzp_printf(">> %s\n", debug_format_addr(debug, addr, lblbuf, sizeof(lblbuf)));
+}
+
+/* ======================================================================== */
+/*  DEBUG_LIST_BREAKPOINTS   -- List active breakpoints                     */
+/*  DEBUG_LIST_TRACEPOINTS   -- List active tracepoints                     */
+/* ======================================================================== */
+LOCAL void debug_list_breakpoints(debug_t *const debug, cp1600_t *const cp)
+{
+    jzp_printf("Breakpoints:\n");
+    cp1600_list_breakpts(cp, CP1600_BKPT, debug_print_breakpt_cb, debug);
+}
+
+LOCAL void debug_list_tracepoints(debug_t *const debug, cp1600_t *const cp)
+{
+    jzp_printf("Tracepoints:\n");
+    cp1600_list_breakpts(cp, CP1600_BKPT_ONCE, debug_print_breakpt_cb, debug);
+}
+
+/* ======================================================================== */
+/*  DEBUG_LIST_WATCHES       -- List read/write watch addresses             */
+/* ======================================================================== */
+LOCAL void debug_list_watches(const debug_t  *const debug, 
+                              const uint32_t *const bmap)
+{
+    const int fmt = debug->symb_addr_format;
+    const char *symb = NULL;
+    uint32_t addr_lo = 0, addr_hi = 0;
+    int in_range = 0;
+    uint32_t addr;
+
+    for (addr = 0; addr <= 0x10000; addr++)
+    {
+        const uint32_t addr_idx = addr >> 5;
+        const uint32_t addr_bit = (1u) << (addr & 0x1F);
+        const int watching = addr < 0x10000 && (bmap[addr_idx] & addr_bit) != 0;
+
+        symb = fmt == 3 || addr >= 0x10000 ? NULL : debug_symb_for_addr(addr);
+
+        /* ---------------------------------------------------------------- */
+        /*  If we encounter a symbol, flush current non-symboled range.     */
+        /*  Also flush range if no longer watching.                         */
+        /* ---------------------------------------------------------------- */
+        if (in_range && (symb || !watching))
+        {
+            jzp_printf(
+                addr_lo == addr_hi ? "Watching $%04X\n" 
+                                   : "Watching $%04X - $%04X\n",
+                addr_lo, addr_hi);
+            in_range = 0;
+            addr_lo = addr_hi = -1;
+        }
+
+        /* ---------------------------------------------------------------- */
+        /*  If we're watching this location, and don't have a range open,   */
+        /*  start a new range.                                              */
+        /* ---------------------------------------------------------------- */
+        if (!in_range && watching)
+        {
+            /* ------------------------------------------------------------ */
+            /*  If this was a symboled location, just print its name and    */
+            /*  don't open a range.  Otherwise, open a range.               */
+            /* ------------------------------------------------------------ */
+            if (symb)
+            {
+                char buf[1024];
+                jzp_printf("Watching %s\n", 
+                           debug_format_addr(debug, addr, buf, sizeof(buf)));
+                in_range = 0;
+                addr_lo = addr_hi = -1;
+            } else
+            {
+                in_range = 1;
+                addr_lo = addr_hi = addr;
+            }
+        }
+
+        /* ---------------------------------------------------------------- */
+        /*  If we're in a range, try to extend it.  Otherwise, print it.    */
+        /* ---------------------------------------------------------------- */
+        if (in_range && watching)
+            addr_hi = addr;
+    }
+}
+
+#ifndef USE_GNU_READLINE
+/* ======================================================================== */
+/*  DEBUG_READLINE   -- Read a line of input from the user.  Returns 0 on   */
+/*                      success, or non-zero if input is exhausted.         */
+/* ======================================================================== */
+LOCAL int debug_readline(char *const buf, const size_t buf_size,
+                         const char *const prompt, debug_t *const debug)
+{
+    jzp_printf(prompt);
+    jzp_flush();
+
+    while (!lzoe_fgets(buf, buf_size, debug->filestk[debug->filestk_depth]))
+    {
+        if (debug->filestk_depth == 0)
+            return -1;
+        lzoe_fclose(debug->filestk[debug->filestk_depth--]);
+    }
+
+    if (debug->filestk_depth > 0)
+        fputs(buf, stdout);
+
+    return 0;
+}
+#else
+/* ======================================================================== */
+/*  DEBUG_READLINE   -- Read a line of input from the user.  Returns 0 on   */
+/*                      success, or non-zero if input is exhausted.         */
+/* ======================================================================== */
+LOCAL int debug_readline(char *const buf, const size_t buf_size,
+                         const char *const prompt, debug_t *const debug)
+{
+    jzp_printf(prompt);
+    jzp_flush();
+
+    while (debug->filestk_depth > 0 && 
+           !lzoe_fgets(buf, buf_size, debug->filestk[debug->filestk_depth]))
+    {
+        lzoe_fclose(debug->filestk[debug->filestk_depth--]);
+    }
+
+    if (debug->filestk_depth > 0)
+    {
+        fputs(buf, stdout);
+        return 0;
+    }
+
+    rl_already_prompted = 1;
+    char *line = readline(prompt);
+
+    if (!line)
+        return -1;
+
+    if (strlen(line) > buf_size - 1)
+        line[buf_size - 1] = '\0';
+
+    strcpy(buf, line);
+
+    if (buf[0])
+        add_history(buf);
+
+    free(line);
+
+    return 0;
+}
+
+/* ======================================================================== */
+/*  DEBUG_READLINE_NO_COMPLETIONS    -- Never expand completions.  Sorry.   */
+/* ======================================================================== */
+LOCAL char *debug_readline_no_completions(const char *text, int state)
+{
+    UNUSED(text);
+    UNUSED(state);
+    return NULL;
+}
+
+/* ======================================================================== */
+/*  DEBUG_READLINE_EVENT_HOOK    -- Pump event loop when getting input.     */
+/* ======================================================================== */
+LOCAL int debug_readline_event_hook(void)
+{
+    event_t *const event = readline_hook ? readline_hook->event : NULL;
+    gfx_t *const gfx = readline_hook ? readline_hook->gfx : NULL;
+
+    if (event && event->periph.tick)
+        event->periph.tick(AS_PERIPH(event), 0);
+
+    if (gfx)
+        gfx_refresh(gfx);
+
+    return 0;
+}
+#endif
+
 /*
  * ============================================================================
  *  DEBUG_RD         -- Capture/print a read event.
@@ -609,9 +859,9 @@ LOCAL uint_16 debug_infer_stack(cp1600_t *cp)
  *                      line called from.
  * ============================================================================
  */
-uint_32 debug_rd(periph_t *p, periph_t *r, uint_32 a, uint_32 d)
+uint32_t debug_rd(periph_t *p, periph_t *r, uint32_t a, uint32_t d)
 {
-    debug_t *debug = (debug_t*)p;
+    debug_t *debug = PERIPH_AS(debug_t, p);
     cp1600_t *cp = debug->cp1600;
     char addrbuf[36], pcbuf[36];
 
@@ -622,16 +872,16 @@ uint_32 debug_rd(periph_t *p, periph_t *r, uint_32 a, uint_32 d)
 
     if (debug->show_rd || WATCHING(a,r))
     {
-        jzp_printf(" RD a=%s d=%.4X %-16s (PC = %s) t=%llu\n", 
-                debug_symb_for_addr(debug, a, addrbuf),
-                d, r==(periph_p)p->bus ? r->req->name:r->name, 
-                debug_symb_for_addr(debug, cp->oldpc, pcbuf),
+        jzp_printf(" RD a=%s d=%.4X %-16s (PC = %s) t=%" U64_FMT "\n",
+                debug_format_addr(debug, a, addrbuf, sizeof(addrbuf)),
+                d, r==AS_PERIPH(p->bus) ? r->req->name:r->name,
+                debug_format_addr(debug, cp->oldpc, pcbuf, sizeof(pcbuf)),
                 cp->periph.now);
     }
 
     if (debug_memattr)
     {
-        if (cp->r[7] == a) 
+        if (cp->r[7] == a)
             debug_memattr[a] |= DEBUG_MA_CODE;
         else if (cp->D)
             debug_memattr[a] |= DEBUG_MA_SDBD | DEBUG_MA_DATA;
@@ -663,9 +913,9 @@ uint_32 debug_rd(periph_t *p, periph_t *r, uint_32 a, uint_32 d)
     return ~0U;
 }
 
-void    debug_wr(periph_t *p, periph_t *r, uint_32 a, uint_32 d)
+void    debug_wr(periph_t *p, periph_t *r, uint32_t a, uint32_t d)
 {
-    debug_t *debug = (debug_t*)p;
+    debug_t *debug = PERIPH_AS(debug_t, p);
     cp1600_t *cp = debug->cp1600;
     char addrbuf[36], pcbuf[36];
 
@@ -674,10 +924,10 @@ void    debug_wr(periph_t *p, periph_t *r, uint_32 a, uint_32 d)
 
     if (debug->show_wr || WATCHING(a,w))
     {
-        jzp_printf(" WR a=%s d=%.4X %-16s (PC = %s) t=%llu\n", 
-                debug_symb_for_addr(debug, a, addrbuf),
-                d, r==(periph_p)p->bus ? r->req->name:r->name, 
-                debug_symb_for_addr(debug, cp->oldpc, pcbuf),
+        jzp_printf(" WR a=%s d=%.4X %-16s (PC = %s) t=%" U64_FMT "\n",
+                debug_format_addr(debug, a, addrbuf, sizeof(addrbuf)),
+                d, r==AS_PERIPH(p->bus) ? r->req->name:r->name,
+                debug_format_addr(debug, cp->oldpc, pcbuf, sizeof(pcbuf)),
                 cp->periph.now);
     }
 
@@ -696,7 +946,7 @@ void    debug_wr(periph_t *p, periph_t *r, uint_32 a, uint_32 d)
 #endif
 }
 
-LOCAL uint_32 debug_peek(periph_t *p, periph_t *r, uint_32 a, uint_32 d)
+LOCAL uint32_t debug_peek(periph_t *p, periph_t *r, uint32_t a, uint32_t d)
 {
     UNUSED(p);
     UNUSED(r);
@@ -705,7 +955,7 @@ LOCAL uint_32 debug_peek(periph_t *p, periph_t *r, uint_32 a, uint_32 d)
     return ~0U;
 }
 
-LOCAL void debug_poke(periph_t *p, periph_t *r, uint_32 a, uint_32 d)
+LOCAL void debug_poke(periph_t *p, periph_t *r, uint32_t a, uint32_t d)
 {
     UNUSED(p);
     UNUSED(r);
@@ -713,119 +963,136 @@ LOCAL void debug_poke(periph_t *p, periph_t *r, uint_32 a, uint_32 d)
     UNUSED(d);
 }
 
-
-uint_32 debug_tk(periph_t *p, uint_32 len)
+LOCAL const char debug_req_ack_char[16] = 
 {
-    debug_t *debug = (debug_t*)p;
+            /*    BUSAK   BUSRQ   INTAK   INTRQ     Meaning             */
+    '-',    /*      0       0       0       0       Normal operation    */
+    'q',    /*      0       0       0       1       Interrupt pending   */
+    '2',    /*      0       0       1       0       Invalid             */
+    'Q',    /*      0       0       1       1       Interrupt taken     */
+    'b',    /*      0       1       0       0       Bus req pending     */
+    '5',    /*      0       1       0       1       Invalid             */
+    '6',    /*      0       1       1       0       Invalid             */
+    '7',    /*      0       1       1       1       Invalid             */
+    '8',    /*      1       0       0       0       Invalid             */
+    '9',    /*      1       0       0       1       Invalid             */
+    'a',    /*      1       0       1       0       Invalid             */
+    'x',    /*      1       0       1       1       Invalid             */
+    'B',    /*      1       1       0       0       Bus req ack'd.      */
+    'd',    /*      1       1       0       1       Invalid             */
+    'e',    /*      1       1       1       0       Invalid             */
+    'f',    /*      1       1       1       1       Invalid             */
+};
+
+static const char *symb_format_desc[4] =
+{
+    "LABEL ($1234)",
+    "LABEL",
+    "$1234 (LABEL)",
+    "$1234"
+};
+
+
+static int non_int_threshold = 54;
+
+LOCAL void debug_record_registers(debug_t *const debug, const uint64_t now,
+                             const int req_ack)
+{
+    if (debug_rh_ptr < 0) return;
+
+    cp1600_t *const cp = debug->cp1600;
+    periph_t *const bus = AS_PERIPH(debug->periph.bus);
+    const uint32_t  pc = cp->r[7];
+
+    memcpy(debug_reghist + debug_rh_ptr * RH_RECSIZE, cp->r, 16);
+
+    debug_reghist[debug_rh_ptr * RH_RECSIZE + 8] = 1 +
+                                          ((!!cp->S    ) << 1) +
+                                          ((!!cp->C    ) << 2) +
+                                          ((!!cp->O    ) << 3) +
+                                          ((!!cp->Z    ) << 4) +
+                                          ((!!cp->I    ) << 5) +
+                                          ((!!cp->D    ) << 6) +
+                                          ((!!cp->intr ) << 7) +
+                                          ((req_ack    ) << 8);
+
+    for (int i = 0; i < 3; i++)
+        debug_reghist[debug_rh_ptr * RH_RECSIZE + 9 + i] =
+            periph_peek(bus, AS_PERIPH(debug), (pc + i) & 0xFFFF, ~0);
+
+    debug_reghist[debug_rh_ptr * RH_RECSIZE + 12] = (now    ) & 0xFFFF;
+    debug_reghist[debug_rh_ptr * RH_RECSIZE + 13] = (now>>16) & 0xFFFF;
+    debug_reghist[debug_rh_ptr * RH_RECSIZE + 14] = (now>>32) & 0xFFFF;
+    debug_reghist[debug_rh_ptr * RH_RECSIZE + 15] = (now>>48) & 0xFFFF;
+
+    debug_rh_ptr = (debug_rh_ptr + 1) & HISTMASK;
+}
+
+uint32_t debug_tk(periph_t *p, uint32_t len)
+{
+    debug_t  *debug = PERIPH_AS(debug_t, p);
     cp1600_t *cp = debug->cp1600;
-    uint_32 pc = cp->r[7];
-    char    buf[1024], *s;
-    static  uint_16 next_hex_dump = 0x0000;
-    static  int     prev_pc = ~0U;
-    static  int     non_int = 0;
-    static  int     show_time = 1;
-    static  int     show_rdwr = 0;
-    static  int     last_over = 0;
-    static  uint_32 fast_fwd  = 0, ff_bkpt = 0; 
-    static  uint_64 prev_rh_now   = 0;
-    static  int     prev_rh_intrq = 0;
-    sint_32 slen = (sint_32)len;
-    uint_64 instrs = cp->tot_instr - debug->tot_instr;
-    uint_64 now = cp->periph.now;
-    uint_16 next_disassem = pc;
-    int     intrq, busrq, wind = 0, show_once = 0;
-    /*static req_bus_t old_req = { 0, 0, 0, 0, 0, 0, 0 };*/
-    /*static uint_64 old_now = 0;*/
+    uint32_t  pc = cp->r[7];
+    char     buf[1024], *s;
+    static   uint16_t next_hex_dump = 0x0000;
+    static   int      prev_pc = -1;
+    static   int      non_int = 0;
+    static   int      show_time = 1;
+    static   int      show_rdwr = 0;
+    static   int      last_over = 0;
+    static   uint32_t fast_fwd  = 0, ff_bkpt = 0;
+    static   uint64_t prev_rh_now     = 0;
+    static   int      prev_rh_req_ack = 0;
+    int32_t  slen = (int32_t)len;
+    uint64_t instrs = cp->tot_instr - debug->tot_instr;
+    uint64_t now = cp->periph.now;
+    uint16_t next_disassem = pc;
+    int      req_ack, wind = -1, show_once = 0;
 
     debug->tot_instr = cp->tot_instr;
+    req_ack = cp->req_ack_state;
 
-    /* get current INTRM, BUSRQ */
-    intrq = (cp->req_bus.intrq & 1);
-    busrq = (cp->req_bus.intrq & 2) >> 1;
-
-    /* See if we've edged outside the INTRQ window or into the next */
-    intrq &= now <  cp->req_bus.intrq_until;
-    intrq |= now >= cp->req_bus.next_intrq;
-
-    /* See if we've edged outside the BUSRQ window or into the next */
-    busrq &= now <  cp->req_bus.busrq_until;
-    busrq |= now >= cp->req_bus.next_busrq;
-
-    /* Merge intrq/busrq back into single 2-bit field */
-    intrq |= busrq << 1;
-
-    /* check to see if we're INTAK or BUSAK */
-    if (now == cp->req_bus.intak)       intrq = 4;
-    if (now >  cp->req_bus.busak &&
-        now == cp->req_bus.busrq_until) intrq = 5;
-#if 0
-    if (intrq > 3)
-    {
-        jzp_printf("prev:  n=%-8llu ni=%-8llu nb=%-8llu\n"
-             "                  iu=%-8llu bu=%-8llu\n"
-             "                   i=%-8llu  b=%-8llu\n", 
-               old_now, 
-               old_req.next_intrq,
-               old_req.next_busrq,
-               old_req.intrq_until,
-               old_req.busrq_until,
-               old_req.intak,
-               old_req.busak);
-    }
-    old_req = cp->req_bus;
-    old_now = now;
-#endif
-
-
-/*jzp_printf("%15llu %15llu %15llu %d\n", now, cp->req_bus.intak, cp->req_bus.busak, intrq);*/
     /* -------------------------------------------------------------------- */
     /*  If we're keeping a trace history, update it now.                    */
     /* -------------------------------------------------------------------- */
-    if (debug_rh_ptr >= 0 && (now != prev_rh_now || intrq != prev_rh_intrq))
+    if (debug_rh_ptr >= 0 && (now != prev_rh_now || req_ack != prev_rh_req_ack))
     {
-        int i;
+        static int ni_start = -1, ni_end = -1;
+        static uint64_t ni_cycle = 0;
 
-        prev_rh_now   = now;
-        prev_rh_intrq = intrq;
+        prev_rh_now     = now;
+        prev_rh_req_ack = req_ack;
 
-        if (slen > 0 && prev_pc > 0 && cp->intr == 0) 
-        { 
-            non_int += len; 
-        } else 
-        { 
-            if (*debug->vid_enable && non_int >= 50)
-            {  
-                char pcbuf[36];
-                jzp_printf("NON_INT = %d at PC = %s\n", non_int, 
-                        debug_symb_for_addr(debug, pc, pcbuf));
+        if (slen > 0 && prev_pc > 0 && cp->intr == 0)
+        {
+            non_int += len;
+            if (ni_start < 0) 
+            {
+                ni_cycle = now - len;
+                ni_start = prev_pc;
             }
-            
+            ni_end = pc;
+        } else
+        {
+            non_int += len;
+            if (*debug->vid_enable && non_int >= non_int_threshold &&
+                ni_start > 0 && ni_end > 0)
+            {
+                char pcbuf0[36], pcbuf1[36];
+                jzp_printf(
+                    "NON_INT = %d at PC = %s .. %s, starting at cycle %"
+                    U64_FMT "\n", non_int,
+                    debug_format_addr(debug, ni_start, pcbuf0, sizeof(pcbuf0)),
+                    debug_format_addr(debug, ni_end, pcbuf1, sizeof(pcbuf1)),
+                    ni_cycle);
+            }
+
             non_int = 0;
+            ni_cycle = 0;
+            ni_start = ni_end = -1;
         }
 
-        memcpy(debug_reghist + debug_rh_ptr * RH_RECSIZE, cp->r, 16);
-
-
-        debug_reghist[debug_rh_ptr * RH_RECSIZE + 8] = 1 +
-                                              ((!!cp->S    ) << 1) + 
-                                              ((!!cp->C    ) << 2) +
-                                              ((!!cp->O    ) << 3) +
-                                              ((!!cp->Z    ) << 4) +
-                                              ((!!cp->I    ) << 5) +
-                                              ((!!cp->D    ) << 6) +
-                                              ((!!cp->intr ) << 7) +
-                                              ((intrq      ) << 8);
-
-        for (i = 0; i < 3; i++)
-            debug_reghist[debug_rh_ptr * RH_RECSIZE + 9 + i] = 
-                periph_peek((periph_t*)p->bus, p, pc + i, ~0);
-
-        debug_reghist[debug_rh_ptr * RH_RECSIZE + 12] = (now    ) & 0xFFFF;
-        debug_reghist[debug_rh_ptr * RH_RECSIZE + 13] = (now>>16) & 0xFFFF;
-        debug_reghist[debug_rh_ptr * RH_RECSIZE + 14] = (now>>32) & 0xFFFF;
-        debug_reghist[debug_rh_ptr * RH_RECSIZE + 15] = (now>>48) & 0xFFFF;
-
-        debug_rh_ptr = (debug_rh_ptr + 1) & HISTMASK;
+        debug_record_registers(debug, now, req_ack);
 
         if (slen > 0 && prev_pc > 0)
         {
@@ -839,15 +1106,18 @@ uint_32 debug_tk(periph_t *p, uint_32 len)
     /*  If slen == -CYC_MAX, we're crashing.                                */
     /* -------------------------------------------------------------------- */
     if (slen == -CYC_MAX || debug_fault_detected)
-    {   
-        if (debug_fault_detected > 0)
+    {
+        if ( debug_fault_detected == DEBUG_CRASHING )
         {
             if (debug_rh_ptr >= 0)  debug_write_reghist("dump.hst", p, cp);
             if (debug_memattr)      debug_write_memattr("dump.atr");
-            jzp_printf("CPU crashed!\n"); 
-        } else
+            jzp_printf("CPU crashed!\n");
+        } else if ( debug_fault_detected == DEBUG_ASYNC_HALT )
         {
             jzp_printf("Asynchronous halt requested.\n");
+        } else if ( debug_fault_detected == DEBUG_HLT_INSTR )
+        {
+            jzp_printf("HLT instruction reached.\n");
         }
         if (debug_halt_reason)
         {
@@ -877,7 +1147,7 @@ uint_32 debug_tk(periph_t *p, uint_32 len)
         /*  Pop off "return from JSRs" that we pass while fast-forwarding.  */
         /*  We shouldn't keep them since we've popped the return stack.     */
         /* ---------------------------------------------------------------- */
-        if (cp->hit_bkpt == 2)
+        if (cp->hit_breakpoint == BK_TRACEPOINT)
             debug_get_jsr_addr(pc);
 
         return len;
@@ -901,15 +1171,15 @@ uint_32 debug_tk(periph_t *p, uint_32 len)
     /* -------------------------------------------------------------------- */
     if (slen < 0)
     {
-        uint_32 jsr_addr = 0;
-
+        uint32_t jsr_addr = 0;
 
         /* ---------------------------------------------------------------- */
         /*  If we hit a tracepoint (ie. the return from a JSR), then don't  */
         /*  drop into the debugger.  Rather, go back into "step" mode with  */
         /*  our remaining step count.                                       */
         /* ---------------------------------------------------------------- */
-        if (cp->hit_bkpt == 2 && (jsr_addr = debug_get_jsr_addr(pc)) != 0)
+        if (cp->hit_breakpoint == BK_TRACEPOINT &&
+                (jsr_addr = debug_get_jsr_addr(pc)) != 0)
         {
             jzp_printf("Returned from JSR at $%.4X.\n", jsr_addr);
             debug->step_count = debug->step_over >> 1;
@@ -920,6 +1190,9 @@ uint_32 debug_tk(periph_t *p, uint_32 len)
 
             if (debug->step_count > 0)
                 debug->step_count--;
+
+            if (debug_rh_ptr < 0)
+                cp->step_count = 1;
         }
 
         /* ---------------------------------------------------------------- */
@@ -927,10 +1200,10 @@ uint_32 debug_tk(periph_t *p, uint_32 len)
         /*  drop into the debugger.  In the case of a breakpoint, let the   */
         /*  user know that we hit a breakpoint.                             */
         /* ---------------------------------------------------------------- */
-        if (cp->hit_bkpt == 1)
+        if (cp->hit_breakpoint == BK_BREAKPOINT)
             jzp_printf(fast_fwd ? "Fast forwarded to $%.4X\n" :
                                   "Hit breakpoint at $%.4X\n", pc);
-        if (cp->hit_bkpt != 2)
+        if (cp->hit_breakpoint != BK_TRACEPOINT)
             debug->step_count = 0;
     }
 
@@ -978,6 +1251,9 @@ show_disassem:
         if (disasm_width < 20)
             disasm_width = -1;
 
+        if (pc != cp->r[7])
+            debug_record_registers(debug, now, req_ack);
+
         pc = cp->r[7];
 
         /* ---------------------------------------------------------------- */
@@ -989,31 +1265,27 @@ show_disassem:
         /* ---------------------------------------------------------------- */
         /*  Print the state of the machine, along w/ disassembly.           */
         /* ---------------------------------------------------------------- */
-        if (debug_symtab && (symb = symtab_getsym(debug_symtab, pc, 0, 0)))
+        if ((symb = debug_symb_for_addr(pc)) != NULL)
             jzp_printf("%s:\n", symb);
 
         jzp_printf(
             show_time ?
                " %.4X %.4X %.4X %.4X %.4X %.4X %.4X %.4X %c%c%c%c%c%c%c%c"
-               "%-*.*s %8llu\n"
+               "%-*.*s %8" LL_FMT "u\n"
             :
                " %.4X %.4X %.4X %.4X %.4X %.4X %.4X %.4X %c%c%c%c%c%c%c%c"
                "%-*.*s\n"
             ,
-               cp->r[0], cp->r[1], cp->r[2], cp->r[3], 
+               cp->r[0], cp->r[1], cp->r[2], cp->r[3],
                cp->r[4], cp->r[5], cp->r[6], cp->r[7],
                cp->S ? 'S' : '-',
-               cp->C ? 'C' : '-',
-               cp->O ? 'O' : '-',
                cp->Z ? 'Z' : '-',
+               cp->O ? 'O' : '-',
+               cp->C ? 'C' : '-',
                cp->I ? 'I' : '-',
                cp->D ? 'D' : '-',
                cp->intr ? 'i' : '-',
-               intrq == 1 ? 'q' : 
-               intrq == 2 ? 'b' : 
-               intrq == 3 ? '?' :
-               intrq == 4 ? 'Q' : 
-               intrq == 5 ? 'B' : '-', 
+               debug_req_ack_char[req_ack],
                disasm_width, disasm_width, dis,
                now);
 
@@ -1025,30 +1297,21 @@ show_disassem:
     /* -------------------------------------------------------------------- */
     if (debug->step_count == 0 /*|| !len*/)
     {
-        int cmd = 0, c, arg = -1, arg2 = -1;
-        char argstr[100], argstr2[100];
+        int cmd = 0, c, c2 = -1, c3 = -1, arg = -1, arg2 = -1;
+        char argstr[101], argstr2[101];
         static int over = 0;
 
-        wind = gfx_force_windowed(debug->gfx, 1);
+        if (wind < 0)
+            wind = gfx_force_windowed(debug->gfx, 1);
 
 next_cmd:
         do
         {
-            jzp_printf("> ");
-            jzp_flush();
+            if (*debug->exit_flag)
+                return CYC_MAX;
 
-            while (!fgets(buf, 1023, debug->filestk[debug->filestk_depth]))
-            {
-                if (debug->filestk_depth == 0)
-                {
-                    strcpy(buf, "q");
-                    break;
-                } else
-                    fclose(debug->filestk[debug->filestk_depth--]);
-            }
-
-            if (debug->filestk_depth > 0)
-                fputs(buf, stdout);
+            if (debug_readline(buf, sizeof(buf), "> ", debug))
+                strcpy(buf, "q");
 
             /* ignore anything after a semicolon */
             if ((s = strchr(buf, ';')) != NULL)
@@ -1085,46 +1348,108 @@ next_cmd:
 
             c = toupper(*s++);
 
+            /* Two letter commands:
+                'GS' for GRAMSHOT
+                'GT' for GRAM text
+                'GQ' for debuG reQs
+             */
+            c2 = toupper(s[0]);
+            c3 = isalpha(c2) && s[1] ? toupper(s[1]) : ' ';
+            if (c == 'G')
+            {
+                if (c2 == 'S' || c2 == 'T' || c2 == 'Q') s++;
+                else c2 = -1;
+            }
+
+            /* NI for non-interruptible threshold. */
+            if (c == 'N')
+            {
+                if (c2 == 'I' && isspace(c3)) s++;
+                else c2 = -1;
+            }
+
+            if (c == 'B')
+            {
+                if ((c2 == 'B' || c2 == 'I') && isspace(c3)) s++;
+                else if (c2 != '?') c2 = -1;
+            }
+
+            /* Allow second character for VA, VM, VS. */
+            if (c == 'V')
+            {
+                if (c2 == 'A' || c2 == 'M' || c2 == 'S') s++;
+                else c2 = -1;
+            }
+
+            /* Allow second character for T?, W?, Q?, ?? */
+            if (c == 'T' || c == 'W' || c == '@' || c == '?')
+            {
+                if (c2 == '?') s++;
+                else c2 = -1;
+            }
+
+            /* RS means reset. */
+            if (c == 'R')
+            {
+                if (c2 == 'S' && isspace(c3)) s++;
+                else c2 = -1;
+            }
+
             /* skip whitespace after command character but before first arg */
             while (isspace(*s))
                 s++;
 
             /* decode the command */
-            if (c == 'S') cmd = 1, over = 0;  /* step into */
-            if (c == 'T') cmd = 1, over = 1;  /* trace over */
-            if (c == 'R') cmd = 2, over = 0;  /* run  */
-            if (c == 'F') cmd = 23;           /* fast forward to */
-            if (c == 'D') cmd = 3;  /* dump/abort */
-            if (c == 'Q') cmd = 4;  /* quit */
-            if (c == 'B') cmd = 5;  /* breakpoint */
-            if (c == 'M') cmd = 6;  /* mem dump */
-            if (c == 'U') cmd = 7;  /* 'Un'assemble.            */
-            if (c == 'C') cmd = 8;  /* Disassembly Cache stats. */
-            if (c == 'G') cmd = 9;  /* Change re'G'ister value. */
-            if (c == 'N') cmd = 10; /* uNset breakpoint */
-            if (c == 'H') cmd = 11; /* toggle History */
-            if (c == 'W') cmd = 12; /* toggle watch write */
-            if (c == '@') cmd = 17; /* toggle watch read  */
-            if (c == 'A') cmd = 13; /* enable memory Attribute discovery */
-            if (c == 'P') cmd = 14; /* poke into memory. (no side effect)*/
-            if (c == 'E') cmd = 15; /* write to memory. (side effects)   */
+            if (c == 'S') { cmd = 1; over = 0; }                /* step into */
+            if (c == 'T' && c2 == -1 ) { cmd = 1; over = 1; }  /* trace over */
+            if (c == 'T' && c2 == '?') cmd = 39;         /* list tracepoints */
+            if (c == 'R' && c2 == -1 ) { cmd = 2; over = 0; }         /* run */
+            if (c == 'F') cmd = 23;                       /* fast forward to */
+            if (c == 'D') cmd = 3;                             /* dump/abort */
+            if (c == 'Q') cmd = 4;                                   /* quit */
+            if (c == 'B' && c2 == -1 ) cmd = 5;                /* breakpoint */
+            if (c == 'B' && c2 == 'B') cmd = 37;   /* Break on missing BUSRQ */
+            if (c == 'B' && c2 == 'I') cmd = 38;   /* Break on missing INTRM */
+            if (c == 'B' && c2 == '?') cmd = 40;         /* List breakpoints */
+            if (c == 'M') cmd = 6;                               /* mem dump */
+            if (c == 'U') cmd = 7;                          /* 'Un'assemble. */
+            if (c == 'C') cmd = 8;               /* Disassembly Cache stats. */
+            if (c == 'G' && c2 == -1 ) cmd = 9;  /* Change re'G'ister value. */
+            if (c == 'G' && c2 == 'S') cmd = 33;                 /* GRAMSHOT */
+            if (c == 'G' && c2 == 'T') cmd = 34;           /* GRAM text dump */
+            if (c == 'G' && c2 == 'Q') cmd = 35;               /* debuG reQs */
+            if (c == 'N' && c2 == -1 ) cmd = 10;         /* uNset breakpoint */
+            if (c == 'N' && c2 == 'I') cmd = 36;  /* Non-Interrupt threshold */
+            if (c == 'H') cmd = 11;                        /* toggle History */
+            if (c == 'W' && c2 == -1 ) cmd = 12;       /* toggle watch write */
+            if (c == 'W' && c2 == '?') cmd = 41;       /* List write-watches */
+            if (c == '@' && c2 == -1 ) cmd = 17;        /* toggle watch read */
+            if (c == '@' && c2 == '?') cmd = 42;        /* List read-watches */
+            if (c == 'A') cmd = 13;     /* enable memory Attribute discovery */
+            if (c == 'P') cmd = 14;    /* poke into memory. (no side effect) */
+            if (c == 'E') cmd = 15;       /* write to memory. (side effects) */
 #ifdef STK_TRC
-            if (c == 'K') cmd = 16; /* stack tracing.  */
+            if (c == 'K') cmd = 16;                       /* stack tracing.  */
 #endif
-            if (c == 'Z') cmd = 18; /* toggle showing timestamps */
+            if (c == 'Z') cmd = 18;             /* toggle showing timestamps */
             if (c == 'X') cmd = 19; /* toggle showing read/write during step */
-            if (c == '?') cmd = 20; /* print usage information */
-            if (c == 'L') cmd = 21; /* load a symbol table file. */
-            if (c == '/') cmd = 22; /* search for symbol in symtab */
-            if (c == '$') cmd = 24; /* toggle STIC video FIFO messages */
-            if (c == '%') cmd = 25; /* toggle STIC dropped reads */
-            if (c == '^') cmd = 26; /* toggle STIC droped writes */
-            if (c == 'O') cmd = 27; /* change label/addr output format */
-            if (c == '<') cmd = 28; /* read script from file */
-            if (c == '!') cmd = 29; /* print last N instructions from hist */
-            if (c == '>') cmd = 30; /* Set window width */
-            if (c == 'V') cmd = 31; /* Print source for vicinity */
-            if (c == '#') cmd = 32; /* Breakpoint on screen blank */
+            if (c == '?' && c2 == -1 ) cmd = 20;  /* print usage information */
+            if (c == '?' && c2 == '?') cmd = 43;    /* print debugger status */
+            if (c == 'L') cmd = 21;             /* load a symbol table file. */
+            if (c == '/') cmd = 22;           /* search for symbol in symtab */
+            if (c == '$') cmd = 24;       /* toggle STIC video FIFO messages */
+            if (c == '%') cmd = 25;             /* toggle STIC dropped reads */
+            if (c == '^') cmd = 26;             /* toggle STIC droped writes */
+            if (c == 'O') cmd = 27;       /* change label/addr output format */
+            if (c == '<') cmd = 28;                 /* read script from file */
+            if (c == '!') cmd = 29;   /* print last N instructions from hist */
+            if (c == '>') cmd = 30;                      /* Set window width */
+            if (c == 'V' && c2 == -1) cmd = 31; /* Print source for vicinity */
+            if (c == '#') cmd = 32;            /* Breakpoint on screen blank */
+            if (c == 'V' && c2 == 'S') cmd = 44;        /* Take a screenshot */
+            if (c == 'V' && c2 == 'M') cmd = 45;   /* Toggle movie recording */
+            if (c == 'V' && c2 == 'A') cmd = 46;     /* Toggle AVI recording */
+            if (c == 'R' && c2 == 'S') cmd = 47;                    /* Reset */
 
             if (cmd == -1)
             {
@@ -1135,14 +1460,14 @@ next_cmd:
 
             if (cmd == 1)
             {
-                if (sscanf(s, "%d", &arg) != 1) 
+                if (sscanf(s, "%d", &arg) != 1)
                     arg = 1;
             } else if (cmd == 2)
             {
-                if (sscanf(s, "%d", &arg) != 1) 
+                if (sscanf(s, "%d", &arg) != 1)
                     arg = -1;
             } else if (cmd == 5 || cmd == 10 || cmd == 23) {
-                if (sscanf(s, "%100s", argstr) != 1) 
+                if (sscanf(s, "%100s", argstr) != 1)
                     arg = pc;
                 else
                 {
@@ -1152,7 +1477,7 @@ next_cmd:
                 }
 #ifdef STK_TRC
             } else if (cmd == 16) {
-                if (sscanf(s, "%100s", argstr) != 1) 
+                if (sscanf(s, "%100s", argstr) != 1)
                     arg = debug_infer_stack(cp);
                 else
                 {
@@ -1167,7 +1492,7 @@ next_cmd:
                 if (args >= 1) arg  = debug_decode_val(argstr,  0xFFFF);
                 if (args >= 2) arg2 = debug_decode_val(argstr2, 0xFFFF);
 
-                if ((args >= 1 && arg  == -1) || 
+                if ((args >= 1 && arg  == -1) ||
                     (args >= 2 && arg2 == -1))
                     goto next_cmd;
 
@@ -1182,21 +1507,28 @@ next_cmd:
             } else if (cmd == 9) {
                 int args = sscanf(s, "%100s %100s", argstr, argstr2);
 
-                if (args >= 1) arg  = debug_decode_val(argstr, 7);
+                if (args >= 1) arg  = debug_decode_val(argstr, 13);
                 if (args >= 2) arg2 = debug_decode_val(argstr2, 0xFFFF);
 
-                if ((args >= 1 && arg  == -1) || 
-                    (args >= 2 && arg2 == -1))
+                if (args >= 1 && arg  == -1)
+                {
+                    jzp_printf(
+                        "   0 thru 7 => R0 thru R7\n"
+                        "   8 => S, 9 => Z, A => O, B => C, "
+                        "C => I, D => D\n");
+                    goto next_cmd;
+                }
+                if (args >= 2 && arg2 == -1)
                     goto next_cmd;
 
-                if (args != 2 || arg < 0 || arg > 7) arg = -2;
+                if (args != 2 || arg < 0 || arg > 13) arg = -2;
             } else if (cmd == 12 || cmd == 17) {
                 int args = sscanf(s, "%100s %100s", argstr, argstr2);
 
                 if (args >= 1) arg  = debug_decode_val(argstr,  0xFFFF);
                 if (args >= 2) arg2 = debug_decode_val(argstr2, 0xFFFF);
 
-                if ((args >= 1 && arg  == -1) || 
+                if ((args >= 1 && arg  == -1) ||
                     (args >= 2 && arg2 == -1))
                     goto next_cmd;
 
@@ -1208,28 +1540,42 @@ next_cmd:
                 if (args >= 1) arg  = debug_decode_val(argstr,  0xFFFF);
                 if (args >= 2) arg2 = debug_decode_val(argstr2, 0xFFFF);
 
-                if ((args >= 1 && arg  == -1) || 
+                if ((args >= 1 && arg  == -1) ||
                     (args >= 2 && arg2 == -1))
                     arg = -2;
 
                 if (args != 2 || arg < 0x0000 || arg > 0xFFFF) arg = -2;
             } else if (cmd == 27 || cmd == 30)
             {
-                if (sscanf(s, "%d", &arg) != 1) 
+                if (sscanf(s, "%d", &arg) != 1)
                     arg = 0;
             } else if (cmd == 29)
             {
                 int args = sscanf(s, "%d %d", &arg, &arg2);
                 if (args != 2)              arg2 = 0;
                 if (args != 1 && args != 2) arg = 40;
-            } else 
-                arg=0;
+            } else if (cmd == 34)
+            {
+                int args = sscanf(s, "%d %d", &arg, &arg2);
+                if (args == 1) { arg2 = 1; }
+                if (args <  1) { arg = 0; arg2 = 64; }
+            } else if (cmd == 36)
+            {
+                if (sscanf(s, "%d", &arg) != 1 || arg < 1)
+                    arg = 54;
+            } else if (cmd == 47)
+            {
+                /* Step one tick when resetting */
+                arg = 1;
+            } else
+                arg = 0;
         } while (!cmd || arg < -1);
 
         switch (cmd)
-        {   
-            case 1: /* step/trace */
-            case 2: /* run */
+        {
+            case 1:  /* step/trace */
+            case 2:  /* run */
+            case 47: /* reset */
             {
                 if (cmd == 1)
                     last_over = over;
@@ -1248,11 +1594,14 @@ next_cmd:
                     debug->step_over = 0;
 
                 debug->step_count = arg;
-                debug->show_ins   = cmd == 1;
+                debug->show_ins   = cmd == 1 || cmd == 47;
                 debug->show_rd = debug->show_wr = cmd == 1 ? show_rdwr : 0;
                 if (debug_rh_ptr < 0)
-                    cp->instr_tick_per = cmd == 1 ? 1 : arg > 0 ? arg : 0;
-                    
+                    cp->step_count = cmd == 1 ? 1 : arg > 0 ? arg : 0;
+
+                if (cmd == 47)
+                    periph_reset(p->bus);   /* Sets pending reset. */
+
                 break;
             }
             case 23:    /* fast forward */
@@ -1266,22 +1615,25 @@ next_cmd:
                     debug->show_rd     = 0;
                     debug->show_wr     = 0;
                     if (debug_rh_ptr < 0)
-                        cp->instr_tick_per = 0;
+                        cp->step_count = 0;
                     ff_bkpt = cp1600_set_breakpt(cp, arg, CP1600_BKPT);
                 }
                 break;
             }
-            case 3: 
+            case 3:
                 dump_state();
                 if (debug_rh_ptr >= 0)
                     debug_write_reghist("dump.hst", p, cp);
                 if (debug_memattr)
                     debug_write_memattr("dump.atr");
                 goto next_cmd;
-                break;
             case 4:
-                exit(0);
-                break;
+            {
+                debug->step_count = -1;
+                cp->step_count = -1;
+                *debug->exit_flag = 1;
+                return CYC_MAX;
+            }
             case 5:
             case 10:
             {
@@ -1292,31 +1644,43 @@ next_cmd:
                     cp1600_clr_breakpt(cp, arg, CP1600_BKPT);
                 jzp_printf("%s breakpoint at $%.4X\n", set ? "Set" : "Unset", arg);
                 goto next_cmd;
-                break;
             }
             case 6:
                 debug_dispmem(p, arg, arg2);
                 goto next_cmd;
-                break;
             case 7:
                 debug_disasm_mem(p, cp, &next_disassem, arg2);
                 goto next_cmd;
-                break;
             case 8:
                 jzp_printf("dc hits: %6d  misses: %6d  nocache: %6d  "
                        "unhook: %6d vs %6d\n", dc_hits, dc_miss, dc_nocache,
                        dc_unhook_ok, dc_unhook_odd);
                 goto next_cmd;
-                break;
             case 9:
-                cp->r[arg] = arg2;
+                switch (arg)
+                {
+                    case 0: case 1: case 2: case 3: 
+                    case 4: case 5: case 6: case 7: 
+                    {
+                        cp->r[arg] = arg2;
+                        break;
+                    }
+                    case  8: cp->S = arg2 & 1; break;
+                    case  9: cp->Z = arg2 & 1; break;
+                    case 10: cp->O = arg2 & 1; break;
+                    case 11: cp->C = arg2 & 1; break;
+                    case 12: cp->I = arg2 & 1; break;
+                    case 13: cp->D = arg2 & 1; break;
+
+                    default:
+                        break;
+                }
                 goto show_disassem;
-                break;
             case 11:
                 if (!debug_histinit)
                 {
-                    debug_reghist = CALLOC(uint_16, (HISTSIZE+1)* RH_RECSIZE);
-                    debug_profile = CALLOC(uint_32, 0x10000);
+                    debug_reghist = CALLOC(uint16_t, (HISTSIZE+1)* RH_RECSIZE);
+                    debug_profile = CALLOC(uint32_t, 0x10000);
                     if (!debug_reghist || !debug_profile)
                     {
                         CONDFREE(debug_reghist);
@@ -1331,19 +1695,18 @@ next_cmd:
                 {
                     if (debug_rh_ptr < 0) debug_rh_ptr = 0;
                     else                  debug_rh_ptr = -1;
-                    jzp_printf("Register History is %s\n", 
+                    jzp_printf("Register History is %s\n",
                             debug_rh_ptr ? "Off" : "On");
                     if (!debug_rh_ptr)
                     {
-                        memset(debug_reghist, 0, 
-                               RH_RECSIZE*sizeof(uint_16)*HISTSIZE);
-                        memset(debug_profile, 0, 0x10000 * sizeof(uint_32));
+                        memset(debug_reghist, 0,
+                               RH_RECSIZE*sizeof(uint16_t)*HISTSIZE);
+                        memset(debug_profile, 0, 0x10000 * sizeof(uint32_t));
                     }
-                    cp->instr_tick_per = debug_rh_ptr ? 0 : 1;
+                    cp->step_count = debug_rh_ptr ? 0 : 1;
                 }
                 jzp_flush();
                 goto next_cmd;
-                break;
             case 12:
                 {
                     int i, watch;
@@ -1357,10 +1720,10 @@ next_cmd:
                     {
                         if (WATCHING(i,w) != watch)
                         {
-                            if (watch != -1) 
+                            if (watch != -1)
                                 jzp_printf(" through $%.4X\n", i - 1);
                             watch = WATCHING(i,w);
-                            jzp_printf("%s watching writes to $%.4X", 
+                            jzp_printf("%s watching writes to $%.4X",
                                    watch ? "Now" : "No longer", i);
                         }
                     }
@@ -1370,7 +1733,6 @@ next_cmd:
                     }
                 }
                 goto next_cmd;
-                break;
             case 17:
                 {
                     int i, watch;
@@ -1384,10 +1746,10 @@ next_cmd:
                     {
                         if (WATCHING(i,r) != watch)
                         {
-                            if (watch != -1) 
+                            if (watch != -1)
                                 jzp_printf(" through $%.4X\n", i - 1);
                             watch = WATCHING(i,r);
-                            jzp_printf("%s watching reads of $%.4X", 
+                            jzp_printf("%s watching reads of $%.4X",
                                    watch ? "Now" : "No longer", i);
                         }
                     }
@@ -1397,12 +1759,11 @@ next_cmd:
                     }
                 }
                 goto next_cmd;
-                break;
             case 13:
                 if (!debug_memattr)
                 {
-                    debug_memattr = CALLOC(uint_8 ,  0x10000);
-                    debug_mempc   = CALLOC(uint_16,  0x10000);
+                    debug_memattr = CALLOC(uint8_t ,  0x10000);
+                    debug_mempc   = CALLOC(uint16_t,  0x10000);
                     if (!debug_memattr || !debug_mempc)
                     {
                         CONDFREE(debug_memattr);
@@ -1414,8 +1775,8 @@ next_cmd:
                     }
                 } else
                 {
-                    memset(debug_memattr, 0, 0x10000 * sizeof(uint_8));
-                    memset(debug_mempc  , 0, 0x10000 * sizeof(uint_16));
+                    memset(debug_memattr, 0, 0x10000 * sizeof(uint8_t));
+                    memset(debug_mempc  , 0, 0x10000 * sizeof(uint16_t));
                     jzp_printf("Reset memory attribute map.\n");
                 }
                 goto next_cmd;
@@ -1423,8 +1784,8 @@ next_cmd:
             {
                 if (arg >= 0)
                 {
-                    periph_poke((periph_p)cp->periph.bus, 
-                                (periph_p)cp, arg, arg2);
+                    periph_poke(AS_PERIPH(cp->periph.bus),
+                                AS_PERIPH(cp), arg, arg2);
                     cp1600_invalidate(cp, arg, arg);
                 }
                 else
@@ -1436,8 +1797,8 @@ next_cmd:
             {
                 if (arg >= 0)
                 {
-                    periph_write((periph_p)cp->periph.bus, 
-                                 (periph_p)cp, arg, arg2);
+                    periph_write(AS_PERIPH(cp->periph.bus),
+                                 AS_PERIPH(cp), arg, arg2);
                     cp1600_invalidate(cp, arg, arg);
                 }
                 else
@@ -1453,7 +1814,7 @@ next_cmd:
                     jzp_printf("Opening stack.trc\n");
                     jzp_printf("Stack base set to $%.4X\n", arg);
                     stk_base = stk_wr = arg;
-                    stk_trc = fopen("stack.trc", "a");
+                    stk_trc  = fopen("stack.trc", "a");
                     if (stk_trc)
                     {
                         fprintf(stk_trc, "--- start of log\n");
@@ -1471,7 +1832,7 @@ next_cmd:
             case 18:
             {
                 show_time = !show_time;
-                jzp_printf(show_time 
+                jzp_printf(show_time
                         ? "Now showing timestamps during step\n"
                         : "No longer showing timestamps during step\n");
                 goto next_cmd;
@@ -1479,12 +1840,12 @@ next_cmd:
             case 19:
             {
                 show_rdwr = !show_rdwr;
-                jzp_printf(show_rdwr 
+                jzp_printf(show_rdwr
                         ? "Now showing CPU reads/writes during step\n"
                         : "No longer showing CPU reads/writes during step\n");
                 goto next_cmd;
             }
-            case 20: 
+            case 20:
             {
                 debug_print_usage(); goto next_cmd;
             }
@@ -1499,47 +1860,45 @@ next_cmd:
                 goto next_cmd;
             }
 
-            case 24: 
+            case 24:
             {
-                *debug->stic_dbg_flags ^= STIC_SHOW_FIFO_LOAD; 
-                jzp_printf(*debug->stic_dbg_flags & STIC_SHOW_FIFO_LOAD
+                debug->stic->debug_flags ^= STIC_SHOW_FIFO_LOAD;
+                jzp_printf(debug->stic->debug_flags & STIC_SHOW_FIFO_LOAD
                         ? "Now showing STIC video FIFO loads\n"
                         : "No longer showing STIC video FIFO loads\n");
                 goto next_cmd;
             }
-            case 25: 
+            case 25:
             {
-                *debug->stic_dbg_flags ^= STIC_SHOW_RD_DROP;
-                jzp_printf(*debug->stic_dbg_flags & STIC_SHOW_RD_DROP
+                debug->stic->debug_flags ^= STIC_SHOW_RD_DROP;
+                jzp_printf(debug->stic->debug_flags & STIC_SHOW_RD_DROP
                         ? "Now showing dropped STIC CTRL/GMEM reads\n"
                         : "No longer showing dropped STIC CTRL/GMEM reads\n");
                 goto next_cmd;
             }
-            case 26: 
+            case 26:
             {
-                *debug->stic_dbg_flags ^= STIC_SHOW_WR_DROP;
-                jzp_printf(*debug->stic_dbg_flags & STIC_SHOW_WR_DROP
+                debug->stic->debug_flags ^= STIC_SHOW_WR_DROP;
+                jzp_printf(debug->stic->debug_flags & STIC_SHOW_WR_DROP
                         ? "Now showing dropped STIC CTRL/GMEM writes\n"
                         : "No longer showing dropped STIC CTRL/GMEM writes\n");
                 goto next_cmd;
             }
-            case 32: 
+            case 32:
             {
-                *debug->stic_dbg_flags ^= STIC_HALT_ON_BLANK;
-                jzp_printf(*debug->stic_dbg_flags & STIC_HALT_ON_BLANK
+                debug->stic->debug_flags ^= STIC_HALT_ON_BLANK;
+                jzp_printf(debug->stic->debug_flags & STIC_HALT_ON_BLANK
                         ? "Now halting when display blanks\n"
                         : "No longer halting when display blanks\n");
                 goto next_cmd;
             }
             case 27:
             {
+                if (arg > 3) arg = 3;
                 if (set_symb_addr_format(arg))
                 {
-                    jzp_printf("debug: Changed address format to \"%s\"\n", 
-                                arg == 0 ? "LABEL ($1234)"
-                              : arg == 1 ? "LABEL"
-                              : arg == 2 ? "$1234 (LABEL)"
-                              :            "$1234");
+                    jzp_printf("debug: Changed address format to \"%s\"\n",
+                                symb_format_desc[arg]);
 
                     debug->symb_addr_format = arg;
                     debug_disasm_cache_inval();
@@ -1568,6 +1927,136 @@ next_cmd:
                 debug_show_vicinity(arg, arg2);
                 goto next_cmd;
             }
+            case 33:
+            {
+                stic_gram_to_gif(debug->stic);
+                goto next_cmd;
+            }
+            case 34:
+            {
+                stic_gram_to_text(debug->stic, arg, arg2, get_disp_width());
+                goto next_cmd;
+            } 
+            case 35:
+            {
+                debug->stic->debug_flags ^= STIC_DBG_REQS;
+                jzp_printf(debug->stic->debug_flags & STIC_DBG_REQS
+                        ? "Now showing STIC BUSRQ/INTRM generation details\n"
+                        : "No longer showing STIC BUSRQ/INTRM generation "
+                          "details\n");
+                goto next_cmd;
+            } 
+            case 36:
+            {
+                jzp_printf("Setting NON_INT threshold to %d\n", arg);
+                non_int_threshold = arg;
+                goto next_cmd;
+            }
+            case 37:
+            {
+                debug->stic->debug_flags ^= STIC_HALT_ON_BUSRQ_DROP;
+                jzp_printf(debug->stic->debug_flags & STIC_HALT_ON_BUSRQ_DROP
+                        ? "Now halting when CPU blocks BUSRQ STIC fetch.\n"
+                        : "No longer halting when CPU blocks BUSRQ STIC "
+                          "fetch.\n");
+                goto next_cmd;
+            } 
+            case 38:
+            {
+                debug->stic->debug_flags ^= STIC_HALT_ON_INTRM_DROP;
+                jzp_printf(debug->stic->debug_flags & STIC_HALT_ON_INTRM_DROP
+                        ? "Now halting when CPU blocks INTRM dispatch.\n"
+                        : "No longer halting when CPU blocks INTRM "
+                          "dispatch.\n");
+                goto next_cmd;
+            } 
+            case 39:
+            {
+                /* List tracepoints */
+                debug_list_tracepoints(debug, cp);
+                goto next_cmd;
+            }
+            case 40:
+            {
+                /* List breakpoints */
+                debug_list_breakpoints(debug, cp);
+                goto next_cmd;
+            }
+            case 41:
+            {
+                /* List write-watches */
+                jzp_printf("Watched writes:\n");
+                debug_list_watches(debug, debug_watch_w);
+                goto next_cmd;
+            }
+            case 42:
+            {
+                /* List read-watches */
+                jzp_printf("Watched reads:\n");
+                debug_list_watches(debug, debug_watch_r);
+                goto next_cmd;
+            }
+            case 43:
+            {
+                const int af = debug->symb_addr_format > 3 ? 3 
+                             : debug->symb_addr_format;
+                const uint32_t sf = debug->stic->debug_flags;
+                /* Print debugger status (command "??") */
+                jzp_printf("Debugger misc status:\n");
+                jzp_printf("  Register history:         %s\n",
+                            debug_rh_ptr < 0 ? "Off" : "On");
+                jzp_printf("  Memory attribute map:     %s\n",
+                            debug_memattr ? "On" : "Off");
+                jzp_printf("  Show cycles:              %s\n",
+                            show_time ? "Yes" : "No");
+                jzp_printf("  Show read/write:          %s\n",
+                            show_rdwr ? "Yes" : "No");
+                jzp_printf("  Non-int threshold:        %d\n",
+                            non_int_threshold);
+                jzp_printf("  Symbol output format:     %s\n",
+                            symb_format_desc[af]);
+
+                jzp_printf("\nSTIC-specific debug flags:\n");
+                jzp_printf("  Show write drops:         %s\n",
+                            (sf & STIC_SHOW_WR_DROP) ? "On" : "Off");
+                jzp_printf("  Show read drops:          %s\n",
+                            (sf & STIC_SHOW_RD_DROP) ? "On" : "Off");
+                jzp_printf("  Show FIFO load:           %s\n",
+                            (sf & STIC_SHOW_FIFO_LOAD) ? "On" : "Off");
+                jzp_printf("  Halt on display blank:    %s\n",
+                            (sf & STIC_HALT_ON_BLANK)  ? "On" : "Off");
+                jzp_printf("  Halt on missed BUSRQ:     %s\n",
+                            (sf & STIC_HALT_ON_BUSRQ_DROP) ? "On" : "Off");
+                jzp_printf("  Halt on missed INTRM:     %s\n",
+                            (sf & STIC_HALT_ON_INTRM_DROP) ? "On" : "Off");
+                            
+                goto next_cmd;
+            }
+            case 44:
+            {
+                gfx_scrshot(debug->gfx);
+                goto next_cmd;
+            }
+            case 45:
+            {
+                gfx_t *const gfx = debug->gfx;
+                gfx->scrshot ^= GFX_MVTOG;
+                gfx_movieupd(gfx);
+                jzp_printf("Movie recording is now %s.%s\n",
+                        gfx->scrshot & GFX_MOVIE ? "ON" : "off",
+                        gfx->scrshot & GFX_MVTOG ? " (toggle pending)" : "");
+                goto next_cmd;
+            }
+            case 46:
+            {
+                gfx_t *const gfx = debug->gfx;
+                gfx->scrshot ^= GFX_AVTOG;
+                gfx_aviupd(gfx);
+                jzp_printf("AVI recording is now %s.%s\n",
+                        gfx->scrshot & GFX_AVI ? "ON" : "off",
+                        gfx->scrshot & GFX_AVTOG ? " (toggle pending)" : "");
+                goto next_cmd;
+            }
         }
 
         if (debug->speed) speed_resync(debug->speed);
@@ -1578,13 +2067,12 @@ next_cmd:
 }
 
 
-
 /*
  * ============================================================================
  *  Instruction Disassembly Cache
  *
  *  This holds a cache of disassembled instructions.  The cache is maintained
- *  as an LRU list of entries.  We place an upper bound on the number of 
+ *  as an LRU list of entries.  We place an upper bound on the number of
  *  entries just so we don't totally thrash through memory.
  * ============================================================================
  */
@@ -1593,9 +2081,9 @@ next_cmd:
 typedef struct disasm_cache_t
 {
     char                    disasm[64];
-    uint_32                 len;
-    struct disasm_cache_t   *next,*prev;
-    char                    **hook;
+    uint32_t                len;
+    struct disasm_cache_t  *next, *prev;
+    char                  **hook;
 } disasm_cache_t;
 
 disasm_cache_t *disasm_cache = NULL;
@@ -1629,11 +2117,11 @@ LOCAL void debug_disasm_cache_inval(void)
  *                       cache if possible.
  * ============================================================================
  */
-char * debug_disasm(periph_t *p, cp1600_t *cp, uint_16 addr, 
-                    uint_32 *len, int dbd)
+char * debug_disasm(periph_t *p, cp1600_t *cp, uint16_t addr,
+                    uint32_t *len, int dbd)
 {
     static char buf[1024];
-    uint_16 w1, w2, w3, pc = addr;
+    uint16_t w1, w2, w3, pc = addr;
     disasm_cache_t *disasm = NULL;
     int instr_len;
 
@@ -1641,19 +2129,19 @@ char * debug_disasm(periph_t *p, cp1600_t *cp, uint_16 addr,
     /*  If memory attribute tracking is enabled and this looks like data,   */
     /*  just return a DECLE directive.  We never cache these.               */
     /* -------------------------------------------------------------------- */
-    if (debug_memattr && 
+    if (debug_memattr &&
         (debug_memattr[addr] & (DEBUG_MA_CODE|DEBUG_MA_DATA)) == DEBUG_MA_DATA)
     {
         char c, d;
         w1 = periph_read((periph_t*)p->bus, p, pc    , ~0);
-    
+
         c = w1 >> 8;
         d = w1;
-        
+
         if ( !isalnum(c) ) c = '.';
         if ( !isalnum(d) ) d = '.';
 
-        sprintf(buf, " %.4X                   DECLE $%.4X ; '%c%c'", 
+        sprintf(buf, " %.4X                   DECLE $%.4X ; '%c%c'",
                      w1, w1, c, d);
 
         if (len)
@@ -1674,7 +2162,7 @@ char * debug_disasm(periph_t *p, cp1600_t *cp, uint_16 addr,
         w2 = periph_read((periph_t*)p->bus, p, pc + 1, ~0);
         w3 = periph_read((periph_t*)p->bus, p, pc + 2, ~0);
 
-        instr_len = dasm1600(buf, pc, dbd, w1, w2, w3, debug_symtab);
+        instr_len = dasm1600(buf, pc, dbd, w1, w2, w3);
 
         dc_miss++;
         dc_hits--;            /* compensate for dc_hits++ in LRU update */
@@ -1708,17 +2196,17 @@ char * debug_disasm(periph_t *p, cp1600_t *cp, uint_16 addr,
         disasm->hook   = &cp->disasm[pc];
         cp->disasm[pc] = (char*) disasm;
 
-        strncpy(disasm->disasm, buf + 17, sizeof(disasm->disasm));
+        strncpy(disasm->disasm, buf + 17, sizeof(disasm->disasm) - 1);
         disasm->disasm[sizeof(disasm->disasm) - 1] = 0;
         disasm->len = instr_len;
-    
+
     }
 
     /* -------------------------------------------------------------------- */
     /*  Grab the cached disassembly and update the LRU.                     */
     /* -------------------------------------------------------------------- */
     dc_hits++;
-    disasm = (disasm_cache_t *)cp->disasm[pc];
+    disasm = (disasm_cache_t *)(void *)cp->disasm[pc];
 
     /* -------------------------------------------------------------------- */
     /*  Move this disasm record to head of the LRU.  Do this by first       */
@@ -1745,7 +2233,7 @@ char * debug_disasm(periph_t *p, cp1600_t *cp, uint_16 addr,
     w2 = periph_read((periph_t*)p->bus, p, pc + 1, ~0);
     w3 = periph_read((periph_t*)p->bus, p, pc + 2, ~0);
 
-    instr_len = dasm1600(buf, pc, cp->D, w1, w2, w3, debug_symtab);
+    instr_len = dasm1600(buf, pc, cp->D, w1, w2, w3);
 
     if (len) *len = instr_len;
 
@@ -1758,8 +2246,8 @@ char * debug_disasm(periph_t *p, cp1600_t *cp, uint_16 addr,
  *  DEBUG_DISASM_SRC  -- Attempt to append source to the disassembly
  * ============================================================================
  */
-const char * debug_disasm_src(periph_t *p, cp1600_t *cp, uint_16 addr, 
-                              uint_32 *len, int dbd, int disasm_width)
+const char * debug_disasm_src(periph_t *p, cp1600_t *cp, uint16_t addr,
+                              uint32_t *len, int dbd, int disasm_width)
 {
     static char buf[1024];
     const char *dis, *src;
@@ -1801,12 +2289,12 @@ const char * debug_disasm_src(periph_t *p, cp1600_t *cp, uint_16 addr,
  *  DEBUG_DISASM_MEM  -- Disassembles a range of memory locations.
  * ============================================================================
  */
-void debug_disasm_mem(periph_t *p, cp1600_t *cp, uint_16 *paddr, uint_32 cnt)
+void debug_disasm_mem(periph_t *p, cp1600_t *cp, uint16_t *paddr, uint32_t cnt)
 {
     const char *dis;
     const char *symb;
-    uint_32 tot = 0, len = ~0, w0 = 0;
-    uint_16 addr = *paddr;
+    uint32_t tot = 0, len = ~0, w0 = 0;
+    uint16_t addr = *paddr;
 
     while (tot <= cnt && len > 0)
     {
@@ -1818,9 +2306,9 @@ void debug_disasm_mem(periph_t *p, cp1600_t *cp, uint_16 *paddr, uint_32 cnt)
         dis = debug_disasm_src(p, cp, addr, &len, len == 1 && w0 == 0x0001,
                                disasm_width);
 
-        if (debug_symtab && (symb = symtab_getsym(debug_symtab, addr, 0, 0)))
+        if ((symb = debug_symb_for_addr(addr)) != NULL)
             jzp_printf("                   %s:\n", symb);
-        jzp_printf(" $%.4X:   %-*.*s\n", addr, 
+        jzp_printf(" $%.4X:   %-*.*s\n", addr,
                    disp_width - 12, disp_width - 12, dis);
 
         addr += len;
@@ -1837,11 +2325,11 @@ void debug_disasm_mem(periph_t *p, cp1600_t *cp, uint_16 *paddr, uint_32 cnt)
  *                       The second arg is the number of addresses to dump.
  * ============================================================================
  */
-void debug_dispmem(periph_t *p, uint_16 addr, uint_16 len)
+void debug_dispmem(periph_t *p, uint16_t addr, uint16_t len)
 {
     int         i, j, k, l;
-    uint_32     w[8];
-    
+    uint32_t     w[8];
+
     /* -------------------------------------------------------------------- */
     /*  Round our address down to the next lower multiple of 8.  Add this   */
     /*  difference to the length, and then round the length up to the       */
@@ -1850,22 +2338,23 @@ void debug_dispmem(periph_t *p, uint_16 addr, uint_16 len)
     k = addr & ~7;
 
     len = (len + 7 + addr - k) & ~7;
-    
+
     /* -------------------------------------------------------------------- */
     /*  Iterate until we've dumped the entire block of memory.              */
     /* -------------------------------------------------------------------- */
     for (i = 0; i < len; i += 8)
     {
         l = k;
-        
+
         /* ---------------------------------------------------------------- */
         /*  Read one row of 8 memory locations.                             */
         /* ---------------------------------------------------------------- */
         for (j = 0; j < 8; j++)
         {
-            w[j] = periph_peek((periph_t*)p->bus, p, k++, ~0);
+            w[j] = periph_peek(AS_PERIPH(p->bus), p, k++, ~0);
+            k &= 0xFFFF;
         }
-        
+
         /* ---------------------------------------------------------------- */
         /*  Display them.                                                   */
         /* ---------------------------------------------------------------- */
@@ -1879,25 +2368,25 @@ void debug_dispmem(periph_t *p, uint_16 addr, uint_16 len)
                        w[5], l + 5 == addr ? '*' : ' ',
                        w[6], l + 6 == addr ? '*' : ' ',
                        w[7], l + 7 == addr ? '*' : ' ');
-        
+
         /* ---------------------------------------------------------------- */
         /*  Display ASCII equivalents.                                      */
         /* ---------------------------------------------------------------- */
         for (j = 0; j < 8; j++)
         {
             char c, d;
-        
+
             c = w[j] >> 8;
             d = w[j];
-            
+
             if ( !isalnum(c) )
                 c = '.';
             if ( !isalnum(d) )
                 d = '.';
-                
+
             jzp_printf( "%c%c", c, d );
         }
-        
+
         jzp_printf( "\n" );
     }
 }
@@ -1909,12 +2398,12 @@ void debug_dispmem(periph_t *p, uint_16 addr, uint_16 len)
  */
 LOCAL const char *debug_render_reghist(int ofs, int indent, int disp_width)
 {
-    int idx, S, C, O, Z, I, D, intr, irq, nirq, disasm_width;
-    uint_16 pc, flags, r0, r1, r2, r3, r4, r5, r6, w1, w2, w3;
+    int idx, S, C, O, Z, I, D, intr, req_ack, nreq_ack, disasm_width;
+    uint16_t pc, flags, r0, r1, r2, r3, r4, r5, r6, w1, w2, w3;
     char *dis, *rslt, *out;
     const char *symb, *src = NULL;
     static char buf[1024];
-    uint_64 now, n0, n1, n2, n3;
+    uint64_t now, n0, n1, n2, n3;
 
     disasm_width = disp_width - 60;
     if (disasm_width > 500) disasm_width = 500;
@@ -1938,31 +2427,32 @@ LOCAL const char *debug_render_reghist(int ofs, int indent, int disp_width)
     r1    = debug_reghist[idx +  1];
     r0    = debug_reghist[idx +  0];
 
-    if ((flags & 1) == 0) 
+    if ((flags & 1) == 0)
     {
         buf[0] = 0;
         return buf;
     }
 
-    S    = (flags >> 1) & 1;
-    C    = (flags >> 2) & 1;
-    O    = (flags >> 3) & 1;
-    Z    = (flags >> 4) & 1;
-    I    = (flags >> 5) & 1;
-    D    = (flags >> 6) & 1;
-    intr = (flags >> 7) & 1;
-    irq  = (flags >> 8) & 7;
+    S        = (flags >> 1) & 1;
+    C        = (flags >> 2) & 1;
+    O        = (flags >> 3) & 1;
+    Z        = (flags >> 4) & 1;
+    I        = (flags >> 5) & 1;
+    D        = (flags >> 6) & 1;
+    intr     = (flags >> 7) & 1;
+    req_ack  = (flags >> 8) & 15;
 
-    nirq = (debug_reghist[idx + 8 + RH_RECSIZE] >> 8) & 7;
+    nreq_ack = (debug_reghist[idx + 8 + RH_RECSIZE] >> 8) & 15;
 
     /* -------------------------------------------------------------------- */
     /*  Directly decode exactly what is in memory now, rather than rely     */
     /*  on the disassembly cache.                                           */
     /* -------------------------------------------------------------------- */
-    dasm1600(buf, pc, D, w1, w2, w3, debug_symtab);
+    dasm1600(buf, pc, D, w1, w2, w3);
     dis = buf + 39;
 
-    if (nirq == 4 || nirq == 5) /* did this one get stomped? */
+    /* Did this instruction get stomped by a BUSAK/INTAK? */
+    if ((nreq_ack & (CP1600_INTAK|CP1600_BUSAK)) != 0)
     {
         dis = buf + 37;
         dis[0] = '>';
@@ -1998,13 +2488,13 @@ LOCAL const char *debug_render_reghist(int ofs, int indent, int disp_width)
     /* -------------------------------------------------------------------- */
     rslt = out = buf + disasm_width + 1;
 
-    if (debug_symtab && (symb = symtab_getsym(debug_symtab, pc, 0, 0)))
+    if ((symb = debug_symb_for_addr(pc)) != NULL)
     {
         int len = strlen(symb);
         if (len > disp_width - 2)
             len = disp_width - 2;
 
-        strncpy(out, symb, len + 1);
+        strncpy(out, symb, disp_width - 1);
         out[len    ] = ':';
         out[len + 1] = '\n';
 
@@ -2012,17 +2502,13 @@ LOCAL const char *debug_render_reghist(int ofs, int indent, int disp_width)
     }
 
     sprintf(out, "%*s%.4X %.4X %.4X %.4X %.4X %.4X %.4X %.4X %c%c%c%c%c%c%c%c"
-           "%-*.*s %8llu\n", 
+           "%-*.*s %8" U64_FMT "\n",
            indent, "",
            r0, r1, r2, r3, r4, r5, r6, pc,
-           S ? 'S' : '-', C ? 'C' : '-', O ? 'O' : '-', Z ? 'Z' : '-',
-           I ? 'I' : '-', D ? 'D' : '-', 
-           intr ? 'i' : '-', 
-           irq == 1 ? 'q' : 
-           irq == 2 ? 'b' : 
-           irq == 3 ? '?' :
-           irq == 4 ? 'Q' :
-           irq == 5 ? 'B' : '-', 
+           S ? 'S' : '-', Z ? 'Z' : '-', O ? 'O' : '-', C ? 'C' : '-', 
+           I ? 'I' : '-', D ? 'D' : '-',
+           intr ? 'i' : '-',
+           debug_req_ack_char[req_ack],
            disasm_width, disasm_width, dis, now);
 
     return rslt;
@@ -2050,13 +2536,13 @@ LOCAL void debug_print_reghist(int count, int offset)
  *  DEBUG_WRITE_REGHIST  -- Write CPU register history trace to file.
  * ============================================================================
  */
-LOCAL void debug_write_reghist(const char *fname, periph_p p, cp1600_t *cp)
+LOCAL void debug_write_reghist(const char *fname, periph_t *p, cp1600_t *cp)
 {
     FILE *f;
     int i;
     double total = 0.0;
     char *dis;
-    uint_16 pc;
+    uint16_t pc;
 
     f = fopen(fname, "w");
     if (!f)
@@ -2107,8 +2593,8 @@ LOCAL void debug_write_reghist(const char *fname, periph_p p, cp1600_t *cp)
         /*  Write the disassembly to the file.                              */
         /* ---------------------------------------------------------------- */
         cycles = debug_profile[pc] >> 1;
-        fprintf(f, "%10d (%7.3f%%) | $%.4X:%s\n", 
-                (uint_32)cycles, 100.0 * cycles / total, pc, dis);
+        fprintf(f, "%10d (%7.3f%%) | $%.4X:%s\n",
+                (uint32_t)cycles, 100.0 * cycles / total, pc, dis);
     }
     jzp_printf("Done.\n");
 
@@ -2141,7 +2627,7 @@ LOCAL void debug_write_memattr(const char *fname)
     for (i = 0; i < 0x10000; i = span_e + 1)
     {
         span_s = i;
-        for (span_e = span_s; span_e < 0x10000 && 
+        for (span_e = span_s; span_e < 0x10000 &&
              debug_memattr[span_e] == debug_memattr[span_s]/* &&
              debug_mempc  [span_e] == debug_mempc  [span_s]*/;
              span_e++)
@@ -2166,7 +2652,7 @@ LOCAL void debug_write_memattr(const char *fname)
         if (dir)
         {
             /*
-            fprintf(f, "%-6s %.4X %.4X ; %.4X\n", dir, span_s, span_e, 
+            fprintf(f, "%-6s %.4X %.4X ; %.4X\n", dir, span_s, span_e,
                     debug_mempc[span_s]);
             */
             fprintf(f, "%-6s %.4X %.4X\n", dir, span_s, span_e);
@@ -2182,12 +2668,12 @@ LOCAL void debug_write_memattr(const char *fname)
 
 /*
  * ============================================================================
- *  DEBUG_DTOR       -- Tears down all the debugger state. 
+ *  DEBUG_DTOR       -- Tears down all the debugger state.
  * ============================================================================
  */
-LOCAL void debug_dtor(periph_p p)
+LOCAL void debug_dtor(periph_t *const p)
 {
-    debug_t *debug = (debug_t*)p;
+    debug_t *debug = PERIPH_AS(debug_t, p);
 
     UNUSED(debug);
 
@@ -2219,7 +2705,7 @@ LOCAL void debug_dtor(periph_p p)
     stk_wr   = 0;
 #endif
 }
-    
+
 
 /*
  * ============================================================================
@@ -2228,11 +2714,10 @@ LOCAL void debug_dtor(periph_p p)
  * ============================================================================
  */
 int debug_init(debug_t *debug, cp1600_t *cp1600, speed_t *speed, gfx_t *gfx,
-               const char *symtbl, uint_8 *vid_enable, uint_32 *stic_dbg_flags,
-               const char *script)
+               stic_t *stic, event_t *event, const char *symtbl,
+               uint8_t *vid_enable, const char *script, uint32_t *exit_flag)
 {
-    static uint_8   dummy  = 0;
-    static uint_32  dummy2 = 0;
+    static uint8_t dummy  = 0;
 
     /* -------------------------------------------------------------------- */
     /*  Set up the debugger's state.                                        */
@@ -2255,16 +2740,18 @@ int debug_init(debug_t *debug, cp1600_t *cp1600, speed_t *speed, gfx_t *gfx,
     debug->speed   = speed;
     debug->gfx     = gfx;
 
-    debug->vid_enable     = vid_enable     ? vid_enable     : &dummy;
-    debug->stic_dbg_flags = stic_dbg_flags ? stic_dbg_flags : &dummy2;
+    debug->vid_enable = vid_enable ? vid_enable : &dummy;
+    debug->stic       = stic;
+    debug->event      = event;
 
-    debug->filestk[0] = stdin;
+    debug->filestk[0] = lzoe_filep( stdin );
+    debug->exit_flag  = exit_flag;
 
     /* -------------------------------------------------------------------- */
     /*  Register the debugger's tick function with the CPU.  We're ticked   */
     /*  by the CPU, not by the peripheral bus.                              */
     /* -------------------------------------------------------------------- */
-    cp1600_instr_tick(cp1600, debug_tk, (periph_p)debug);
+    cp1600_instr_tick(cp1600, debug_tk, AS_PERIPH(debug));
 
     /* -------------------------------------------------------------------- */
     /*  Set up the instruction disassembly cache.                           */
@@ -2274,7 +2761,7 @@ int debug_init(debug_t *debug, cp1600_t *cp1600, speed_t *speed, gfx_t *gfx,
         int i;
 
         disasm_cache = CALLOC(disasm_cache_t, DISASM_CACHE);
-        
+
         for (i = 0; i < DISASM_CACHE-1; i++)
         {
             disasm_cache[i  ].next = &disasm_cache[i+1];
@@ -2302,6 +2789,15 @@ int debug_init(debug_t *debug, cp1600_t *cp1600, speed_t *speed, gfx_t *gfx,
     if (script)
         debug_open_script(debug, script);
 
+#ifdef USE_GNU_READLINE
+    /* -------------------------------------------------------------------- */
+    /*  For now, disable Readline completions.                              */
+    /* -------------------------------------------------------------------- */
+    rl_completion_entry_function = debug_readline_no_completions;
+    rl_event_hook = debug_readline_event_hook;
+    readline_hook = debug;  /* Ugh. Readline uses globals, so we must also. */
+#endif
+
     return 0;
 }
 
@@ -2316,9 +2812,9 @@ int debug_init(debug_t *debug, cp1600_t *cp1600, speed_t *speed, gfx_t *gfx,
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                 Copyright (c) 1998-1999, Joseph Zbiciak                  */
 /* ======================================================================== */

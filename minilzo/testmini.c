@@ -2,6 +2,12 @@
 
    This file is part of the LZO real-time data compression library.
 
+   Copyright (C) 2011 Markus Franz Xaver Johannes Oberhumer
+   Copyright (C) 2010 Markus Franz Xaver Johannes Oberhumer
+   Copyright (C) 2009 Markus Franz Xaver Johannes Oberhumer
+   Copyright (C) 2008 Markus Franz Xaver Johannes Oberhumer
+   Copyright (C) 2007 Markus Franz Xaver Johannes Oberhumer
+   Copyright (C) 2006 Markus Franz Xaver Johannes Oberhumer
    Copyright (C) 2005 Markus Franz Xaver Johannes Oberhumer
    Copyright (C) 2004 Markus Franz Xaver Johannes Oberhumer
    Copyright (C) 2003 Markus Franz Xaver Johannes Oberhumer
@@ -15,8 +21,9 @@
    All Rights Reserved.
 
    The LZO library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU General Public License,
-   version 2, as published by the Free Software Foundation.
+   modify it under the terms of the GNU General Public License as
+   published by the Free Software Foundation; either version 2 of
+   the License, or (at your option) any later version.
 
    The LZO library is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -53,8 +60,8 @@
 #include "minilzo.h"
 
 
-/* We want to compress the data block at `in' with length `IN_LEN' to
- * the block at `out'. Because the input block may be incompressible,
+/* We want to compress the data block at 'in' with length 'IN_LEN' to
+ * the block at 'out'. Because the input block may be incompressible,
  * we must provide a little more output space in case that compression
  * is not possible.
  */
@@ -73,13 +80,13 @@ static unsigned char __LZO_MMODEL out [ OUT_LEN ];
 
 
 /* Work-memory needed for compression. Allocate memory in units
- * of `lzo_align_t' (instead of `char') to make sure it is properly aligned.
+ * of 'lzo_align_t' (instead of 'char') to make sure it is properly aligned.
  */
 
 #define HEAP_ALLOC(var,size) \
     lzo_align_t __LZO_MMODEL var [ ((size) + (sizeof(lzo_align_t) - 1)) / sizeof(lzo_align_t) ]
 
-static HEAP_ALLOC(wrkmem,LZO1X_1_MEM_COMPRESS);
+static HEAP_ALLOC(wrkmem, LZO1X_1_MEM_COMPRESS);
 
 
 /*************************************************************************
@@ -97,8 +104,8 @@ int main(int argc, char *argv[])
         return 0;
 
     printf("\nLZO real-time data compression library (v%s, %s).\n",
-            lzo_version_string(), lzo_version_date());
-    printf("Copyright (C) 1996-2005 Markus Franz Xaver Johannes Oberhumer\nAll Rights Reserved.\n\n");
+           lzo_version_string(), lzo_version_date());
+    printf("Copyright (C) 1996-2011 Markus Franz Xaver Johannes Oberhumer\nAll Rights Reserved.\n\n");
 
 
 /*
@@ -107,7 +114,7 @@ int main(int argc, char *argv[])
     if (lzo_init() != LZO_E_OK)
     {
         printf("internal error - lzo_init() failed !!!\n");
-        printf("(this usually indicates a compiler bug - try recompiling\nwithout optimizations, and enable `-DLZO_DEBUG' for diagnostics)\n");
+        printf("(this usually indicates a compiler bug - try recompiling\nwithout optimizations, and enable '-DLZO_DEBUG' for diagnostics)\n");
         return 3;
     }
 
@@ -120,7 +127,7 @@ int main(int argc, char *argv[])
     lzo_memset(in,0,in_len);
 
 /*
- * Step 3: compress from `in' to `out' with LZO1X-1
+ * Step 3: compress from 'in' to 'out' with LZO1X-1
  */
     r = lzo1x_1_compress(in,in_len,out,&out_len,wrkmem);
     if (r == LZO_E_OK)
@@ -140,8 +147,9 @@ int main(int argc, char *argv[])
     }
 
 /*
- * Step 4: decompress again, now going from `out' to `in'
+ * Step 4: decompress again, now going from 'out' to 'in'
  */
+    new_len = in_len;
     r = lzo1x_decompress(out,out_len,in,&new_len,NULL);
     if (r == LZO_E_OK && new_len == in_len)
         printf("decompressed %lu bytes back into %lu bytes\n",
@@ -158,6 +166,6 @@ int main(int argc, char *argv[])
 }
 
 /*
-vi:ts=4
+vi:ts=4:et
 */
 

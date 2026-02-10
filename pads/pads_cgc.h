@@ -2,7 +2,6 @@
  * ============================================================================
  *  Title:    CGC Interface for controller pads.
  *  Author:   J. Zbiciak
- *  $Id$
  * ============================================================================
  *  This module implements the controller pads.
  *  Pads are peripherals that extend periph_t.
@@ -19,22 +18,22 @@
  */
 typedef struct pad_cgc_t
 {
-#ifdef CGC_SUPPORTED
     periph_t    periph;     /*  Peripheral structure.                       */
+#ifdef CGC_SUPPORTED
     int         num_errors; /*  Number of errors reading CGC.               */
-    uint_8      io  [2];    /*  Flag bits:  Is this side set for output?    */
+    uint8_t     io  [2];    /*  Flag bits:  Is this side set for output?    */
 #else
     char        unused;     /*  nearly empty struct if compiled out.        */
 #endif
 
 #ifdef CGC_DLL
-    uint_32     cgc_num;    /*  Which CGC are we hooked to?                 */
-#endif  
+    uint32_t    cgc_num;    /*  Which CGC are we hooked to?                 */
+#endif
 
 #ifdef CGC_THREAD
-    int         fd;         /*  File descriptor of CGC.                     */
-    v_uint_8    val[2];     /*  Last values read from CGC.                  */
-    v_uint_8    die;        /*  Flag telling CGC thread to die.             */
+    int         fd;             /*  File descriptor of CGC.                 */
+    volatile uint8_t val[2];    /*  Last values read from CGC.              */
+    volatile uint8_t die;       /*  Flag telling CGC thread to die.         */
 #endif
 } pad_cgc_t;
 
@@ -45,14 +44,14 @@ typedef struct pad_cgc_t
  *  PAD_CGC_READ -- Get the current state of the CGC controller.
  * ============================================================================
  */
-uint_32 pad_cgc_read(periph_t *, periph_t *, uint_32, uint_32);
+uint32_t pad_cgc_read(periph_t *, periph_t *, uint32_t, uint32_t);
 
 /*
  * ============================================================================
  *  PAD_CGC_WRITE -- We need to monitor the I/O state for the pads' ports.
  * ============================================================================
  */
-void    pad_cgc_write(periph_t *, periph_t *, uint_32, uint_32);
+void    pad_cgc_write(periph_t *, periph_t *, uint32_t, uint32_t);
 
 #endif /*CGC_SUPPORTED*/
 
@@ -63,10 +62,10 @@ void    pad_cgc_write(periph_t *, periph_t *, uint_32, uint_32);
  */
 int pad_cgc_init
 (
-    pad_cgc_t   *pad,           /*  CGC structure to initialize             */
-    uint_32     addr,           /*  Base address of pad.                    */
+    pad_cgc_t  *pad,            /*  CGC structure to initialize             */
+    uint32_t    addr,           /*  Base address of pad.                    */
     int         cgc_num,        /*  Which CGC in system to hook to  (win32) */
-    const char  *cgc_dev        /*  Device node associated w/ CGC.  (linux) */
+    const char *cgc_dev         /*  Device node associated w/ CGC.  (linux) */
 );
 
 #endif
@@ -82,9 +81,9 @@ int pad_cgc_init
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ======================================================================== */
 /*                 Copyright (c) 1998-2004, Joseph Zbiciak                  */
 /* ======================================================================== */

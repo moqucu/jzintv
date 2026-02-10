@@ -13,17 +13,20 @@
 #ifndef LEGACY_H_
 #define LEGACY_H_
 
+typedef struct legacy_loc_t
+{
+    uint8_t  width;      /* width of this location                       */
+    uint8_t  flags;      /* flags associated with this location.         */
+    uint16_t data;       /* data associated with this location.          */
+} legacy_loc_t;
+
 typedef struct legacy_t
 {
     periph_t    periph;     /* This is a "peripheral".                      */
-    struct legacy_loc_t
-    {
-        uint_8  width;      /* width of this location                       */
-        uint_8  flags;      /* flags associated with this location.         */
-        uint_16 data;       /* data associated with this location.          */
-    }           *loc;
+    legacy_loc_t *loc;
     mem_t       *pg_rom;    /* any paged ROMs that were in the CFG are here */
     int         npg_rom;    /* number of paged ROMs.                        */
+    int         jlp_accel;  /* does this legacy game use JLP?               */
     bc_cfgfile_t *bc;       /* config file.  Valid between read & register  */
 } legacy_t;
 
@@ -32,17 +35,17 @@ typedef struct legacy_t
 /* ======================================================================== */
 /*  LEGACY_READ -- read from a legacy BIN+CFG.                              */
 /* ======================================================================== */
-uint_32 legacy_read (periph_t *per, periph_t *ign, uint_32 addr, uint_32 data);
+uint32_t legacy_read (periph_t *per, periph_t *ign, uint32_t addr, uint32_t data);
 
 /* ======================================================================== */
 /*  LEGACY_WRITE -- write to a legacy BIN+CFG.                              */
 /* ======================================================================== */
-void  legacy_write(periph_t *per, periph_t *ign, uint_32 addr, uint_32 data);
+void  legacy_write(periph_t *per, periph_t *ign, uint32_t addr, uint32_t data);
 
 /* ======================================================================== */
 /*  LEGACY_POKE  -- write to a legacy BIN+CFG, ignoring read-only status.   */
 /* ======================================================================== */
-void legacy_poke (periph_t *per, periph_t *ign, uint_32 addr, uint_32 data);
+void legacy_poke (periph_t *per, periph_t *ign, uint32_t addr, uint32_t data);
 
 
 /* ======================================================================== */
@@ -61,7 +64,10 @@ char *legacy_bincfg
     path_t          *path,
     const char      *fname,     /*  Basename to use for CFG/BIN     */
     int             *legacy_rom,
-    void            *cpu
+    void            *cpu,
+    int             flag_jlp_accel,
+    int             flag_jlp_flash,
+    int             rand_mem
 );
 
 /* ======================================================================== */
@@ -71,7 +77,7 @@ char *legacy_bincfg
 int legacy_register
 (
     legacy_t        *l,
-    periph_bus_p    bus,
+    periph_bus_t    *bus,
     cp1600_t        *cp
 );
 
@@ -88,9 +94,9 @@ int legacy_register
 /*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       */
 /*  General Public License for more details.                                */
 /*                                                                          */
-/*  You should have received a copy of the GNU General Public License       */
-/*  along with this program; if not, write to the Free Software             */
-/*  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.               */
+/*  You should have received a copy of the GNU General Public License along */
+/*  with this program; if not, write to the Free Software Foundation, Inc., */
+/*  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.             */
 /* ------------------------------------------------------------------------ */
 /*                 Copyright (c) 2003-+Inf, Joseph Zbiciak                  */
 /* ======================================================================== */

@@ -12,8 +12,8 @@ as published by the Free Software Foundation; either version 2
 of the License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of 
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the 
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
@@ -46,21 +46,21 @@ RegHelp g_reg(HKEY_CURRENT_USER);
 //-----------------------------------------------------------------------------
 LRESULT CALLBACK FrameProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
-    switch (message) 
-    {   
+    switch (message)
+    {
         case WM_CREATE: // This happens when window is first created
         {
-            CLIENTCREATESTRUCT ccs; 
- 
+            CLIENTCREATESTRUCT ccs;
+
             // Open the registry key we will be using
             g_reg.OpenKey(IMASM_REGISTRY_KEY);
 
-            // Retrieve the handle to the window menu and assign the 
-            // first child window identifier.  
-            ccs.hWindowMenu = GetSubMenu(GetMenu(hWnd), 3); 
-            ccs.idFirstChild = IDC_CHILDBASE; 
- 
-            // Create the MDI client window. 
+            // Retrieve the handle to the window menu and assign the
+            // first child window identifier.
+            ccs.hWindowMenu = GetSubMenu(GetMenu(hWnd), 3);
+            ccs.idFirstChild = IDC_CHILDBASE;
+
+            // Create the MDI client window.
             g_hMDIClient = CreateWindowEx(0,
                                         "MDICLIENT",
                                         (LPCTSTR)NULL,
@@ -72,12 +72,12 @@ LRESULT CALLBACK FrameProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
                                         hWnd,
                                         (HMENU)IDC_CLIENT,
                                         g_hInst,
-                                        (LPVOID)&ccs);  
-            ShowWindow(g_hMDIClient, SW_SHOW); 
+                                        (LPVOID)&ccs);
+            ShowWindow(g_hMDIClient, SW_SHOW);
 
             // Create the file pane window
             g_pFP = new FilePane(hWnd);
-    
+
             // Create the status bar
             g_hStatBar = CreateWindowEx(    0,
                                             STATUSCLASSNAME,
@@ -93,7 +93,7 @@ LRESULT CALLBACK FrameProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
                                             0);
 
             CreateToolbar(hWnd);
-    
+
             if (g_bAutoUpdate)
             {
                 SendMessage(g_hToolBar, TB_SETSTATE, (WPARAM)IDC_AUTO, (LPARAM)(TBSTATE_ENABLED | TBSTATE_CHECKED));
@@ -121,7 +121,7 @@ LRESULT CALLBACK FrameProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
             g_aPopup[5].uiString = IDS_HELP_MENU;
             g_aPopup[6].hMenu = 0;
             g_aPopup[6].uiString = 0;
-            
+
             return 0;
         }// WM_CREATE
 
@@ -131,7 +131,7 @@ LRESULT CALLBACK FrameProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
                 case IDC_NEW:
                     HandleIDC_NEW(g_hMDIClient);
                     break;
-                    
+
                 case IDC_OPEN:
                     HandleIDC_OPEN(g_hMDIClient);
                     break;
@@ -196,7 +196,7 @@ LRESULT CALLBACK FrameProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
                 case IDC_TILEHORIZ:
                     SendMessage(g_hMDIClient, WM_MDITILE, MDITILE_HORIZONTAL | MDITILE_SKIPDISABLED, 0);
                     break;
-                
+
                 case IDC_TILEVERT:
                     SendMessage(g_hMDIClient, WM_MDITILE, MDITILE_VERTICAL | MDITILE_SKIPDISABLED, 0);
                     break;
@@ -223,46 +223,46 @@ LRESULT CALLBACK FrameProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
             }
             break;
 
-        case WM_NOTIFY: 
+        case WM_NOTIFY:
         {
             LPNMHDR pHdr = (LPNMHDR)lParam;
 
-            switch (pHdr->code) 
-            { 
-                case TTN_GETDISPINFO: 
-                { 
-                    LPTOOLTIPTEXT lpttt; 
+            switch (pHdr->code)
+            {
+                case TTN_GETDISPINFO:
+                {
+                    LPTOOLTIPTEXT lpttt;
 
-                    lpttt = (LPTOOLTIPTEXT)lParam; 
-                    lpttt->hinst = g_hInst; 
+                    lpttt = (LPTOOLTIPTEXT)lParam;
+                    lpttt->hinst = g_hInst;
 
-                    // Specify the resource identifier of the descriptive 
-                    // text for the given button. 
-                    switch (lpttt->hdr.idFrom) 
-                    { 
-                        case IDC_NEW: 
-                            lpttt->lpszText = MAKEINTRESOURCE(IDS_NEW); 
-                            break; 
-                        case IDC_OPEN: 
-                            lpttt->lpszText = MAKEINTRESOURCE(IDS_OPEN); 
-                            break; 
-                        case IDC_OPENPROJECT: 
-                            lpttt->lpszText = MAKEINTRESOURCE(IDS_OPENPROJECT); 
-                            break; 
-                        case IDC_SAVE: 
-                            lpttt->lpszText = MAKEINTRESOURCE(IDS_SAVE); 
-                            break; 
-                        case IDC_SAVEAS: 
-                            lpttt->lpszText = MAKEINTRESOURCE(IDS_SAVEAS); 
-                            break; 
-                        case IDC_AUTO: 
-                            lpttt->lpszText = MAKEINTRESOURCE(IDS_AUTO); 
-                            break; 
-                        case IDC_PRECOMPILE: 
-                            lpttt->lpszText = MAKEINTRESOURCE(IDS_PRECOMPILE); 
-                            break; 
-                    } 
-                    break; 
+                    // Specify the resource identifier of the descriptive
+                    // text for the given button.
+                    switch (lpttt->hdr.idFrom)
+                    {
+                        case IDC_NEW:
+                            lpttt->lpszText = MAKEINTRESOURCE(IDS_NEW);
+                            break;
+                        case IDC_OPEN:
+                            lpttt->lpszText = MAKEINTRESOURCE(IDS_OPEN);
+                            break;
+                        case IDC_OPENPROJECT:
+                            lpttt->lpszText = MAKEINTRESOURCE(IDS_OPENPROJECT);
+                            break;
+                        case IDC_SAVE:
+                            lpttt->lpszText = MAKEINTRESOURCE(IDS_SAVE);
+                            break;
+                        case IDC_SAVEAS:
+                            lpttt->lpszText = MAKEINTRESOURCE(IDS_SAVEAS);
+                            break;
+                        case IDC_AUTO:
+                            lpttt->lpszText = MAKEINTRESOURCE(IDS_AUTO);
+                            break;
+                        case IDC_PRECOMPILE:
+                            lpttt->lpszText = MAKEINTRESOURCE(IDS_PRECOMPILE);
+                            break;
+                    }
+                    break;
                 }
 
                 case NM_DBLCLK:
@@ -289,10 +289,10 @@ LRESULT CALLBACK FrameProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
                     }
                     break;
                 }
-                
-                default: 
-                    break; 
-            } 
+
+                default:
+                    break;
+            }
             break;
         }
 
@@ -319,10 +319,10 @@ LRESULT CALLBACK FrameProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
                         MenuHelp(WM_MENUSELECT, wParam, lParam, GetMenu(hWnd), g_hInst, g_hStatBar, (LPUINT)&g_aPopup[i].uiString);
                         break;
                     }
-                }               
+                }
             }
 
-            
+
 
             return 0;
         }
@@ -331,19 +331,19 @@ LRESULT CALLBACK FrameProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
             DestroyChildren(g_hMDIClient);
             DestroyWindow(hWnd);
             break;
-        
+
         case WM_SIZE:  // Get size of client
         {
             int iClientX = LOWORD(lParam);
             int iClientY = HIWORD(lParam);
 
             SendMessage(g_hToolBar, TB_AUTOSIZE, 0, 0);
-            
+
             int aiParts[] = {iClientX - 210, iClientX - 110, iClientX - 80, iClientX - 50, iClientX - 20};
             SendMessage(g_hStatBar, SB_SETPARTS, (WPARAM)5, (LPARAM)aiParts);
             SendMessage(g_hStatBar, WM_SIZE, 0, 0);
             UpdateStatusBar(g_hCurChild);
-            
+
             RECT rc;
 
             GetWindowRect(g_hToolBar, &rc);
@@ -356,32 +356,32 @@ LRESULT CALLBACK FrameProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
 
             // Now resize the file pane
             int cxFilePane = iClientX / 5;
-            g_pFP->Resize(0, cyTool, cxFilePane, iClientY - cyTool - cyStat);           
+            g_pFP->Resize(0, cyTool, cxFilePane, iClientY - cyTool - cyStat);
 
             // And resize the MDI Client window
-            MoveWindow(g_hMDIClient, cxFilePane, cyTool, iClientX - cxFilePane, iClientY - cyTool - cyStat, TRUE);              
-            
+            MoveWindow(g_hMDIClient, cxFilePane, cyTool, iClientX - cxFilePane, iClientY - cyTool - cyStat, TRUE);
+
             // Do this on the first WM_SIZE message so the window is sized properly
             if (*g_szCmdLineFile != NUL)
-            {   
+            {
                 LoadFileIntoNewWindow(g_szCmdLineFile);
                 *g_szCmdLineFile = NUL;
             }
 
             return 0; // WM_SIZE
         }
-        
-        case WM_DESTROY:            
+
+        case WM_DESTROY:
             if (g_pFP)
             {
                 delete g_pFP;
             }
 
             DoExitProcessing(hWnd);
-            PostQuitMessage(0);         
+            PostQuitMessage(0);
             break; // WM_DESTROY
 
-        default:    // Otherwise, let Windows process message       
+        default:    // Otherwise, let Windows process message
             break;
    }// end switch
 
@@ -390,7 +390,7 @@ LRESULT CALLBACK FrameProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
 
 //-----------------------------------------------------------------------------
 // Name: void DestroyChildren(HWND hWnd)()
-// Desc: 
+// Desc:
 //-----------------------------------------------------------------------------
 void DestroyChildren(HWND hClient)
 {
@@ -408,5 +408,5 @@ void DestroyChildren(HWND hClient)
 
 //-----------------------------------------------------------------------------
 // Name: ()
-// Desc: 
+// Desc:
 //-----------------------------------------------------------------------------
