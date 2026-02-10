@@ -23,7 +23,7 @@ R = ../rom
 
 # Set our target architecture(s).  Since MacOS supports fat binaries, this
 # can list multiple architectures.
-ARCH ?= -arch x86_64
+# ARCH ?= -arch x86_64
 
 # Set "X" to be the executable extension, and "O" to be the object extension.
 X =
@@ -37,7 +37,7 @@ RM ?= rm -f
 # Note! It must really be GNU Readline, and not the Editline wrapper that
 # comes with XCode. Edit RL_CFLAGS, RL_LFLAGS below to match where you've
 # installed it.
-GNU_READLINE ?= 1
+# GNU_READLINE ?= 1
 
 # Changed to use SDL frameworks .-- Fri. Aug. 6 JJT
 # Now SDL2 -- 28-OCT-2017 JZ
@@ -45,19 +45,21 @@ GNU_READLINE ?= 1
 # The instructions for installing the SDL2 framework suggest that it be placed
 # in your ~/Library/Frameworks directory. Override this variable if this is
 # not the case.
-SDL2_FRAMEWORK ?= /Library/Frameworks/SDL2.framework
+SDL2_FRAMEWORK ?= /opt/homebrew/Cellar/sdl2/2.28.5
 
 # Flags for using the so-called "portable syntax" for including SDL2 headers
 # (such as #include "SDL.h")
-SDL2_PORT_SYN_FLAGS := -I$(SDL2_FRAMEWORK)/Headers/
+# SDL2_PORT_SYN_FLAGS := -I$(SDL2_FRAMEWORK)/Headers/
+SDL2_PORT_SYN_FLAGS := -I$(SDL2_FRAMEWORK)/include -D_THREAD_SAFE
 
 # Note: -F$(SDL2_FRAMEWORK)/.. ensures that gcc can find the SDL2 framework even
 # if SDL2_FRAMEWORK had to be overrriden.  See above.
 #
 # TODO:  Eliminate -DUSE_SDL2, at least in this form.
 SDL2_CFLAGS := -DUSE_SDL2 $(SDL2_PORT_SYN_FLAGS)
-SDL2_LFLAGS := -F$(SDL2_FRAMEWORK)/.. -framework SDL2 \
-               -framework AppKit -framework Foundation -lobjc
+#SDL2_LFLAGS := -F$(SDL2_FRAMEWORK)/.. -framework SDL2 \
+#               -framework AppKit -framework Foundation -lobjc
+SDL2_LFLAGS := -L/opt/homebrew/Cellar/sdl2/2.28.5/lib -lSDL2
 
 # Override these in a .mak file.  See buildcfg/00-compiler*.txt for examples.
 LTO ?= -flto
@@ -74,18 +76,20 @@ CC_MFILE ?= clang $(ARCH)
 
 # This must be 10.9 or higher with current XCode / Clang 11.
 # This number can go as low as to 10.6 with GCC.
-MACOS_VERSION_MIN ?= 10.9
+MACOS_VERSION_MIN ?= 13.0
 
 # Default optimization flags, if none specified in a buildcfg/*.mak file.
 OPT_FLAGS ?= -O3
 
 CFLAGS   += $(ARCH) -mmacosx-version-min=$(MACOS_VERSION_MIN)
 CFLAGS   += -I. -I.. $(EXTRA)
+CFLAGS   += -I/Library/Developer/CommandLineTools/SDKs/MacOSX14.2.sdk/System/Library/Frameworks/QuartzCore.framework/Versions/A/Headers
 
 CXXFLAGS += $(ARCH) -mmacosx-version-min=$(MACOS_VERSION_MIN)
 CXXFLAGS += -I. -I.. $(EXTRA)
 
-LFLAGS   += -L/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/lib
+# LFLAGS   += -L/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/lib
+LFLAGS   += -L/Library/Developer/CommandLineTools/SDKs/MacOSX14.2.sdk/usr/lib
 
 OBJS       = jzintv.$(O)
 PROG_SDL2  = $(B)/jzintv$(X)
