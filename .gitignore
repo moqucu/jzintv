@@ -7,3 +7,8 @@
 *.swp
 .exrc
 Makefile.backup
+
+# Build output directories
+/bin/
+/lib/
+/rom/
