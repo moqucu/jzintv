@@ -24,7 +24,7 @@ ROMW 16 ; Use standard GI 10-bit ROM width
 ;------------------------------------------------------------------------------
 ; Include system information
 ;------------------------------------------------------------------------------
-INCLUDE "../library/gimini.asm"
+INCLUDE "../diag/library/gimini.asm"
 
 ;------------------------------------------------------------------------------
 ; macros
@@ -137,8 +137,8 @@ ENDP
 ;; ======================================================================== ;;
 ;; LIBRARY INCLUDES ;;
 ;; ======================================================================== ;;
-INCLUDE "../library/print.asm" ; PRINT.xxx routines
-INCLUDE "../library/fillmem.asm" ; CLRSCR/FILLZERO/FILLMEM
+INCLUDE "../diag/library/print.asm" ; PRINT.xxx routines
+INCLUDE "../diag/library/fillmem.asm" ; CLRSCR/FILLZERO/FILLMEM
 
 
 ;- 
