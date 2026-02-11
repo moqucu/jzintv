@@ -58,11 +58,11 @@ HIST2       RMB     256
 ;; ======================================================================== ;;
 ;;  Macros and definitions                                                  ;;
 ;; ======================================================================== ;;
-            INCLUDE "library/gimini.asm"
-            INCLUDE "macro/util.mac"
-            INCLUDE "macro/stic.mac"
-            INCLUDE "macro/gfx.mac"
-            INCLUDE "macro/print.mac"
+            INCLUDE "diag/library/gimini.asm"
+            INCLUDE "diag/macro/util.mac"
+            INCLUDE "diag/macro/stic.mac"
+            INCLUDE "diag/macro/gfx.mac"
+            INCLUDE "diag/macro/print.mac"
 
             ORG     $5000
             REPEAT  $1000
@@ -260,10 +260,10 @@ ISRINIT     PROC
 ;; ======================================================================== ;;
 ;;  LIBRARY INCLUDES                                                        ;;
 ;; ======================================================================== ;;
-            INCLUDE "library/fillmem.asm"
-            INCLUDE "library/hexdisp.asm"
-            INCLUDE "library/print.asm"
-            INCLUDE "library/wnk.asm"
+            INCLUDE "diag/library/fillmem.asm"
+            INCLUDE "diag/library/hexdisp.asm"
+            INCLUDE "diag/library/print.asm"
+            INCLUDE "diag/library/wnk.asm"
 
 
 SHOWHIST    PROC 

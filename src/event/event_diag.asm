@@ -48,11 +48,11 @@ CURPOS      RMB     1
 ;; ======================================================================== ;;
 ;;  Macros and definitions                                                  ;;
 ;; ======================================================================== ;;
-            INCLUDE "library/gimini.asm"
-            INCLUDE "macro/util.mac"
-            INCLUDE "macro/stic.mac"
-            INCLUDE "macro/gfx.mac"
-            INCLUDE "macro/print.mac"
+            INCLUDE "diag/library/gimini.asm"
+            INCLUDE "diag/macro/util.mac"
+            INCLUDE "diag/macro/stic.mac"
+            INCLUDE "diag/macro/gfx.mac"
+            INCLUDE "diag/macro/print.mac"
 
             ORG     $5000           ; Use default memory map
 
@@ -320,10 +320,10 @@ DO_EL       PROC
 ;; ======================================================================== ;;
 ;;  LIBRARY INCLUDES                                                        ;;
 ;; ======================================================================== ;;
-            INCLUDE "library/print.asm"
-            INCLUDE "library/fillmem.asm"
-            INCLUDE "library/prnum16.asm"
-            INCLUDE "library/hexdisp.asm"
+            INCLUDE "diag/library/print.asm"
+            INCLUDE "diag/library/fillmem.asm"
+            INCLUDE "diag/library/prnum16.asm"
+            INCLUDE "diag/library/hexdisp.asm"
 
 ;; ======================================================================== ;;
 ;;  Title screen text rendered as a graphic.                                ;;

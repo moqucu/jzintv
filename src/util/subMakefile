@@ -197,16 +197,15 @@ TOCLEAN += $(INTVNAME_OBJ)
 PROGS   += $(R)/emu_ver.rom
 TOCLEAN += $(R)/emu_ver.rom util/emu_ver.lst
 
-$(R)/emu_ver.rom:  ../examples/library/print.asm
-$(R)/emu_ver.rom:  ../examples/library/prnum16.asm
-$(R)/emu_ver.rom:  ../examples/library/prnum32.asm
-$(R)/emu_ver.rom:  ../examples/library/fillmem.asm
-$(R)/emu_ver.rom:  ../examples/library/hexdisp.asm
-$(R)/emu_ver.rom:  ../examples/library/gimini.asm
-$(R)/emu_ver.rom:  ../examples/macro/stic.mac
-$(R)/emu_ver.rom:  ../examples/macro/util.mac
-$(R)/emu_ver.rom:  ../examples/macro/print.mac
-$(R)/emu_ver.rom:  ../examples/macro/gfx.mac
+$(R)/emu_ver.rom:  diag/library/print.asm
+$(R)/emu_ver.rom:  diag/library/prnum16.asm
+$(R)/emu_ver.rom:  diag/library/fillmem.asm
+$(R)/emu_ver.rom:  diag/library/hexdisp.asm
+$(R)/emu_ver.rom:  diag/library/gimini.asm
+$(R)/emu_ver.rom:  diag/macro/stic.mac
+$(R)/emu_ver.rom:  diag/macro/util.mac
+$(R)/emu_ver.rom:  diag/macro/print.mac
+$(R)/emu_ver.rom:  diag/macro/gfx.mac
 
 $(R)/emu_ver.rom:	$(B)/as1600$(X) util/emu_ver.asm 
-	$(B)/as1600$(X) -o $(R)/emu_ver.rom -i../examples/ -l util/emu_ver.lst util/emu_ver.asm
+	$(B)/as1600$(X) -o $(R)/emu_ver.rom -i. -l util/emu_ver.lst util/emu_ver.asm
