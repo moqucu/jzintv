@@ -10,6 +10,23 @@ jzIntv is an Intellivision emulator and development kit for Linux, macOS, and Wi
 
 Run `jzintv --help` for usage information. You'll need an EXEC image, a GROM image, and a game ROM to run. These can be found on the *Intellivision Lives!* or *Intellivision Rocks!* CDs from http://www.intellivisionlives.com/.
 
+### Key Bindings (Default)
+
+| Key | Action |
+| :--- | :--- |
+| **F1** | Quit |
+| **F4** | Break into Debugger |
+| **F5** | Switch to Keymap 0 (Default) |
+| **F6** | Switch to Keymap 1 (1-Player) |
+| **F7** | Switch to Keymap 2 (ECS Keyboard) |
+| **F8** | Shift to Keymap 3 (Command Keys) |
+| **F9** | Toggle Fullscreen/Windowed |
+| **F10** | Toggle Movie Recording |
+| **F11** | Take Screenshot |
+| **F12** | Reset Emulator |
+| **Pause** | Pause Emulator |
+| **PgUp/PgDn**| Volume Up/Down |
+
 ## Building
 
 ```sh
@@ -20,6 +37,21 @@ make -C src -f Makefile.linux_sdl2   # Linux
 Build outputs go to `bin/`, `lib/`, and `rom/`. Create these directories before the first build if they don't exist.
 
 Build configuration overrides can be placed in `src/buildcfg/*.mak`.
+
+## Project Structure
+
+- `src/`: Core emulator and tool source code.
+    - `cp1600/`: CP-1600 CPU simulation.
+    - `stic/`: STIC graphics chip simulation.
+    - `ay8910/`: PSG sound chip simulation.
+    - `debug/`: Integrated debugger.
+    - `asm/`, `dasm/`: Assembler (`as1600`) and Disassembler (`dasm1600`).
+- `docs/`: Technical documentation and historical references.
+- `examples/`: Programming examples and library functions.
+- `bin/`: Compiled executables.
+- `rom/`: Place for system ROMs (`exec.bin`, `grom.bin`).
+
+For a deep dive into the source code, see the **[Source Code Reference](https://github.com/jzintv/jzintv/wiki/Source-Code-Structure)** on the Wiki.
 
 ## Documentation
 
@@ -41,7 +73,7 @@ See the [`docs/`](docs/) directory, which includes:
 
 ### Windows
 
-- See [`docs/platform/README-win32.txt`](docs/platform/README-win32.txt) for setup instructions.
+- See the **[Windows Setup Guide](https://github.com/jzintv/jzintv/wiki/Windows-Setup)** on the Wiki for detailed installation and environment variable instructions.
 - Console output is available; set `SDL_STDIO_REDIRECT=0` to send stdout/stderr to files instead.
 - Use `Makefile.w32_sdl1` or `Makefile.w32_sdl2` to build.
 
