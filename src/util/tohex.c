@@ -48,10 +48,20 @@ int main(int argc, char *argv[])
                    !strcmp(argv[1],"--help")))
     {
         fprintf(stderr,
+            "tohex -- Hexdump Generation Utility\n\n"
             "Usage: tohex [infile [outfile]]\n\n"
             "  'infile' and 'outfile' default to stdin and stdout.\n\n"
             "  Use 'tohex - outfile' to use stdin for infile while\n"
-            "  still specifying an output file.\n\n");
+            "  still specifying an output file.\n\n"
+            "The output format of tohex looks like so:\n\n"
+            " 00 00 00 00 00 01 00 00   00 30 00 50 00 00 00 00  # .........0.P.... 00000000\n"
+            " 00 02 00 50 00 0F 00 61   03 C0 00 00 00 00 00 00  # ...P...a........ 00000010\n\n"
+            "The left hand portion (to the left of the '#' divider) shows the bytes\n"
+            "of the file in hexadecimal.  Each row contains 16 bytes, divided into\n"
+            "two groups of 8 for readability.\n\n"
+            "To the right of the # divider is the ASCII interpretation of the data.\n"
+            "Non-printing characters are shown as dots.\n\n"
+            "At the far right is the byte offset into the file.\n\n");
         exit(1);
     }
 

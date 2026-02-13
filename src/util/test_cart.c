@@ -7,9 +7,19 @@
 
 cart_rd_t cr;
 
-int main()
+int main(int argc, char *argv[])
 {
     unsigned w, r;
+
+    if (argc > 1 && (!strcmp(argv[1], "-h") || !strcmp(argv[1], "--help") || !strcmp(argv[1], "-?")))
+    {
+        printf(
+            "test_cart -- Cart Reader Tester\n\n"
+            "This utility performs a selftest on the connected cartridge reader.\n\n"
+            "Usage:  test_cart\n\n"
+        );
+        return 0;
+    }
 
     cr_init_ports(0);
     cr.port = cr_detect(0);

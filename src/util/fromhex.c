@@ -324,10 +324,16 @@ int main(int argc, char *argv[])
                    !strcmp(argv[1],"--help")))
     {
         fprintf(stderr,
+            "fromhex -- Hexdump Parsing Utility\n\n"
             "Usage: fromhex [infile [outfile]]\n\n"
             "  'infile' and 'outfile' default to stdin and stdout.\n\n"
             "  Use 'fromhex - outfile' to use stdin for infile while\n"
-            "  still specifying an output file.\n\n");
+            "  still specifying an output file.\n\n"
+            "The input format should be a list of hexadecimal bytes,\n"
+            "optionally followed by a comment. The hex numbers can be\n"
+            "either upper or lower case. Comments start with a '#' and\n"
+            "end at the next newline. Example:\n\n"
+            "   AA BB CC DD EE ...  [# optional comment]\n\n");
         exit(1);
     }
 

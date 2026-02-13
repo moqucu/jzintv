@@ -46,10 +46,15 @@ int main(int argc, char *argv[])
                    !strcmp(argv[1],"--help")))
     {
         fprintf(stderr,
+            "tobit -- Bit-dump Generation Utility\n\n"
             "Usage: tobit [infile [outfile]]\n\n"
             "  'infile' and 'outfile' default to stdin and stdout.\n\n"
             "  Use 'tobit - outfile' to use stdin for infile while\n"
-            "  still specifying an output file.\n\n");
+            "  still specifying an output file.\n\n"
+            "The output format of tobit looks like so:\n\n"
+            " 0 1 1 0 1 0 0 1   0 1 0 0 0 0 1 0             # 69 42  ib  00000000\n\n"
+            "A list of bits followed by a '#' divider, then the HEX and ASCII\n"
+            "interpretation of the bits. Non-printing characters are shown as dots.\n\n");
         exit(1);
     }
 
