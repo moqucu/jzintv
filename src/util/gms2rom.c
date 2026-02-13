@@ -473,9 +473,20 @@ int main(int argc, char *argv[])
     /* -------------------------------------------------------------------- */
     /*  Parse arguments and open the GMS file.                              */
     /* -------------------------------------------------------------------- */
-    if (argc < 2 || argc > 3)
+    if (argc < 2 || argc > 3 || 
+        !strcmp(argv[1],"-h") || !strcmp(argv[1],"--help") || !strcmp(argv[1],"-?"))
     {
-        fprintf(stderr, "usage: gms2rom foo.gms [bar.rom]\n");
+        fprintf(stderr, 
+            "gms2rom -- Convert INTVPC Game Save state to an Intellicart .ROM image\n\n"
+            "This utility takes an INTVPC .GMS Game Save state file and attempts to\n"
+            "convert it to a .ROM file. It performs this feat by scanning the .GMS\n"
+            "file and recovering the state of the Inty. It then inserts a small shim\n"
+            "into the address space. This shim is responsible for loading these state\n"
+            "information into the Inty and then resuming the game.\n\n"
+            "usage: gms2rom foo.gms [bar.rom]\n\n"
+            "If you omit the output filename, gms2rom will generate a new file name\n"
+            "which is the same as the Game Save file, except the .gms is replaced with\n"
+            ".ROM. To get BIN+CFG format output, run the resulting ROM through rom2bin.\n\n");
         exit(1);
     }
 

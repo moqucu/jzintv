@@ -281,6 +281,20 @@ int main(int argc, char *argv[])
     double actual_rate = 0., now;
     unsigned samples;
 
+    if (argc > 1 && (!strcmp(argv[1], "-h") || !strcmp(argv[1], "--help") || !strcmp(argv[1], "-?")))
+    {
+        printf(
+            "test_hcif -- Test program for the Hand Controller Interface\n\n"
+            "This program is a simple utility for testing the \"Nudds/Moeller\n"
+            "Hand Controller Interface\", a device which allows connecting actual\n"
+            "Intellivision Hand Controllers via a PC printer port.\n\n"
+            "Usage:  test_hcif [LPT# [Rate]]\n\n"
+            "  LPT port # is 1, 2, or 3.  If omitted, 1 is assumed.\n"
+            "  Rate is the LPT query rate in HZ (1 to 100). Default is 25.\n\n"
+        );
+        return 0;
+    }
+
     printf("==============================================================\n");
     printf(" Test Utility for the Nudds/Moeller Hand Controller Interface\n");
     printf(" By Joseph Zbiciak.\n");

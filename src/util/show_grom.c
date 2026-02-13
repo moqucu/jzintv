@@ -460,22 +460,33 @@ LOCAL void html_dump(FILE *f, const char *filename, int x_dim, int y_dim,
 LOCAL void usage(char *argv0)
 {
     fprintf(stderr,
-      "Usage:  %s [flags] grom.bin\n"
-      "\n"
-      "        Recognized flags:\n"
-      "\n"
-      "        -o outfile  Specify output file (writes to stdout by default)\n"
-      "        -d #        Digit display mode for card #'s\n"
-      "                    1  Decimal only (default)\n"
-      "                    2  Hexadecimal only \n"
-      "                    3  Hexadecimal and Decimal\n"
-      "        -h          HTML output (default is ASCII)\n"
-      "        -x #        Displayed width for GIFs       (HTML mode only)\n"
-      "        -y #        Displayed height for GIFs      (HTML mode only)\n"
-      "        -r #        Cards per row                  (HTML mode only)\n"
-      "        -f #        Relative font size for labels  (HTML mode only)\n"
-      "        grom.bin    Pathname for GROM.BIN file to show contents of\n",
-      argv0);
+"show_grom -- Reads in a GROM file, and shows the pictures within it.\n\n"
+"Usage:  %s [flags] grom.bin\n"
+"\n"
+"General Flags:\n"
+"    -o outfile  Specify output file (writes to stdout by default)\n"
+"    -d #        Digit display mode for card #'s\n"
+"                1: Decimal only (default)\n"
+"                2: Hexadecimal only\n"
+"                3: Hexadecimal and Decimal\n"
+"    -r #        Cards per row (default is 8)\n"
+"\n"
+"HTML Mode Flags (use -h to enable HTML mode):\n"
+"    -h          Enable HTML output mode\n"
+"    -x #        Displayed width for GIFs (default 64)\n"
+"    -y #        Displayed height for GIFs (default 64)\n"
+"    -f #        Relative font size for labels (-4 to 4)\n"
+"\n"
+"ASCII Mode (Default):\n"
+"  In ASCII mode, each card is displayed as an 8x8 grid of '#' and '.'\n"
+"  characters. '#' indicates an 'ON' pixel, '.' indicates 'OFF'.\n"
+"\n"
+"HTML Mode:\n"
+"  In HTML mode, show_grom outputs an HTML file and a set of 256 GIF\n"
+"  files (one for each GROM card). The GIF files are named based on\n"
+"  the output filename.\n"
+"\n"
+    , argv0);
     exit(0);
 }
 

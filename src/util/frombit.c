@@ -321,10 +321,15 @@ int main(int argc, char *argv[])
                    !strcmp(argv[1],"--help")))
     {
         fprintf(stderr,
+            "frombit -- Bit-dump Parsing Utility\n\n"
             "Usage: frombit [infile [outfile]]\n\n"
             "  'infile' and 'outfile' default to stdin and stdout.\n\n"
             "  Use 'frombit - outfile' to use stdin for infile while\n"
-            "  still specifying an output file.\n\n");
+            "  still specifying an output file.\n\n"
+            "The input format should be a list of bits, optionally followed\n"
+            "by a comment. Comments start with a '#' and end at the next\n"
+            "newline. Example:\n\n"
+            "   1011 101 00110 ...  [# optional comment]\n\n");
         exit(1);
     }
 
