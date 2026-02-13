@@ -51,17 +51,14 @@ Build configuration overrides can be placed in `src/buildcfg/*.mak`.
 - `bin/`: Compiled executables.
 - `rom/`: Place for system ROMs (`exec.bin`, `grom.bin`).
 
-For a deep dive into the source code, see the **[Source Code Reference](https://github.com/jzintv/jzintv/wiki/Source-Code-Structure)** on the Wiki.
-
 ## Documentation
 
-See the [`docs/`](docs/) directory, which includes:
+Comprehensive documentation is available on the project wikis:
 
-- **`docs/jzintv/`** — Emulator usage, debugger, joystick config, keyboard hack files
-- **`docs/utilities/`** — AS1600 assembler, disassembler, and other SDK tools
-- **`docs/programming/`** — CP-1600 assembly language tutorial and Intellivision hardware references
-- **`docs/De_Re_Intellivision/`** — Comprehensive Intellivision reference by William M. Moeller
-- **`docs/tech/`** — Hardware schematics and SP0256 voice chip documentation
+- **[jzIntv Wiki](https://github.com/moqucu/jzintv/wiki)**: Emulator usage, history, debugger, and technical specifications.
+- **[Intellivision Development Wiki](https://github.com/moqucu/jzintv-examples/wiki)**: Programming tutorials, hardware references, and SDK tool manuals.
+
+For a deep dive into the source code, see the **[Source Code Reference](https://github.com/moqucu/jzintv/wiki/Source-Code-Structure)** on the Wiki.
 
 ## Platform Notes
 
